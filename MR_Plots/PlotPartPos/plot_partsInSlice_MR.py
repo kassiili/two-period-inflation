@@ -1,15 +1,18 @@
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
-from read_dataset import read_dataset
-from read_header import read_header
+from read_dataset_MR import read_dataset
+from read_header_MR import read_header
 
 class plot_slice:
 
 
     #Calculate center of mass for the dm particles:
-    def calcCM(self, dmCoords):
-        cm = np.mean(dmCoords, axis=0)
+    def calcCM(self):
+        if (self.part_type != 1):
+            cm = np.mean(read_dataset(1,'Coordinates'), axis=0)
+        else:
+            cm = np.mean(self.coords, axis=0)
         return cm
 
 
@@ -25,11 +28,7 @@ class plot_slice:
         self.width = 0.2
         self.coords = read_dataset(self.part_type, 'Coordinates')
 
-        #Calculate center of mass:
-        if (self.part_type != 1):
-            self.cm = self.calcCM(read_dataset(1,'Coordinates'))
-        else:
-            self.cm = self.calcCM(self.coords)
+        self.cm = self.calcCM()
 
         self.compute_slice()
 
@@ -44,10 +43,11 @@ class plot_slice:
 
         axes.set_title('Particles (type %i) in a volume slice centered on a LG analogue'%self.part_type)
 
-        plt.savefig('jou.png') #a
-        plt.close()
+        #plt.savefig('slice_partType%i_MR.png'%self.part_type)
+        #plt.close()
+        plt.show()
 
-slice = plot_slice(1)
+slice = plot_slice(4)
 slice.plot()
 #part_types = [0,1,4]
 #for n in part_types:
