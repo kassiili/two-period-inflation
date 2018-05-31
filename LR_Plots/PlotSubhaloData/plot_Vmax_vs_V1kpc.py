@@ -38,7 +38,7 @@ class plot_slice:
             coords = self.coordsBySubGroup[subGroupNumber]
 
             start = time.clock()
-            partsWithinR1kpc[idx] = coords[np.sum((coords - cop)**2, axis=1) < 10**(-6)][:,0].size         # Find the coordinates, whose distance from cop is less than 1kpc (unit of coords is Mpc), calculate how many there are. (np.sum(...) returns an array of distances, one for each vector in coords)
+            partsWithinR1kpc[idx] = (np.sum((coords - cop)**2, axis=1) < 10**(-6)).sum()         # Find the coordinates, whose distance from cop is less than 1kpc (unit of coords is Mpc), calculate how many there are. (np.sum(...) returns an array of distances, one for each vector in coords)
             sum += time.clock()-start
 
             #print(coords.shape, ', ', cop.shape)
