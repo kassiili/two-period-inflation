@@ -41,17 +41,14 @@ class plot_slice:
 
         axes.scatter(self.coords[:,1], self.coords[:,2], s=0.01)
 
-        axes.set_title('Particles (type %i) in a volume slice centered on a LG analogue'%self.part_type)
+        axes.set_title('Particles (type %i) in a volume slice'%self.part_type)
 
-        #plt.savefig('slice_partType%i_MR.png'%self.part_type)
-        #plt.close()
-        plt.show()
+        plt.savefig('slice_partType%i_MR.png'%self.part_type)
+        plt.close()
 
-slice = plot_slice(4)
-slice.plot()
-#part_types = [0,1,4]
-#for n in part_types:
-#    print(n)
-#    slice = plot_slice(n) 
-#    slice.plot()
+
+part_types = [0,1,4]
+for n in part_types:
+    slice = plot_slice(n) 
+    slice.plot()
 

@@ -1,8 +1,8 @@
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
-from read_subhaloData import read_subhaloData
-from read_header import read_header
+from read_subhaloData_MR import read_subhaloData
+from read_header_MR import read_header
 
 class plot_Rmax_vs_Vmax:
 
@@ -33,13 +33,11 @@ class plot_Rmax_vs_Vmax:
         axes.legend()
         axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
         axes.set_ylabel('$r_{max}[\mathrm{kpc}]$')
-#        axes.set_xlim([10, 100])
-#        axes.set_ylim([10**6, 10**10])
 
-        plt.savefig('rmax_vs_vmax.png')
+        plt.show()
+        plt.savefig('rmax_vs_vmax_MR.png')
         plt.close()
 
 slice = plot_Rmax_vs_Vmax()
 slice.plot()
-#slice.compute_slice()
 

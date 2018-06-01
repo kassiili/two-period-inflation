@@ -3,8 +3,8 @@ import h5py
 import time
 import matplotlib.pyplot as plt
 import matplotlib.colors as clrs
-from read_dataset import read_dataset
-from read_header import read_header
+from read_dataset_MR import read_dataset
+from read_header_MR import read_header
 
 class plot_slice:
 
@@ -36,7 +36,7 @@ class plot_slice:
     def __init__(self, part_type):
         self.part_type = part_type
         self.a, self.h, self.massTable, self.boxsize = read_header() 
-        self.width = 1 #Mpc/h
+        self.width = 0.1 #Mpc/h
         self.coords = read_dataset(part_type, 'Coordinates')
         self.subGroupNumbers = read_dataset(part_type, 'SubGroupNumber')
         self.groupNumbers = read_dataset(part_type, 'GroupNumber')
@@ -65,16 +65,8 @@ class plot_slice:
 
         axes.scatter(x, y, s=0.1, c=col, edgecolor='none', cmap='viridis_r')
 
-        #Get a list of all available colors (however, now the colors are arbitrary...)
-#        colors = list(clrs.cnames.keys())
-#        color = 0
-#        for subgroup in self.coordsBySubGroup.values():
-#            axes.scatter(subgroup[:,1], subgroup[:,2], s=0.1, c=colors[color], edgecolor='none')
-#            color += 1
-
-        plt.show()
-#        plt.savefig('dm_bySubgroup.png')
-#        plt.close()
+        plt.savefig('slice_partType%i_bySubGroup_MR.png'%self.part_type)
+        plt.close()
 
 slice = plot_slice(1) 
 slice.plot()

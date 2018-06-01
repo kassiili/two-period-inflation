@@ -2,8 +2,8 @@ import numpy as np
 import h5py
 import time
 import matplotlib.pyplot as plt
-from read_subhaloData import read_subhaloData
-from read_header import read_header
+from read_subhaloData_MR import read_subhaloData
+from read_header_MR import read_header
 
 class plot_SMF_vs_Vmax:
 
@@ -21,11 +21,14 @@ class plot_SMF_vs_Vmax:
 
     def calc_median_trend2(self, x, y):
         xy = np.vstack([x,y])
+        
+        # Sort into ascending order by x:
         xy = xy[:,xy[0,:].argsort()]
+
         bars = 10
         datapoints = xy[0,:].size
 
-        #Excĺude last elements (if necessary) to allow reshaping:
+        # Excĺude last elements (if necessary) to allow reshaping:
         if (datapoints%bars != 0):
             tmpX = xy[0,:-(datapoints%bars)]
             tmpY = xy[1,:-(datapoints%bars)]
@@ -37,9 +40,6 @@ class plot_SMF_vs_Vmax:
         #Reshape into a 2D numpy array with number of rows = bars:
         tmpX = tmpX.reshape((bars, int(datapoints/bars)))
         tmpY = tmpY.reshape((bars, int(datapoints/bars)))
-
-        #xSplit = xy[0,:-(xy[0,:].size%bars)].reshape((int(xy[0,:].size/bars), bars))
-
 
         #Calculate the medians of the rows of the reshaped arrays:
         medianX = np.median(tmpX, axis=1)
@@ -71,21 +71,16 @@ class plot_SMF_vs_Vmax:
         axes.scatter(self.maxVelocitiesSat, self.stellarMassesSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
         axes.scatter(self.maxVelocitiesIsol, self.stellarMassesIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
 
-#        start = time.clock()
-#        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
-#        axes.plot(median[0], median[1], c='red', linestyle='--')
+        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
+        axes.plot(median[0], median[1], c='red', linestyle='--')
 
         axes.legend()
         axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
         axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
         axes.set_title('SMF of luminous subhaloes')
-#        axes.set_xlim([10, 100])
-#        axes.set_ylim([10**6, 10**10])
 
-        plt.savefig('SMF_vs_Vmax.png')
+        plt.savefig('SMF_vs_Vmax_MR.png')
         plt.close()
 
 slice = plot_SMF_vs_Vmax() 
 slice.plot()
-#slice.compute_slice()
-
