@@ -1,62 +1,62 @@
-import numpy as np
 import sys
+import numpy as np
 import h5py
 import time
 import matplotlib.pyplot as plt
-from read_subhaloData_MR import read_subhaloData
-from read_partIDs_MR import read_partIDs
+import matplotlib.colors as clrs
+from read_subhaloData_phys_MR import read_subhaloData
 from read_header_MR import read_header
 
 sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/MR_Plots/PlotPartPos/')
-from read_dataset_MR import read_dataset
+from read_dataset_phys_MR import read_dataset
 
-class plot_Rmax_vs_Vmax:
 
-    def read_partIDs_bySubGroup(self):
-        subOffsets = read_subhaloData('SubOffset')
-        subLengthsType = read_subhaloData('SubLengthType')
-        partIDs = read_partIDs('ParticleID')
-        subGroupNumbers = read_subhaloData('SubGroupNumber')
+class plot_Vmax_vs_V1kpc:
 
-        partIDs_bySubGroup = dict()
-        
-#        for idx, subOffset in enumerate(subOffsets):
-#            partIDs_bySubGroup[subGroupNumbers[idx]] = 
 
-        # If I want to iterate through subgroup numbers I'll (or at least so it seems) have to also iterate through all the index slices
-        # that contain particles of that subgroup. This is because the slices can be of varying lengths, which makes selecting elements 
-        # of the particle ID array by an index array very difficult. Thus, it might be easier to iterate through the slices first.
-        # The problem with that approach is that I'll need to append the particle ID array on a large number of occations.
+    def calcVelocitiesAt1kpc(self):
+        # Get subgroup and group numbers from particle data:
+        subGroupNumbers_fromPartData = read_dataset(self.part_type, 'SubGroupNumber')
+        groupNumbers_fromPartData = read_dataset(self.part_type, 'GroupNumber')
 
-        for idx, subGroupNumber in enumerate(subGroupNumbers):
-            startIdxs = subOffsets[subGroupNumbers == subGroupNumber]
-            endIdxs = startIdxs + subLengthsType[subGroupNumbers == subGroupNumber, self.part_type]
+        partsWithinR1kpc = np.empty((self.maxVelocities.size,))
+        gravConst = 1.989/3.0857*10**15 * 6.674*10**(-11)    # m^3/(kg*s^2) -> kpc/(10^10 Msol) * (km/s)^2
 
-            indexes = []
-            for i in range(startIdxs.size):
-                indexes.extend(range(startIdxs[i], endIdxs[i]+1))
-            partIDs_bySubGroup[subGroupNumber] = np.take(partIDs, indexes)
+        sum = 0
+
+        # Iterate through subhaloes:
+        for idx, subGroupNumber in enumerate(self.subGroupNumbers_fromSubhaloData):
+            mask = np.logical_and(subGroupNumbers_fromPartData == subGroupNumber, groupNumbers_fromPartData == self.groupNumbers_fromSubhaloData[idx])
+            coords = self.coords[mask,:]    # Select coordinates from the particular subhalo.
+
+            partsWithinR1kpc[idx] = (np.sum((coords - self.cops[idx])**2, axis=1) < 10**(-6)).sum()         # Find the coordinates, whose distance from cop is less than 1kpc (unit of coords is Mpc), calculate how many there are. (np.sum(...) returns an array of distances, one for each vector in coords)
+
+            # Do not include subhaloes with less than 10 particles:
+            if (partsWithinR1kpc[idx] < 10):    
+                partsWithinR1kpc[idx] = 0
+
+        return np.sqrt(self.massTable[self.part_type] * partsWithinR1kpc * gravConst)
 
 
     def __init__(self):
-        #self.a, self.h, mass, self.boxsize = read_header() 
-        self.part_type = 1
-        self.maxVelocities = read_subhaloData('Vmax')
-        #self.stellarMasses = read_subhaloData('Stars/Mass')
-        
+        self.part_type = 1 
+        self.a, self.h, self.massTable, self.boxsize = read_header() 
         self.coords = read_dataset(self.part_type, 'Coordinates')
+        self.subGroupNumbers_fromSubhaloData = read_subhaloData('SubGroupNumber')
+        self.groupNumbers_fromSubhaloData = read_subhaloData('GroupNumber')
+        self.maxVelocities = read_subhaloData('Vmax')
+        self.cops = read_subhaloData('CentreOfPotential')
 
         start = time.clock()
-        self.read_partIDs_bySubGroup()
-        print(time.clock()-start)
-    
-#        maskSat = np.logical_and.reduce((maxVelocities > 0, maxRadii > 0, self.subGroupNumbers != 0, self.stellarMasses > 0))
-#        maskIsol = np.logical_and.reduce((maxVelocities > 0, maxRadii > 0, self.subGroupNumbers == 0, self.stellarMasses > 0))
-#
-#        self.maxVelocitiesSat = maxVelocities[maskSat]
-#        self.maxRadiiSat = maxRadii[maskSat]
-#        self.maxVelocitiesIsol = maxVelocities[maskIsol]
-#        self.maxRadiiIsol = maxRadii[maskIsol]
+        velocitiesAt1kpc = self.calcVelocitiesAt1kpc()
+        print(time.clock() - start)
+
+        maskSat = np.logical_and(self.maxVelocities > 0, self.subGroupNumbers_fromSubhaloData != 0)
+        maskIsol = np.logical_and(self.maxVelocities > 0, self.subGroupNumbers_fromSubhaloData == 0)
+        self.maxVelocitiesSat = self.maxVelocities[maskSat]
+        self.velocitiesAt1kpcSat = velocitiesAt1kpc[maskSat]
+        self.maxVelocitiesIsol = self.maxVelocities[maskIsol]
+        self.velocitiesAt1kpcIsol = velocitiesAt1kpc[maskIsol]
 
 
     def plot(self):
@@ -65,16 +65,26 @@ class plot_Rmax_vs_Vmax:
 
         axes.set_xscale('log')
         axes.set_yscale('log')
-        axes.scatter(self.maxVelocitiesSat, self.maxRadiiSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
-        axes.scatter(self.maxVelocitiesIsol, self.maxRadiiIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
-        axes.legend()
-        axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$r_{max}[\mathrm{kpc}]$')
-#        axes.set_xlim([10, 100])
-#        axes.set_ylim([10**6, 10**10])
 
-        plt.savefig('rmax_vs_vmax.png')
+        axes.scatter(self.velocitiesAt1kpcSat[self.velocitiesAt1kpcSat > 10], self.maxVelocitiesSat[self.velocitiesAt1kpcSat > 10], s=3, c='red', edgecolor='none', label='satellite galaxies')
+        axes.scatter(self.velocitiesAt1kpcIsol[self.velocitiesAt1kpcIsol > 10], self.maxVelocitiesIsol[self.velocitiesAt1kpcIsol > 10], s=3, c='blue', edgecolor='none', label='isolated galaxies')
+
+#        start = time.clock()
+#        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
+#        axes.plot(median[0], median[1], c='red', linestyle='--')
+
+        x = np.arange(10,100)
+        y = np.arange(10,100)
+        axes.plot(x, y, c='black')
+
+        axes.legend()
+        axes.set_xlabel('$v_{1kpc}[\mathrm{km s^{-1}}]$')
+        axes.set_ylabel('$v_{max}[\mathrm{km s^{-1}}]$')
+
+        plt.show()
+        plt.savefig('Vmax_vs_V1kpc_MR.png')
         plt.close()
 
-slice = plot_Rmax_vs_Vmax()
-#slice.plot()
+
+plot = plot_Vmax_vs_V1kpc() 
+plot.plot()

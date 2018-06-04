@@ -4,7 +4,6 @@ import pandas as pd
 import h5py
 import time
 import matplotlib.pyplot as plt
-import matplotlib.colors as clrs
 from read_subhaloData2_LR import read_subhaloData
 from read_header_LR import read_header
 
@@ -24,18 +23,25 @@ class plot_Vmax_vs_V1kpc:
         gravConst = 1.989/3.0857*10**15 * 6.674*10**(-11)    # m^3/(kg*s^2) -> kpc/(10^10 Msol) * (km/s)^2
 
         sum = 0
+        sum1 = 0
+        sum2 = 0
 
         # Iterate through subhaloes:
         for idx, subGroupNumber in enumerate(self.subGroupNumbers_fromSubhaloData):
+            start = time.clock()
             mask = np.logical_and(subGroupNumbers_fromPartData == subGroupNumber, groupNumbers_fromPartData == self.groupNumbers_fromSubhaloData[idx])
             coords = self.coords[mask,:]    # Select coordinates from the particular subhalo.
+            sum += time.clock() - start
 
-            partsWithinR1kpc[idx] = (np.sum((coords - self.cops[idx])**2, axis=1) < 10**(-6)).sum()         # Find the coordinates, whose distance from cop is less than 1kpc (unit of coords is Mpc), calculate how many there are. (np.sum(...) returns an array of distances, one for each vector in coords)
+            start2 = time.clock()
+            partsWithinR1kpc[idx] = (np.sum((coords - self.cops[idx])**2, axis=1) < 10**(-6)).sum()     # Find the coordinates, whose distance from cop is less than 1kpc (unit of coords is Mpc), calculate how many there are. (np.sum(...) returns an array of distances, one for each vector in coords)
+            sum2 += time.clock() - start
 
-            # Do not include subhaloes with less than 10 particles:
+            # Do not include subhaloes with less than 10 particles inside 1kpc circular radius:
             if (partsWithinR1kpc[idx] < 10):    
                 partsWithinR1kpc[idx] = 0
 
+        print(sum) # this takes time!
         return np.sqrt(self.massTable[self.part_type] * partsWithinR1kpc * gravConst)
 
 
