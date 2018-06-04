@@ -14,19 +14,32 @@ class plot_Rmax_vs_Vmax:
 
     def read_partIDs_bySubGroup(self):
         subOffsets = read_subhaloData('SubOffset')
+        sort_indices = subOffsets.argsort()
+        subOffsets = subOffsets[sort_indices]
         subLengthsType = read_subhaloData('SubLengthType')
+        subLengths = read_subhaloData('SubLength')[sort_indices]
         partIDs = read_partIDs('ParticleID')
-        subGroupNumbers = read_subhaloData('SubGroupNumber')
+        subGroupNumbers = read_subhaloData('SubGroupNumber')[sort_indices]
 
-        print(subOffsets.size, ', ', subGroupNumbers.size)
-        partIDs_bySubGroup = dict()
-        print(max(subOffsets))
-        print(partIDs.size)
-        print(self.maxVelocities.size)
-        print(subLengthsType.sum())
+        point = 0
+        for idx, subOffset in enumerate(subOffsets):
+            print(subOffset, subLengths[idx], subGroupNumbers[idx])
+            if (subOffset != point):
+                for i in range(idx-1,idx+2):
+                    print(subGroupNumbers[i])
+                print(subOffset - point, '\n')
+                point = subOffset
+            point += subLengths[idx]
+            if (idx > 200):
+                break
+            
+#        print(subOffsets.size, ', ', subGroupNumbers.size)
+#        partIDs_bySubGroup = dict()
+#        print(max(subOffsets))
+#        print(partIDs.size)
+#        print(self.maxVelocities.size)
+#        print(subLengthsType.sum())
         
-#        for idx, subOffset in enumerate(subOffsets):
-#            partIDs_bySubGroup[subGroupNumbers[idx]] = 
 
         # If I want to iterate through subgroup numbers I'll (or at least so it seems) have to also iterate through all the index slices
         # that contain particles of that subgroup. This is because the slices can be of varying lengths, which makes selecting elements 

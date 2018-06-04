@@ -2,8 +2,8 @@ import numpy as np
 import h5py
 import time
 import matplotlib.pyplot as plt
-from read_subhaloData import read_subhaloData
-from read_header import read_header
+from read_subhaloData2_LR import read_subhaloData
+from read_header_LR import read_header
 
 class plot_SMF_vs_Vmax:
 
@@ -79,11 +79,10 @@ class plot_SMF_vs_Vmax:
         axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
         axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
         axes.set_title('SMF of luminous subhaloes')
-#        axes.set_xlim([10, 100])
-#        axes.set_ylim([10**6, 10**10])
 
-        plt.savefig('SMF_vs_Vmax.png')
-        plt.close()
+        plt.show()
+#        plt.savefig('SMF_vs_Vmax.png')
+#        plt.close()
 
 slice = plot_SMF_vs_Vmax() 
 slice.plot()
