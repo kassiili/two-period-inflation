@@ -19,11 +19,13 @@ class plot_Vmax_vs_V1kpc:
         subGroupNumbers_fromPartData = read_dataset(self.part_type, 'SubGroupNumber')
         groupNumbers_fromPartData = read_dataset(self.part_type, 'GroupNumber')
 
+        # Sort by group numbers then by subgroup numbers:
+        # sorting_idxs = np.lexsort((subGroupNumbers_fromPartData, groupNumbers_fromPartData))
+
         partsWithinR1kpc = np.empty((self.maxVelocities.size,))
         gravConst = 1.989/3.0857*10**15 * 6.674*10**(-11)    # m^3/(kg*s^2) -> kpc/(10^10 Msol) * (km/s)^2
 
         sum = 0
-        sum1 = 0
         sum2 = 0
 
         # Iterate through subhaloes:
@@ -32,6 +34,13 @@ class plot_Vmax_vs_V1kpc:
             mask = np.logical_and(subGroupNumbers_fromPartData == subGroupNumber, groupNumbers_fromPartData == self.groupNumbers_fromSubhaloData[idx])
             coords = self.coords[mask,:]    # Select coordinates from the particular subhalo.
             sum += time.clock() - start
+
+            # Select coords of the particular subhalo:
+#            mask1 = (groupNumbers_fromPartData == self.groupNumbers_fromSubhaloData[idx])
+#            coords = self.coords[mask1,:]
+#            help = subGroupNumbers_fromPartData[mask1]
+#            mask2 = (help == subGroupNumber)
+#            coords = coords[mask2,:]
 
             start2 = time.clock()
             partsWithinR1kpc[idx] = (np.sum((coords - self.cops[idx])**2, axis=1) < 10**(-6)).sum()     # Find the coordinates, whose distance from cop is less than 1kpc (unit of coords is Mpc), calculate how many there are. (np.sum(...) returns an array of distances, one for each vector in coords)
