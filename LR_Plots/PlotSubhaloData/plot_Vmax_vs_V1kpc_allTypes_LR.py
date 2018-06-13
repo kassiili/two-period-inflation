@@ -20,7 +20,7 @@ class plot_Vmax_vs_V1kpc:
         #sorting_idxs = np.lexsort((self.subGroupNumbers_fromPartData, self.groupNumbers_fromPartData))
 
         V1kpc = np.zeros((self.maxVelocities.size,))
-        gravConst = 1.989/3.0857*10**15 * 6.674*10**(-11)    # m^3/(kg*s^2) -> kpc/(10^10 Msol) * (km/s)^2
+        gravConst = 1.989/3.0857*10**15 * 6.674*10**(-11)    # m^3/(kg*s^2) -> kpc/(10^10 Msun) * (km/s)^2
 
         # Iterate through particle types:
         for partType in [0,1,4]:
@@ -69,17 +69,27 @@ class plot_Vmax_vs_V1kpc:
                 masses = read_dataset(partType, 'Masses').reshape((coords[:,0].size, 1))
 
                 self.coordsAndMasses[partType] = np.hstack((coords, masses))
-            self.subGroupNumbers_fromPartData[partType] = read_dataset(partType, 'SubGroupNumber')
-            self.groupNumbers_fromPartData[partType] = read_dataset(partType, 'GroupNumber')
+            self.subGroupNumbers_fromPartData[partType] = read_dataset(partType, 'SubGroupNumber').astype(dtype="int16")
+            self.groupNumbers_fromPartData[partType] = read_dataset(partType, 'GroupNumber').astype(dtype="int16")
 
-        self.subGroupNumbers_fromSubhaloData = read_subhaloData('SubGroupNumber')
-        self.groupNumbers_fromSubhaloData = read_subhaloData('GroupNumber')
+        self.subGroupNumbers_fromSubhaloData = read_subhaloData('SubGroupNumber').astype(dtype="int16")
+        self.groupNumbers_fromSubhaloData = read_subhaloData('GroupNumber').astype(dtype="int16")
+        print(type(self.subGroupNumbers_fromSubhaloData[0]))
+
         self.maxVelocities = read_subhaloData('Vmax')
         self.cops = read_subhaloData('CentreOfPotential')
 
         start = time.clock()
         velocitiesAt1kpc = self.calcVelocitiesAt1kpc()
         print(time.clock() - start)
+
+        mask = velocitiesAt1kpc > self.maxVelocities
+        oddOnes = {}
+        oddOnes['SGN'] = self.subGroupNumbers_fromSubhaloData[mask]
+        oddOnes['GN'] = self.groupNumbers_fromSubhaloData[mask]
+
+        for gn, sgn in zip(oddOnes['GN'], oddOnes['SGN']):
+            print(gn, sgn)
 
         maskSat = np.logical_and(self.maxVelocities > 0, self.subGroupNumbers_fromSubhaloData != 0)
         maskIsol = np.logical_and(self.maxVelocities > 0, self.subGroupNumbers_fromSubhaloData == 0)

@@ -1,6 +1,7 @@
 import sys
 import h5py
 import numpy as np
+import time
 import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt 
@@ -16,29 +17,25 @@ class RotationCurve:
     def __init__(self, gn, sgn):
 
         self.a, self.h, self.massTable, self.boxsize = read_header()
-        self.centre = self.find_center_of_mass(gn, sgn)
+        self.centre = self.find_centre_of_potential(gn, sgn)
 
         # Load data.
         self.gas    = self.read_galaxy(0, gn, sgn)
-        print(1)
         self.dm     = self.read_galaxy(1, gn, sgn)
-        print(2)
         self.stars  = self.read_galaxy(4, gn, sgn)
-        print(3)
         self.bh     = self.read_galaxy(5, gn, sgn)
-        print(4)
 
         # Plot.
-        self.plot()
+        self.plot(gn, sgn)
 
-    def find_center_of_mass(self, gn, sgn):
-        """ Obtain the center of mass of the given galaxy from the subhalo catalogues. """
+    def find_centre_of_potential(self, gn, sgn):
+        """ Obtain the centre of potential of the given galaxy from the subhalo catalogues. """
 
         subGroupNumbers = read_subhaloData('SubGroupNumber')
         groupNumbers = read_subhaloData('GroupNumber')
-        com = read_subhaloData('CentreOfMass')
+        cop = read_subhaloData('CentreOfPotential')
 
-        return com[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]
+        return cop[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.Mpc)
 
     def read_galaxy(self, itype, gn, sgn):
         """ For a given galaxy (defined by its GroupNumber and SubGroupNumber)
@@ -50,6 +47,7 @@ class RotationCurve:
         # Load data, then mask to selected GroupNumber and SubGroupNumber.
         gns  = read_dataset(itype, 'GroupNumber')
         sgns = read_dataset(itype, 'SubGroupNumber')
+
         mask = np.logical_and(gns == gn, sgns == sgn)
         if itype == 1:
             data['mass'] = read_dataset_dm_mass()[mask] * u.g.to(u.Msun)
@@ -75,6 +73,10 @@ class RotationCurve:
         # Compute cumulative mass.
         cmass = np.cumsum(arr['mass'][mask])
 
+        # Begin rotation curve from the 10th particle to reduce noise at the low end of the curve.
+        r = r[range(9, r.size)]
+        cmass = cmass[range(9, cmass.size)]
+
         # Compute velocity.
         myG = G.to(u.km**2 * u.Mpc * u.Msun**-1 * u.s**-2).value
         v = np.sqrt((myG * cmass) / r)
@@ -82,7 +84,27 @@ class RotationCurve:
         # Return r in Mpc and v in km/s.
         return r, v
 
-    def plot(self):
+    def calc_V1kpc(self, arr):
+        """ Calculate the rotational velocity at 1kpc. """
+
+        r = np.sum((arr['coords'] - self.centre)**2, axis=1)
+        mask = np.logical_and(r > 0, r < 10**-6)
+        print(mask.sum())
+
+        myG = G.to(u.km**2 * u.Mpc * u.Msun**-1 * u.s**-2).value
+        return np.sqrt(arr['mass'][mask].sum() * myG / 10**-3)
+
+        # Compute distance to centre.
+#        r = np.linalg.norm(arr['coords'] - self.centre, axis=1)
+#
+#        # Mask chooses only particles within 1kpc of cop.
+#        mask = np.logical_and(r > 0, r < 10**-3)
+#
+#        myG = G.to(u.km**2 * u.Mpc * u.Msun**-1 * u.s**-2).value
+#        return np.sqrt(myG * arr['mass'][mask].sum() / 10**-3)
+
+
+    def plot(self, gn, sgn):
         plt.figure()
 
         # All parttypes together.
@@ -99,11 +121,23 @@ class RotationCurve:
 #            plt.plot(r*1000., v, label=lab)
 
         r, v = self.compute_rotation_curve(combined)
-        print(r.size)
         plt.plot(r*1000., v)
 
+        # Get Vmax and Rmax:
+        subGroupNumbers = read_subhaloData('SubGroupNumber')
+        groupNumbers = read_subhaloData('GroupNumber')
+        vmax = read_subhaloData('Vmax')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
+        rmax = read_subhaloData('VmaxRadius')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
+
+        v1kpc = self.calc_V1kpc(combined)
+
+        plt.axhline(vmax, linestyle='dashed', c='red', label='Vmax=%1.3f'%vmax)
+        plt.axvline(rmax, linestyle='dashed', c='red', label='Rmax=%1.3f'%rmax)
+        plt.axhline(v1kpc, linestyle='dashed', c='green', label='V1kpc=%1.3f'%v1kpc)
+        plt.axvline(1, linestyle='dashed', c='green')
+        
         # Save plot.
-        #plt.legend(loc='center right')
+        plt.legend(loc='center right')
         plt.minorticks_on()
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
         plt.xlim(1, 50); # plt.tight_layout()
@@ -112,5 +146,18 @@ class RotationCurve:
 #        plt.savefig('RotationCurve.png')
 #        plt.close()
 
-x = RotationCurve(1, 0)
+oddsg = [20, 25, 27, 1]
+oddg = [2, 3, 3, 51]
+
+print(1, 0)
+RotationCurve(1,0)
+
+for g, sg in zip(oddg, oddsg):
+    print(g, sg)
+    RotationCurve(g,sg)
+
+#gn = 4
+#sgns = [0,1,2]
+#for sgn in sgns:
+#    x = RotationCurve(gn, sgn)
 

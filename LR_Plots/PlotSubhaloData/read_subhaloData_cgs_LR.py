@@ -38,3 +38,7 @@ def read_subhaloData(att, nfiles=95):
 
     return data
 
+#Rmax = read_subhaloData('VmaxRadius')
+#print(Rmax.max())
+#print(Rmax.mean())
+#print(np.median(Rmax))
