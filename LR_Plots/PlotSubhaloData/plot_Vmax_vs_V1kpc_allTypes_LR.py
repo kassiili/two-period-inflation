@@ -98,6 +98,27 @@ class plot_Vmax_vs_V1kpc:
         self.maxVelocitiesIsol = self.maxVelocities[maskIsol]
         self.velocitiesAt1kpcIsol = velocitiesAt1kpc[maskIsol]
 
+ 
+    def read_galaxies(self, part_type):
+        """ """
+
+        data = {}
+
+        data['GroupNumber']  = read_dataset(part_type, 'GroupNumber')
+        data['SubGroupNumber'] = read_dataset(part_type, 'SubGroupNumber')
+
+        if itype == 1:
+            data['mass'] = read_dataset_dm_mass()[mask] * u.g.to(u.Msun)
+        else:
+            data['mass'] = read_dataset(itype, 'Masses')[mask] * u.g.to(u.Msun)
+        data['coords'] = read_dataset(itype, 'Coordinates')[mask] * u.cm.to(u.Mpc)
+
+        # Periodic wrap coordinates around centre.
+        boxsize = self.boxsize/self.h
+        data['coords'] = np.mod(data['coords']-self.centre+0.5*boxsize,boxsize)+self.centre-0.5*boxsize
+
+        return data
+
 
     def plot(self):
         fig = plt.figure()
