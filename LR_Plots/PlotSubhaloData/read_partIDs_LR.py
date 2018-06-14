@@ -1,10 +1,10 @@
 import numpy as np
 import h5py
 
-def read_partIDs(att, nfiles=95):
+def read_partIDs(att, nfiles=95, dataset='LR'):
     """ Read a selected dataset from the IDs group of the group data files, att is the attribute name.  """
 
-    path = '/home/kassiili/SummerProject/practise-with-datasets/V1_LR_fix/groups_127_z000p000'
+    path = '/home/kassiili/SummerProject/practise-with-datasets/V1_%s_fix/groups_127_z000p000'%dataset
 
     # Output array.
     data = []
@@ -33,8 +33,8 @@ def read_partIDs(att, nfiles=95):
         data = np.concatenate(data)
 
     # Convert to physical.
-#    if data.dtype != np.int32 and data.dtype != np.int64:
-#        data = np.multiply(data, cgs * a**aexp * h**hexp, dtype='f8')
+    if data.dtype != np.int32 and data.dtype != np.int64:
+        data = np.multiply(data, cgs * a**aexp * h**hexp, dtype='f8')
 
     return data
 
