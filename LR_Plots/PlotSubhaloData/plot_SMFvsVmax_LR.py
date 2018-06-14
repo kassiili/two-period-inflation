@@ -84,7 +84,6 @@ class plot_SMF_vs_Vmax:
 #        plt.savefig('SMF_vs_Vmax.png')
 #        plt.close()
 
-slice = plot_SMF_vs_Vmax() 
-slice.plot()
-#slice.compute_slice()
+plot = plot_SMF_vs_Vmax() 
+plot.plot()
 
