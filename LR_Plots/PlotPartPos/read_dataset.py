@@ -1,15 +1,18 @@
 import numpy as np
 import h5py
 
-def read_dataset(itype, att, nfiles=16):
+def read_dataset(itype, att, nfiles=16, dataset='LR'):
     """ Read a selected dataset, itype is the PartType and att is the attribute name. """
+
+    if (dataset == 'MR' and nfiles == 16):
+        nfiles = 95
 
     # Output array.
     data = []
 
     # Loop over each file and extract the data.
     for i in range(nfiles):
-        path = '/home/kassiili/SummerProject/practise-with-datasets/V1_LR_fix/snapshot_127_z000p000'
+        path = '/home/kassiili/SummerProject/practise-with-datasets/V1_%s_fix/snapshot_127_z000p000'%dataset
         f = h5py.File('%s/snap_127_z000p000.%i.hdf5'%(path, i), 'r')
         tmp = f['PartType%i/%s'%(itype, att)][...]
         data.append(tmp)
@@ -32,9 +35,8 @@ def read_dataset(itype, att, nfiles=16):
         data = np.concatenate(data)
 
     # Convert to physical.
-#    if data.dtype != np.int32 and data.dtype != np.int64:
-#        data = np.multiply(data, cgs * a**aexp * h**hexp, dtype='f8')
+    if data.dtype != np.int32 and data.dtype != np.int64:
+        data = np.multiply(data, cgs * a**aexp * h**hexp, dtype='f8')
 
     return data
 
-read_dataset(0, 'Coordinates')

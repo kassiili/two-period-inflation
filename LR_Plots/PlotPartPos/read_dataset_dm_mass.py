@@ -1,9 +1,9 @@
 import numpy as np
 import h5py
 
-def read_dataset_dm_mass():
+def read_dataset_dm_mass(dataset='LR'):
     """ Special case for the mass of dark matter particles. """
-    path = '/home/kassiili/SummerProject/practise-with-datasets/V1_LR_fix/snapshot_127_z000p000'
+    path = '/home/kassiili/SummerProject/practise-with-datasets/V1_%s_fix/snapshot_127_z000p000'%dataset
     f           = h5py.File('%s/snap_127_z000p000.0.hdf5'%path, 'r')
     h           = f['Header'].attrs.get('HubbleParam')
     a           = f['Header'].attrs.get('Time')
