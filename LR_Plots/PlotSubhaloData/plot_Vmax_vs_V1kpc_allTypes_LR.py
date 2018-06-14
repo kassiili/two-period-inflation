@@ -51,35 +51,27 @@ class plot_Vmax_vs_V1kpc:
         gas = self.read_particle_data(0)
         dm = self.read_particle_data(1)
         stars = self.read_particle_data(4)
+        BHs = self.read_particle_data(5)
 
         # Combine particle data into single array:
         self.combined = {}
-        self.combined['coords'] = np.vstack((gas['coords'], dm['coords'], stars['coords']))
-        self.combined['mass'] = np.concatenate((gas['mass'], dm['mass'], stars['mass']))
-        self.combined['groupNumber'] = np.concatenate((gas['groupNumber'], dm['groupNumber'], stars['groupNumber']))
-        self.combined['subGroupNumber'] = np.concatenate((gas['subGroupNumber'], dm['subGroupNumber'], stars['subGroupNumber']))
+        self.combined['coords'] = np.vstack((gas['coords'], dm['coords'], stars['coords'], BHs['coords']))
+        self.combined['mass'] = np.concatenate((gas['mass'], dm['mass'], stars['mass'], BHs['mass']))
+        self.combined['groupNumber'] = np.concatenate((gas['groupNumber'], dm['groupNumber'], stars['groupNumber'], BHs['groupNumber']))
+        self.combined['subGroupNumber'] = np.concatenate((gas['subGroupNumber'], dm['subGroupNumber'], stars['subGroupNumber'], BHs['subGroupNumber']))
 
         self.subhaloData = self.read_subhalo_data()
 
         start = time.clock()
-        velocitiesAt1kpc = self.calcVelocitiesAt1kpc()
+        self.velocitiesAt1kpc = self.calcVelocitiesAt1kpc()
         print(time.clock() - start)
-
         
-        mask = velocitiesAt1kpc > self.subhaloData['Vmax']
-        oddOnes = {}
-        oddOnes['SGN'] = self.subhaloData['subGroupNumber'][mask]
-        oddOnes['GN'] = self.subhaloData['groupNumber'][mask]
-
-        for gn, sgn in zip(oddOnes['GN'], oddOnes['SGN']):
-            print(gn, sgn)
-
         maskSat = np.logical_and(self.subhaloData['Vmax'] > 0, self.subhaloData['subGroupNumber'] != 0)
         maskIsol = np.logical_and(self.subhaloData['Vmax'] > 0, self.subhaloData['subGroupNumber'] == 0)
         self.VmaxSat = self.subhaloData['Vmax'][maskSat]
-        self.V1kpcSat = velocitiesAt1kpc[maskSat]
+        self.V1kpcSat = self.velocitiesAt1kpc[maskSat]
         self.VmaxIsol = self.subhaloData['Vmax'][maskIsol]
-        self.V1kpcIsol = velocitiesAt1kpc[maskIsol]
+        self.V1kpcIsol = self.velocitiesAt1kpc[maskIsol]
 
  
     def read_particle_data(self, part_type):
@@ -124,6 +116,17 @@ class plot_Vmax_vs_V1kpc:
 #        start = time.clock()
 #        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
 #        axes.plot(median[0], median[1], c='red', linestyle='--')
+
+        mask = self.velocitiesAt1kpc > self.subhaloData['Vmax']
+        oddOnes = {}
+        oddOnes['SGN'] = self.subhaloData['subGroupNumber'][mask]
+        oddOnes['GN'] = self.subhaloData['groupNumber'][mask]
+
+        for gn, sgn in zip(oddOnes['GN'], oddOnes['SGN']):
+            mask2 = np.logical_and(self.subhaloData['groupNumber'] == gn, self.subhaloData['subGroupNumber'] == sgn)
+            axes.scatter(self.velocitiesAt1kpc[mask2], self.subhaloData['Vmax'][mask2], s=5, c='green', edgecolor='none')
+            print(gn, sgn)
+
 
         x = np.arange(10,100)
         y = np.arange(10,100)

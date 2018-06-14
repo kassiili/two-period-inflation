@@ -87,21 +87,14 @@ class RotationCurve:
     def calc_V1kpc(self, arr):
         """ Calculate the rotational velocity at 1kpc. """
 
-        r = np.sum((arr['coords'] - self.centre)**2, axis=1)
-        mask = np.logical_and(r > 0, r < 10**-6)
-        print(mask.sum())
+        # Compute distance to centre.
+        r = np.linalg.norm(arr['coords'] - self.centre, axis=1)
+
+        # Mask chooses only particles within 1kpc of cop.
+        mask = np.logical_and(r > 0, r < 10**-3)
 
         myG = G.to(u.km**2 * u.Mpc * u.Msun**-1 * u.s**-2).value
-        return np.sqrt(arr['mass'][mask].sum() * myG / 10**-3)
-
-        # Compute distance to centre.
-#        r = np.linalg.norm(arr['coords'] - self.centre, axis=1)
-#
-#        # Mask chooses only particles within 1kpc of cop.
-#        mask = np.logical_and(r > 0, r < 10**-3)
-#
-#        myG = G.to(u.km**2 * u.Mpc * u.Msun**-1 * u.s**-2).value
-#        return np.sqrt(myG * arr['mass'][mask].sum() / 10**-3)
+        return np.sqrt(myG * arr['mass'][mask].sum() / 10**-3)
 
 
     def plot(self, gn, sgn):
@@ -139,22 +132,25 @@ class RotationCurve:
         # Save plot.
         plt.legend(loc='center right')
         plt.minorticks_on()
+        plt.title('Rotation curve of halo with GN = %i and SGN = %i'%(gn,sgn))
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
-        plt.xlim(1, 50); # plt.tight_layout()
+        plt.xlim(0, 50); # plt.tight_layout()
 
-        plt.show()
-#        plt.savefig('RotationCurve.png')
-#        plt.close()
+#        plt.show()
+        plt.savefig('RotationCurve_g%i-sg%i.png'%(gn,sgn))
+        plt.close()
 
-oddsg = [20, 25, 27, 1]
-oddg = [2, 3, 3, 51]
+#oddsg = [20, 25, 27, 1]
+#oddg = [2, 3, 3, 51]
 
-print(1, 0)
 RotationCurve(1,0)
+#RotationCurve(2,5)
+#RotationCurve(1,16)
+#RotationCurve(9,3)
 
-for g, sg in zip(oddg, oddsg):
-    print(g, sg)
-    RotationCurve(g,sg)
+#for g, sg in zip(oddg, oddsg):
+#    print(g, sg)
+#    RotationCurve(g,sg)
 
 #gn = 4
 #sgns = [0,1,2]
