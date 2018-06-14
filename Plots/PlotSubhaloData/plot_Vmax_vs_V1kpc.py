@@ -6,17 +6,16 @@ import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt
 import matplotlib.colors as clrs
-from read_subhaloData_cgs_LR import read_subhaloData
-from read_header_LR import read_header
+from read_subhaloData import read_subhaloData
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/LR_Plots/PlotPartPos/')
-from read_dataset_cgs import read_dataset
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/PlotPartPos/')
+from read_dataset import read_dataset
 from read_dataset_dm_mass import read_dataset_dm_mass
+
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
 from read_header import read_header
 
-
 class plot_Vmax_vs_V1kpc:
-
 
     def calcVelocitiesAt1kpc(self):
         """ For each subhalo, calculate the circular velocity at 1kpc. """
@@ -43,8 +42,9 @@ class plot_Vmax_vs_V1kpc:
 
         return np.sqrt(massWithin1kpc * myG)
 
+    def __init__(self, dataset='LR'):
 
-    def __init__(self):
+        self.dataset = dataset
         self.a, self.h, self.massTable, self.boxsize = read_header() 
 
         # Read particle data of all particle types:
@@ -73,7 +73,6 @@ class plot_Vmax_vs_V1kpc:
         self.VmaxIsol = self.subhaloData['Vmax'][maskIsol]
         self.V1kpcIsol = self.velocitiesAt1kpc[maskIsol]
 
- 
     def read_particle_data(self, part_type):
         """ Read group numbers, subgroup numbers, particle masses and coordinates of all the particles of a certain type. """
 
@@ -127,7 +126,6 @@ class plot_Vmax_vs_V1kpc:
             axes.scatter(self.velocitiesAt1kpc[mask2], self.subhaloData['Vmax'][mask2], s=5, c='green', edgecolor='none')
             print(gn, sgn)
 
-
         x = np.arange(10,100)
         y = np.arange(10,100)
         axes.plot(x, y, c='black')
@@ -137,7 +135,7 @@ class plot_Vmax_vs_V1kpc:
         axes.set_ylabel('$v_{max}[\mathrm{km s^{-1}}]$')
 
         plt.show()
-#        plt.savefig('SMF_vs_Vmax.png')
+#        plt.savefig('Vmax_vs_V1kpc_%s.png'%self.dataset)
 #        plt.close()
 
 

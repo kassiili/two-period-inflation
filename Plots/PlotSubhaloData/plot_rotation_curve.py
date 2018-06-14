@@ -5,17 +5,20 @@ import time
 import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt 
-from read_subhaloData_cgs_LR import read_subhaloData
+from read_subhaloData import read_subhaloData
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/LR_Plots/PlotPartPos/')
-from read_dataset_cgs import read_dataset
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/PlotPartPos/')
+from read_dataset import read_dataset
 from read_dataset_dm_mass import read_dataset_dm_mass
+
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
 from read_header import read_header
 
 class RotationCurve:
 
-    def __init__(self, gn, sgn):
+    def __init__(self, gn, sgn, dataset='LR'):
 
+        self.dataset = dataset
         self.a, self.h, self.massTable, self.boxsize = read_header()
         self.centre = self.find_centre_of_potential(gn, sgn)
 
@@ -137,7 +140,7 @@ class RotationCurve:
         plt.xlim(0, 50); # plt.tight_layout()
 
 #        plt.show()
-        plt.savefig('RotationCurve_g%i-sg%i.png'%(gn,sgn))
+        plt.savefig('RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
         plt.close()
 
 #oddsg = [20, 25, 27, 1]

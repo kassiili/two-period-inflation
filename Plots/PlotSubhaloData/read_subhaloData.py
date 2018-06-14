@@ -1,13 +1,13 @@
 import numpy as np
 import h5py
 
-def read_subhaloData(att, nfiles=16, dataset='LR'):
+def read_subhaloData(att, nfiles=95, dataset='LR'):
     """ Read a selected dataset from the subhalo catalogues, att is the attribute name, dataset determines, which dataset is used.  """
 
     path = '/home/kassiili/SummerProject/practise-with-datasets/V1_%s_fix/groups_127_z000p000'%dataset
 
     if (dataset == 'MR' and nfiles == 16):
-        nfiles = 95
+        nfiles = 192
 
     # Output array.
     data = []
