@@ -1,124 +1,115 @@
 import sys
 import numpy as np
-import pandas as pd
 import h5py
 import time
+import astropy.units as u
+from astropy.constants import G
 import matplotlib.pyplot as plt
 import matplotlib.colors as clrs
-from read_subhaloData2_LR import read_subhaloData
+from read_subhaloData_cgs_LR import read_subhaloData
 from read_header_LR import read_header
 
 sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/LR_Plots/PlotPartPos/')
-from read_dataset2 import read_dataset
+from read_dataset_cgs import read_dataset
+from read_dataset_dm_mass import read_dataset_dm_mass
+from read_header import read_header
 
 
 class plot_Vmax_vs_V1kpc:
 
 
     def calcVelocitiesAt1kpc(self):
-        # Sort by group numbers then by subgroup numbers:
-        #sorting_idxs = np.lexsort((self.subGroupNumbers_fromPartData, self.groupNumbers_fromPartData))
+        """ For each subhalo, calculate the circular velocity at 1kpc. """
 
-        V1kpc = np.zeros((self.maxVelocities.size,))
-        gravConst = 1.989/3.0857*10**15 * 6.674*10**(-11)    # m^3/(kg*s^2) -> kpc/(10^10 Msun) * (km/s)^2
+        massWithin1kpc = np.zeros((self.subhaloData['groupNumber'].size))
 
-        # Iterate through particle types:
-        for partType in [0,1,4]:
+        for idx, (gn, sgn, cop) in enumerate(zip(self.subhaloData['groupNumber'], self.subhaloData['subGroupNumber'], self.subhaloData['COP'])):
 
-            partsWithinR1kpc = np.zeros((self.maxVelocities.size,))
-            masses = np.zeros((1))
-            coords = np.zeros((1))
+            # Get coordinates and corresponding masses of the particles in the halo:
+            mask = np.logical_and(self.combined['groupNumber'] == gn, self.combined['subGroupNumber'] == sgn)
+            coords = self.combined['coords'][mask]
+            mass = self.combined['mass'][mask]
 
-            # Iterate through subhaloes:
-            for idx, subGroupNumber in enumerate(self.subGroupNumbers_fromSubhaloData):
+            # Periodic wrap coordinates around centre.
+#            boxsize = self.boxsize/self.h
+#            data['coords'] = np.mod(data['coords']-self.centre+0.5*boxsize,boxsize)+self.centre-0.5*boxsize
 
-                # Select coords of the particular subhalo:
-                mask1 = (self.groupNumbers_fromPartData[partType] == self.groupNumbers_fromSubhaloData[idx])
-                coords = self.coordsAndMasses[partType][mask1,:]
-                help = self.subGroupNumbers_fromPartData[partType][mask1]
-                mask2 = (help == subGroupNumber)
-                coords = coords[mask2,:]
-                
-                coords = self.coordsAndMasses[partType][:,:3]
-                maskR1kpc = np.sum((coords - self.cops[idx])**2, axis=1) < 10**(-6)     # Find the coordinates, whose distance from cop is less than 1kpc (unit of coords is Mpc), calculate how many there are. (np.sum(...) returns an array of distances, one for each vector in coords)
-                if (partType == 1):
-                    V1kpc[idx] += self.massTable[partType] * maskR1kpc.sum()
-                else:
-                    masses = self.coordsAndMasses[partType][:,3]
-                    V1kpc[idx] += masses[maskR1kpc].sum()    # Need the same elements from masses as I need from coords..
+            # Calculate distances from COP:
+            r = np.linalg.norm(coords - cop, axis=1)
 
-                # Do not include subhaloes with less than 10 particles:
-#                if (partsWithinR1kpc[idx] < 10):    
-#                    partsWithinR1kpc[idx] = 0
+            massWithin1kpc[idx] = mass[np.logical_and(r > 0, r < 1)].sum()
 
-        return np.sqrt(V1kpc * gravConst)
+        myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
+
+        return np.sqrt(massWithin1kpc * myG)
+
 
     def __init__(self):
         self.a, self.h, self.massTable, self.boxsize = read_header() 
 
         # Read particle data of all particle types:
-        self.coordsAndMasses = 5*[0]
-        self.subGroupNumbers_fromPartData = 5*[0]
-        self.groupNumbers_fromPartData = 5*[0]
-        for partType in [0,1,4]:
-            # For particles other than dm (which all have the same mass), add particle mass to the end of the coord vector:
-            if (partType == 1):
-                self.coordsAndMasses[partType] = read_dataset(partType, 'Coordinates')
-            else:
-                coords = read_dataset(partType, 'Coordinates')
-                masses = read_dataset(partType, 'Masses').reshape((coords[:,0].size, 1))
+        gas = self.read_particle_data(0)
+        dm = self.read_particle_data(1)
+        stars = self.read_particle_data(4)
 
-                self.coordsAndMasses[partType] = np.hstack((coords, masses))
-            self.subGroupNumbers_fromPartData[partType] = read_dataset(partType, 'SubGroupNumber').astype(dtype="int16")
-            self.groupNumbers_fromPartData[partType] = read_dataset(partType, 'GroupNumber').astype(dtype="int16")
+        # Combine particle data into single array:
+        self.combined = {}
+        self.combined['coords'] = np.vstack((gas['coords'], dm['coords'], stars['coords']))
+        self.combined['mass'] = np.concatenate((gas['mass'], dm['mass'], stars['mass']))
+        self.combined['groupNumber'] = np.concatenate((gas['groupNumber'], dm['groupNumber'], stars['groupNumber']))
+        self.combined['subGroupNumber'] = np.concatenate((gas['subGroupNumber'], dm['subGroupNumber'], stars['subGroupNumber']))
 
-        self.subGroupNumbers_fromSubhaloData = read_subhaloData('SubGroupNumber').astype(dtype="int16")
-        self.groupNumbers_fromSubhaloData = read_subhaloData('GroupNumber').astype(dtype="int16")
-        print(type(self.subGroupNumbers_fromSubhaloData[0]))
-
-        self.maxVelocities = read_subhaloData('Vmax')
-        self.cops = read_subhaloData('CentreOfPotential')
+        self.subhaloData = self.read_subhalo_data()
 
         start = time.clock()
         velocitiesAt1kpc = self.calcVelocitiesAt1kpc()
         print(time.clock() - start)
 
-        mask = velocitiesAt1kpc > self.maxVelocities
+        
+        mask = velocitiesAt1kpc > self.subhaloData['Vmax']
         oddOnes = {}
-        oddOnes['SGN'] = self.subGroupNumbers_fromSubhaloData[mask]
-        oddOnes['GN'] = self.groupNumbers_fromSubhaloData[mask]
+        oddOnes['SGN'] = self.subhaloData['subGroupNumber'][mask]
+        oddOnes['GN'] = self.subhaloData['groupNumber'][mask]
 
         for gn, sgn in zip(oddOnes['GN'], oddOnes['SGN']):
             print(gn, sgn)
 
-        maskSat = np.logical_and(self.maxVelocities > 0, self.subGroupNumbers_fromSubhaloData != 0)
-        maskIsol = np.logical_and(self.maxVelocities > 0, self.subGroupNumbers_fromSubhaloData == 0)
-        self.maxVelocitiesSat = self.maxVelocities[maskSat]
-        self.velocitiesAt1kpcSat = velocitiesAt1kpc[maskSat]
-        self.maxVelocitiesIsol = self.maxVelocities[maskIsol]
-        self.velocitiesAt1kpcIsol = velocitiesAt1kpc[maskIsol]
+        maskSat = np.logical_and(self.subhaloData['Vmax'] > 0, self.subhaloData['subGroupNumber'] != 0)
+        maskIsol = np.logical_and(self.subhaloData['Vmax'] > 0, self.subhaloData['subGroupNumber'] == 0)
+        self.VmaxSat = self.subhaloData['Vmax'][maskSat]
+        self.V1kpcSat = velocitiesAt1kpc[maskSat]
+        self.VmaxIsol = self.subhaloData['Vmax'][maskIsol]
+        self.V1kpcIsol = velocitiesAt1kpc[maskIsol]
 
  
-    def read_galaxies(self, part_type):
-        """ """
+    def read_particle_data(self, part_type):
+        """ Read group numbers, subgroup numbers, particle masses and coordinates of all the particles of a certain type. """
 
         data = {}
 
-        data['GroupNumber']  = read_dataset(part_type, 'GroupNumber')
-        data['SubGroupNumber'] = read_dataset(part_type, 'SubGroupNumber')
+        data['groupNumber']  = read_dataset(part_type, 'GroupNumber')
+        data['subGroupNumber'] = read_dataset(part_type, 'SubGroupNumber')
 
-        if itype == 1:
-            data['mass'] = read_dataset_dm_mass()[mask] * u.g.to(u.Msun)
+        if part_type == 1:
+            data['mass'] = read_dataset_dm_mass() * u.g.to(u.Msun)
         else:
-            data['mass'] = read_dataset(itype, 'Masses')[mask] * u.g.to(u.Msun)
-        data['coords'] = read_dataset(itype, 'Coordinates')[mask] * u.cm.to(u.Mpc)
-
-        # Periodic wrap coordinates around centre.
-        boxsize = self.boxsize/self.h
-        data['coords'] = np.mod(data['coords']-self.centre+0.5*boxsize,boxsize)+self.centre-0.5*boxsize
+            data['mass'] = read_dataset(part_type, 'Masses') * u.g.to(u.Msun)
+        data['coords'] = read_dataset(part_type, 'Coordinates') * u.cm.to(u.kpc)
 
         return data
 
+    def read_subhalo_data(self):
+        """ Read group numbers, subgroup numbers, max circular velocities and centre of potentials of all the subhaloes. """
+
+        data = {}
+
+        data['groupNumber'] = read_subhaloData('GroupNumber')
+        data['subGroupNumber'] = read_subhaloData('SubGroupNumber')
+
+        data['Vmax'] = read_subhaloData('Vmax')/100000  # cm/s to km/s
+        data['COP'] = read_subhaloData('CentreOfPotential') * u.cm.to(u.kpc)
+
+        return data
 
     def plot(self):
         fig = plt.figure()
@@ -127,8 +118,8 @@ class plot_Vmax_vs_V1kpc:
         axes.set_xscale('log')
         axes.set_yscale('log')
 
-        axes.scatter(self.velocitiesAt1kpcSat[self.velocitiesAt1kpcSat > 10], self.maxVelocitiesSat[self.velocitiesAt1kpcSat > 10], s=3, c='red', edgecolor='none', label='satellite galaxies')
-        axes.scatter(self.velocitiesAt1kpcIsol[self.velocitiesAt1kpcIsol > 10], self.maxVelocitiesIsol[self.velocitiesAt1kpcIsol > 10], s=3, c='blue', edgecolor='none', label='isolated galaxies')
+        axes.scatter(self.V1kpcSat[self.V1kpcSat > 10], self.VmaxSat[self.V1kpcSat > 10], s=3, c='red', edgecolor='none', label='satellite galaxies')
+        axes.scatter(self.V1kpcIsol[self.V1kpcIsol > 10], self.VmaxIsol[self.V1kpcIsol > 10], s=3, c='blue', edgecolor='none', label='isolated galaxies')
 
 #        start = time.clock()
 #        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
