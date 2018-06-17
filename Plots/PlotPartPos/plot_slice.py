@@ -22,14 +22,14 @@ class plot_slice:
 
     def __init__(self, part_type, dataset='LR'):
         self.dataset = dataset
-        self.a, self.h, mass, self.boxsize = read_header() 
+        self.a, self.h, mass, self.boxsize = read_header(dataset=self.dataset) 
         self.part_type = part_type
         self.width = 0.2
-        self.coords = read_dataset(self.part_type, 'Coordinates') * u.cm.to(u.Mpc)
+        self.coords = read_dataset(self.part_type, 'Coordinates', dataset=self.dataset) * u.cm.to(u.Mpc)
 
         #Calculate center of mass:
         if (self.part_type != 1):
-            self.cm = self.calcCM(read_dataset(1,'Coordinates') * u.cm.to(u.Mpc))
+            self.cm = self.calcCM(read_dataset(1, 'Coordinates', dataset=self.dataset) * u.cm.to(u.Mpc))
         else:
             self.cm = self.calcCM(self.coords)
 
@@ -49,7 +49,7 @@ class plot_slice:
 #        plt.savefig('slice_partType%i%s.png'%(self.part_type, self.dataset)) 
 #        plt.close()
 
-slice = plot_slice(1)
+slice = plot_slice(1, dataset='LR')
 slice.plot()
 #part_types = [0,1,4]
 #for n in part_types:

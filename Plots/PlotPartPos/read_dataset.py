@@ -4,9 +4,6 @@ import h5py
 def read_dataset(itype, att, nfiles=16, dataset='LR'):
     """ Read a selected dataset, itype is the PartType and att is the attribute name. """
 
-    if (dataset == 'MR' and nfiles == 16):
-        nfiles = 95
-
     # Output array.
     data = []
 

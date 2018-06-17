@@ -19,7 +19,7 @@ class RotationCurve:
     def __init__(self, gn, sgn, dataset='LR'):
 
         self.dataset = dataset
-        self.a, self.h, self.massTable, self.boxsize = read_header(dataset='MR')
+        self.a, self.h, self.massTable, self.boxsize = read_header(dataset=self.dataset)
         self.centre = self.find_centre_of_potential(gn, sgn)
 
         # Load data.
@@ -34,11 +34,11 @@ class RotationCurve:
     def find_centre_of_potential(self, gn, sgn):
         """ Obtain the centre of potential of the given galaxy from the subhalo catalogues. """
 
-        subGroupNumbers = read_subhaloData('SubGroupNumber', dataset='MR')
-        groupNumbers = read_subhaloData('GroupNumber', dataset='MR')
-        cop = read_subhaloData('CentreOfPotential', dataset='MR')
+        subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
+        groupNumbers = read_subhaloData('GroupNumber', dataset=self.dataset)
+        cop = read_subhaloData('CentreOfPotential', dataset=self.dataset)
 
-        return cop[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.Mpc)
+        return cop[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
 
     def read_galaxy(self, itype, gn, sgn):
         """ For a given galaxy (defined by its GroupNumber and SubGroupNumber)
@@ -48,15 +48,15 @@ class RotationCurve:
         data = {}
 
         # Load data, then mask to selected GroupNumber and SubGroupNumber.
-        gns  = read_dataset(itype, 'GroupNumber', dataset='MR')
-        sgns = read_dataset(itype, 'SubGroupNumber', dataset='MR')
+        gns  = read_dataset(itype, 'GroupNumber', dataset=self.dataset)
+        sgns = read_dataset(itype, 'SubGroupNumber', dataset=self.dataset)
 
         mask = np.logical_and(gns == gn, sgns == sgn)
         if itype == 1:
-            data['mass'] = read_dataset_dm_mass(dataset='MR')[mask] * u.g.to(u.Msun)
+            data['mass'] = read_dataset_dm_mass(dataset=self.dataset)[mask] * u.g.to(u.Msun)
         else:
-            data['mass'] = read_dataset(itype, 'Masses', dataset='MR')[mask] * u.g.to(u.Msun)
-        data['coords'] = read_dataset(itype, 'Coordinates', dataset='MR')[mask] * u.cm.to(u.Mpc)
+            data['mass'] = read_dataset(itype, 'Masses', dataset=self.dataset)[mask] * u.g.to(u.Msun)
+        data['coords'] = read_dataset(itype, 'Coordinates', dataset=self.dataset)[mask] * u.cm.to(u.kpc)
 
         # Periodic wrap coordinates around centre.
         boxsize = self.boxsize/self.h
@@ -81,10 +81,10 @@ class RotationCurve:
         cmass = cmass[range(9, cmass.size)]
 
         # Compute velocity.
-        myG = G.to(u.km**2 * u.Mpc * u.Msun**-1 * u.s**-2).value
+        myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
         v = np.sqrt((myG * cmass) / r)
 
-        # Return r in Mpc and v in km/s.
+        # Return r in kpc and v in km/s.
         return r, v
 
     def calc_V1kpc(self, arr):
@@ -94,11 +94,10 @@ class RotationCurve:
         r = np.linalg.norm(arr['coords'] - self.centre, axis=1)
 
         # Mask chooses only particles within 1kpc of cop.
-        mask = np.logical_and(r > 0, r < 10**-3)
+        mask = np.logical_and(r > 0, r < 1)
 
-        myG = G.to(u.km**2 * u.Mpc * u.Msun**-1 * u.s**-2).value
-        return np.sqrt(myG * arr['mass'][mask].sum() / 10**-3)
-
+        myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
+        return np.sqrt(myG * arr['mass'][mask].sum())
 
     def plot(self, gn, sgn):
         plt.figure()
@@ -117,13 +116,13 @@ class RotationCurve:
 #            plt.plot(r*1000., v, label=lab)
 
         r, v = self.compute_rotation_curve(combined)
-        plt.plot(r*1000., v)
+        plt.plot(r, v)
 
         # Get Vmax and Rmax:
-        subGroupNumbers = read_subhaloData('SubGroupNumber', dataset='MR')
-        groupNumbers = read_subhaloData('GroupNumber', dataset='MR')
-        vmax = read_subhaloData('Vmax', dataset='MR')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
-        rmax = read_subhaloData('VmaxRadius', dataset='MR')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
+        subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
+        groupNumbers = read_subhaloData('GroupNumber', dataset=self.dataset)
+        vmax = read_subhaloData('Vmax', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
+        rmax = read_subhaloData('VmaxRadius', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
 
         v1kpc = self.calc_V1kpc(combined)
 
@@ -143,20 +142,13 @@ class RotationCurve:
 #        plt.savefig('RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
 #        plt.close()
 
-#oddsg = [20, 25, 27, 1]
-#oddg = [2, 3, 3, 51]
-
-RotationCurve(1, 0, dataset='MR')
-#RotationCurve(2,5)
-#RotationCurve(1,16)
-#RotationCurve(9,3)
+oddg = [5, 17, 51, 80, 80]
+oddsg = [11, 2, 1, 1, 2]
 
 #for g, sg in zip(oddg, oddsg):
-#    print(g, sg)
 #    RotationCurve(g,sg)
 
-#gn = 4
-#sgns = [0,1,2]
-#for sgn in sgns:
-#    x = RotationCurve(gn, sgn)
+oddgIsol = [121, 258, 270, 299, 519]    # 5 of many 
 
+for gn in oddgIsol:
+    RotationCurve(gn, 0)
