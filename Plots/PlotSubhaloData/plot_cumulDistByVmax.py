@@ -12,10 +12,12 @@ from read_header import read_header
 
 class plot_subhalo_dist_vs_vmax:
 
-    def __init__(self):
-        maxVelocities = read_subhaloData('Vmax') / 100000 # cm/s to km/s
-        stellarMasses = read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
-        subGroupNumbers = read_subhaloData('SubGroupNumber')
+    def __init__(self, dataset='LR'):
+        self.dataset = dataset
+
+        maxVelocities = read_subhaloData('Vmax', dataset=self.dataset) / 100000 # cm/s to km/s
+        stellarMasses = read_subhaloData('Stars/Mass', dataset=self.dataset) * u.g.to(u.Msun)
+        subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
         self.maxVelocitiesSatLum = maxVelocities[np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, subGroupNumbers != 0))]
         self.maxVelocitiesSatDark = maxVelocities[np.logical_and.reduce((maxVelocities > 0, stellarMasses == 0, subGroupNumbers != 0))]
         self.maxVelocitiesIsolLum = maxVelocities[np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, subGroupNumbers == 0))]
@@ -26,7 +28,6 @@ class plot_subhalo_dist_vs_vmax:
         self.maxVelocitiesSatDark[::-1].sort()
         self.maxVelocitiesIsolLum[::-1].sort()
         self.maxVelocitiesIsolDark[::-1].sort()
-
 
     def plot(self):
         fig = plt.figure()
@@ -45,9 +46,9 @@ class plot_subhalo_dist_vs_vmax:
         axes.set_title('Distribution of luminous subhaloes as a function of $v_{max}$')
 
         plt.show()
-#        plt.savefig('dist-of-subhaloes-as-function-of-Vmax_MR.png')
+#        plt.savefig('Dist-of-subhaloes-as-function-of-Vmax_%s.png'%self.dataset)
 #        plt.close()
 
-plot = plot_subhalo_dist_vs_vmax() 
+plot = plot_subhalo_dist_vs_vmax(dataset='MR') 
 plot.plot()
 

@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import h5py
 import astropy.units as u
@@ -11,10 +12,10 @@ class plot_Rmax_vs_Vmax:
 
     def __init__(self, dataset='LR'):
         self.dataset = dataset
-        maxVelocities = read_subhaloData('Vmax') / 100000   # cm/s to km/s
-        maxRadii = read_subhaloData('VmaxRadius') * u.cm.to(u.kpc)
-        self.stellarMasses = read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
-        self.subGroupNumbers = read_subhaloData('SubGroupNumber')
+        maxVelocities = read_subhaloData('Vmax', dataset=self.dataset) / 100000   # cm/s to km/s
+        maxRadii = read_subhaloData('VmaxRadius', dataset=self.dataset) * u.cm.to(u.kpc)
+        self.stellarMasses = read_subhaloData('Stars/Mass', dataset=self.dataset) * u.g.to(u.Msun)
+        self.subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
 
         maskSat = np.logical_and.reduce((maxVelocities > 0, maxRadii > 0, self.subGroupNumbers != 0, self.stellarMasses > 0))
         maskIsol = np.logical_and.reduce((maxVelocities > 0, maxRadii > 0, self.subGroupNumbers == 0, self.stellarMasses > 0))
@@ -23,7 +24,6 @@ class plot_Rmax_vs_Vmax:
         self.maxRadiiSat = maxRadii[maskSat]
         self.maxVelocitiesIsol = maxVelocities[maskIsol]
         self.maxRadiiIsol = maxRadii[maskIsol]
-
 
     def plot(self):
         fig = plt.figure()
@@ -42,6 +42,6 @@ class plot_Rmax_vs_Vmax:
 #        plt.savefig('rmax_vs_vmax%s.png'%self.dataset)
 #        plt.close()
 
-slice = plot_Rmax_vs_Vmax()
+slice = plot_Rmax_vs_Vmax(dataset='MR')
 slice.plot()
 

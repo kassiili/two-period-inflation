@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import h5py
 import time
@@ -9,6 +10,42 @@ sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
 from read_header import read_header
 
 class plot_SMF_vs_Vmax:
+
+    def __init__(self, dataset='LR'):
+        self.dataset = dataset
+        maxVelocities = read_subhaloData('Vmax', dataset=self.dataset) / 100000   # cm/s to km/s
+        stellarMasses = read_subhaloData('Stars/Mass', dataset=self.dataset) * u.g.to(u.Msun)
+        self.subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
+        maskSat = np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, self.subGroupNumbers != 0))
+        maskIsol = np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, self.subGroupNumbers == 0))
+
+        self.maxVelocitiesSat = maxVelocities[maskSat]
+        self.stellarMassesSat = stellarMasses[maskSat]
+        self.maxVelocitiesIsol = maxVelocities[maskIsol]
+        self.stellarMassesIsol = stellarMasses[maskIsol]
+
+    def plot(self):
+        fig = plt.figure()
+        axes = plt.gca()
+
+        axes.set_xscale('log')
+        axes.set_yscale('log')
+
+        axes.scatter(self.maxVelocitiesSat, self.stellarMassesSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
+        axes.scatter(self.maxVelocitiesIsol, self.stellarMassesIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
+
+#        start = time.clock()
+#        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
+#        axes.plot(median[0], median[1], c='red', linestyle='--')
+
+        axes.legend()
+        axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
+        axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
+        axes.set_title('SMF of luminous subhaloes')
+
+        plt.show()
+#        plt.savefig('SMF_vs_Vmax_%s.png'%self.dataset)
+#        plt.close()
 
     def calc_median_trend(self, x, y):
         minX = min(x)
@@ -43,51 +80,12 @@ class plot_SMF_vs_Vmax:
 
         #xSplit = xy[0,:-(xy[0,:].size%bars)].reshape((int(xy[0,:].size/bars), bars))
 
-
         #Calculate the medians of the rows of the reshaped arrays:
         medianX = np.median(tmpX, axis=1)
         medianY = np.median(tmpY, axis=1)
 
         return [medianX, medianY]
 
-
-    def __init__(self, dataset='LR'):
-        self.dataset = dataset
-        maxVelocities = read_subhaloData('Vmax') / 100000   # cm/s to km/s
-        stellarMasses = read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
-        self.subGroupNumbers = read_subhaloData('SubGroupNumber')
-        maskSat = np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, self.subGroupNumbers != 0))
-        maskIsol = np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, self.subGroupNumbers == 0))
-
-        self.maxVelocitiesSat = maxVelocities[maskSat]
-        self.stellarMassesSat = stellarMasses[maskSat]
-        self.maxVelocitiesIsol = maxVelocities[maskIsol]
-        self.stellarMassesIsol = stellarMasses[maskIsol]
-
-
-    def plot(self):
-        fig = plt.figure()
-        axes = plt.gca()
-
-        axes.set_xscale('log')
-        axes.set_yscale('log')
-
-        axes.scatter(self.maxVelocitiesSat, self.stellarMassesSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
-        axes.scatter(self.maxVelocitiesIsol, self.stellarMassesIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
-
-#        start = time.clock()
-#        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
-#        axes.plot(median[0], median[1], c='red', linestyle='--')
-
-        axes.legend()
-        axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
-        axes.set_title('SMF of luminous subhaloes')
-
-        plt.show()
-#        plt.savefig('SMF_vs_Vmax_%s.png'%self.dataset)
-#        plt.close()
-
-plot = plot_SMF_vs_Vmax() 
+plot = plot_SMF_vs_Vmax(dataset='MR') 
 plot.plot()
 
