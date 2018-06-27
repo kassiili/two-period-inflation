@@ -41,7 +41,7 @@ class RotationCurve:
         return cop[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
 
     def read_galaxy(self, itype, gn, sgn):
-        """ For a given galaxy (defined by its GroupNumber and SubGroupNumber)
+        """ For a given galaxy (identified by its GroupNumber and SubGroupNumber),
         extract the coordinates and mass of all particles of a selected type.
         Coordinates are then wrapped around the centre to account for periodicity. """
 
@@ -109,12 +109,6 @@ class RotationCurve:
         combined['coords'] = np.vstack((self.gas['coords'], self.dm['coords'],
             self.stars['coords'], self.bh['coords']))
         
-        # Loop over each parttype.
-#        for x, lab in zip([self.gas, self.dm, self.stars, combined],
-#                        ['Gas', 'Dark Matter', 'Stars', 'All']):
-#            r, v = self.compute_rotation_curve(x)
-#            plt.plot(r*1000., v, label=lab)
-
         r, v = self.compute_rotation_curve(combined)
         plt.plot(r, v)
 
