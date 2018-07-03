@@ -9,7 +9,7 @@ from read_subhaloData import read_subhaloData
 sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
 from read_header import read_header
 
-class plot_SMF_vs_Vmax:
+class plot_SM_vs_Vmax:
 
     def __init__(self, dataset='LR'):
         self.dataset = dataset
@@ -34,17 +34,19 @@ class plot_SMF_vs_Vmax:
         axes.scatter(self.maxVelocitiesSat, self.stellarMassesSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
         axes.scatter(self.maxVelocitiesIsol, self.stellarMassesIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
 
-#        start = time.clock()
-#        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
-#        axes.plot(median[0], median[1], c='red', linestyle='--')
+        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
+        axes.plot(median[0], median[1], c='red', linestyle='--')
+
+        median = self.calc_median_trend2(self.maxVelocitiesIsol, self.stellarMassesIsol)
+        axes.plot(median[0], median[1], c='blue', linestyle='--')
 
         axes.legend()
         axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
         axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
-        axes.set_title('SMF of luminous subhaloes')
+        #axes.set_title('Stellar mass of luminous subhaloes')
 
         plt.show()
-#        plt.savefig('SMF_vs_Vmax_%s.png'%self.dataset)
+#        plt.savefig('SM_vs_Vmax_%s.png'%self.dataset)
 #        plt.close()
 
     def calc_median_trend(self, x, y):
@@ -65,10 +67,10 @@ class plot_SMF_vs_Vmax:
         bars = 10
         datapoints = xy[0,:].size
 
-        #Excĺude last elements (if necessary) to allow reshaping:
+        #Excĺude first elements (if necessary) to allow reshaping:
         if (datapoints%bars != 0):
-            tmpX = xy[0,:-(datapoints%bars)]
-            tmpY = xy[1,:-(datapoints%bars)]
+            tmpX = xy[0,(datapoints%bars):]
+            tmpY = xy[1,(datapoints%bars):]
             datapoints -= datapoints%bars
         else:
             tmpX = xy[0,:]
@@ -78,14 +80,12 @@ class plot_SMF_vs_Vmax:
         tmpX = tmpX.reshape((bars, int(datapoints/bars)))
         tmpY = tmpY.reshape((bars, int(datapoints/bars)))
 
-        #xSplit = xy[0,:-(xy[0,:].size%bars)].reshape((int(xy[0,:].size/bars), bars))
-
         #Calculate the medians of the rows of the reshaped arrays:
         medianX = np.median(tmpX, axis=1)
         medianY = np.median(tmpY, axis=1)
 
         return [medianX, medianY]
 
-plot = plot_SMF_vs_Vmax(dataset='MR') 
+plot = plot_SM_vs_Vmax(dataset='MR') 
 plot.plot()
 

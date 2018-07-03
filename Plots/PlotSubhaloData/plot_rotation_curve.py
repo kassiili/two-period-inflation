@@ -128,13 +128,17 @@ class RotationCurve:
         # Save plot.
         plt.legend(loc='center right')
         plt.minorticks_on()
-        plt.title('Rotation curve of halo with GN = %i and SGN = %i'%(gn,sgn))
+        plt.title('Rotation curve of halo with GN = %i and SGN = %i (%s)'%(gn,sgn,self.dataset))
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
         plt.xlim(0, 50); # plt.tight_layout()
 
         plt.show()
 #        plt.savefig('RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
 #        plt.close()
+
+RotationCurve(2, 0, dataset='LR')
+
+
 
 oddg = [5, 17, 51, 80, 80]
 oddsg = [11, 2, 1, 1, 2]
@@ -144,5 +148,5 @@ oddsg = [11, 2, 1, 1, 2]
 
 oddgIsol = [121, 258, 270, 299, 519]    # 5 of many 
 
-for gn in oddgIsol:
-    RotationCurve(gn, 0)
+#for gn in oddgIsol:
+#    RotationCurve(gn, 0)

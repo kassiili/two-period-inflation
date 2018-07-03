@@ -16,14 +16,14 @@ class plot_slice:
     def __init__(self, part_type, dataset='LR'):
         self.dataset = dataset
         self.part_type = part_type
-        self.a, self.h, self.massTable, self.boxsize = read_header() 
+        self.a, self.h, self.massTable, self.boxsize = read_header(dataset=self.dataset) 
         self.width = 1 #Mpc/h
-        self.coords = read_dataset(part_type, 'Coordinates') * u.cm.to(u.Mpc)
-        self.subGroupNumbers = read_dataset(part_type, 'SubGroupNumber')
-        self.groupNumbers = read_dataset(part_type, 'GroupNumber')
+        self.coords = read_dataset(part_type, 'Coordinates', dataset=self.dataset) * u.cm.to(u.Mpc)
+        self.subGroupNumbers = read_dataset(part_type, 'SubGroupNumber', dataset=self.dataset)
+        self.groupNumbers = read_dataset(part_type, 'GroupNumber', dataset=self.dataset)
 
         #Calculate center of mass for dm particles:
-        self.cm = self.calcCM(read_dataset(1, 'Coordinates') * u.cm.to(u.Mpc))
+        self.cm = self.calcCM(read_dataset(1, 'Coordinates', dataset=self.dataset) * u.cm.to(u.Mpc))
 
         self.coordsBySubGroup = self.divideIntoSubgroups()
 
@@ -55,8 +55,8 @@ class plot_slice:
         axes = plt.gca() 
 
         # Limits are quite awfully hardcoded for the specific case of the LR dataset..
-        axes.set_xlim([self.cm[1]-0.3, self.cm[1]+0.3])
-        axes.set_ylim([self.cm[2]-0.5, self.cm[2]+0.1])
+#        axes.set_xlim([self.cm[1]-0.3, self.cm[1]+0.3])
+#        axes.set_ylim([self.cm[2]-0.5, self.cm[2]+0.1])
 
         col = []
         x = []
@@ -74,6 +74,6 @@ class plot_slice:
 #        plt.savefig('dm_bySubgroup_%s.png'%self.dataset)
 #        plt.close()
 
-slice = plot_slice(1) 
+slice = plot_slice(1, dataset='MR') 
 slice.plot()
 
