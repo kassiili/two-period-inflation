@@ -59,13 +59,15 @@ class plot_slice:
         centrals = COPs[mask] * u.cm.to(u.Mpc)
         axes.scatter(centrals[:,x], centrals[:,y], s=10, c='red', edgecolor='none')
 
+        print(self.cm[self.slice_axis], ', ', centrals[:,self.slice_axis])
+
 #        axes.set_title('Particles (type %i) in a volume slice centered on a LG analogue'%self.part_type)
 
-#        plt.show()
-        plt.savefig('slice_partType%i%s.png'%(self.part_type, self.dataset)) 
-        plt.close()
+        plt.show()
+#        plt.savefig('slice_partType%i%s.png'%(self.part_type, self.dataset)) 
+#        plt.close()
 
-slice = plot_slice(1, 0, dataset='MR')
+slice = plot_slice(1, 2, dataset='MR')
 slice.plot()
 #part_types = [0,1,4]
 #for n in part_types:

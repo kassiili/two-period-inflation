@@ -59,8 +59,8 @@ class RotationCurve:
         data['coords'] = read_dataset(itype, 'Coordinates', dataset=self.dataset)[mask] * u.cm.to(u.kpc)
 
         # Periodic wrap coordinates around centre.
-        boxsize = self.boxsize/self.h
-        data['coords'] = np.mod(data['coords']-self.centre+0.5*boxsize,boxsize)+self.centre-0.5*boxsize
+#        boxsize = self.boxsize/self.h
+#        data['coords'] = np.mod(data['coords']-self.centre+0.5*boxsize,boxsize)+self.centre-0.5*boxsize
 
         return data
 
@@ -69,16 +69,20 @@ class RotationCurve:
 
         # Compute distance to centre.
         r = np.linalg.norm(arr['coords'] - self.centre, axis=1)
-        r = r[r>0]
+        #r = np.sqrt(np.sum((arr['coords'] - self.centre)**2, axis=1))
+       # r = r[r>0]
         mask = np.argsort(r)
         r = r[mask]
 
+        print(max(r))
+
         # Compute cumulative mass.
         cmass = np.cumsum(arr['mass'][mask])
+        print(cmass[-1])
 
         # Begin rotation curve from the 10th particle to reduce noise at the low end of the curve.
-        r = r[range(9, r.size)]
-        cmass = cmass[range(9, cmass.size)]
+        r = r[10:]
+        cmass = cmass[10:]
 
         # Compute velocity.
         myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
@@ -108,6 +112,10 @@ class RotationCurve:
             self.stars['mass'], self.bh['mass']))
         combined['coords'] = np.vstack((self.gas['coords'], self.dm['coords'],
             self.stars['coords'], self.bh['coords']))
+
+        print('0: ', np.min(combined['coords'][:,0]), '--', np.max(combined['coords'][:,0]))
+        print('1: ', np.min(combined['coords'][:,1]), '--', np.max(combined['coords'][:,1]))
+        print('2: ', np.min(combined['coords'][:,2]), '--', np.max(combined['coords'][:,2]))
         
         r, v = self.compute_rotation_curve(combined)
         plt.plot(r, v)
@@ -116,6 +124,8 @@ class RotationCurve:
         subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
         groupNumbers = read_subhaloData('GroupNumber', dataset=self.dataset)
         vmax = read_subhaloData('Vmax', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
+        mass = read_subhaloData('Mass', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.g.to(u.Msun)
+        print(mass)
         rmax = read_subhaloData('VmaxRadius', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
 
         v1kpc = self.calc_V1kpc(combined)
@@ -132,11 +142,12 @@ class RotationCurve:
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
         plt.xlim(0, 50); # plt.tight_layout()
 
+        fig = plt.gcf()
+        fig.savefig('Figures/RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
         plt.show()
-#        plt.savefig('RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
-#        plt.close()
+        plt.close()
 
-RotationCurve(2, 0, dataset='LR')
+RotationCurve(2, 0, dataset='MR')
 
 
 
