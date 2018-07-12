@@ -20,7 +20,8 @@ class RotationCurve:
 
         self.dataset = dataset
         self.a, self.h, self.massTable, self.boxsize = read_header(dataset=self.dataset)
-        self.centre = self.find_centre_of_potential(gn, sgn)
+        self.boxsize = self.boxsize*1000/self.h # Mpc/h -> kpc
+        self.centre = self.find_centre_of_potential(gn, sgn) 
 
         # Load data.
         self.gas    = self.read_galaxy(0, gn, sgn)
@@ -59,26 +60,21 @@ class RotationCurve:
         data['coords'] = read_dataset(itype, 'Coordinates', dataset=self.dataset)[mask] * u.cm.to(u.kpc)
 
         # Periodic wrap coordinates around centre.
-#        boxsize = self.boxsize/self.h
-#        data['coords'] = np.mod(data['coords']-self.centre+0.5*boxsize,boxsize)+self.centre-0.5*boxsize
-
+        data['coords'] = np.mod(data['coords']-self.centre+0.5*self.boxsize,self.boxsize)+self.centre-0.5*self.boxsize
         return data
 
     def compute_rotation_curve(self, arr):
         """ Compute the rotation curve. """
 
         # Compute distance to centre.
+        #self.centre = np.mod(self.centre + 0.5*self.boxsize,self.boxsize)-0.5*self.boxsize
+        
         r = np.linalg.norm(arr['coords'] - self.centre, axis=1)
-        #r = np.sqrt(np.sum((arr['coords'] - self.centre)**2, axis=1))
        # r = r[r>0]
         mask = np.argsort(r)
         r = r[mask]
 
-        print(max(r))
-
-        # Compute cumulative mass.
         cmass = np.cumsum(arr['mass'][mask])
-        print(cmass[-1])
 
         # Begin rotation curve from the 10th particle to reduce noise at the low end of the curve.
         r = r[10:]
@@ -113,10 +109,6 @@ class RotationCurve:
         combined['coords'] = np.vstack((self.gas['coords'], self.dm['coords'],
             self.stars['coords'], self.bh['coords']))
 
-        print('0: ', np.min(combined['coords'][:,0]), '--', np.max(combined['coords'][:,0]))
-        print('1: ', np.min(combined['coords'][:,1]), '--', np.max(combined['coords'][:,1]))
-        print('2: ', np.min(combined['coords'][:,2]), '--', np.max(combined['coords'][:,2]))
-        
         r, v = self.compute_rotation_curve(combined)
         plt.plot(r, v)
 
@@ -124,8 +116,6 @@ class RotationCurve:
         subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
         groupNumbers = read_subhaloData('GroupNumber', dataset=self.dataset)
         vmax = read_subhaloData('Vmax', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
-        mass = read_subhaloData('Mass', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.g.to(u.Msun)
-        print(mass)
         rmax = read_subhaloData('VmaxRadius', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
 
         v1kpc = self.calc_V1kpc(combined)
@@ -138,16 +128,16 @@ class RotationCurve:
         # Save plot.
         plt.legend(loc='center right')
         plt.minorticks_on()
-        plt.title('Rotation curve of halo with GN = %i and SGN = %i (%s)'%(gn,sgn,self.dataset))
+        #plt.title('Rotation curve of halo with GN = %i and SGN = %i (%s)'%(gn,sgn,self.dataset))
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
-        plt.xlim(0, 50); # plt.tight_layout()
+        plt.xlim(0, 80); # plt.tight_layout()
 
         fig = plt.gcf()
         fig.savefig('Figures/RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
         plt.show()
         plt.close()
 
-RotationCurve(2, 0, dataset='MR')
+RotationCurve(1, 0, dataset='MR')
 
 
 
