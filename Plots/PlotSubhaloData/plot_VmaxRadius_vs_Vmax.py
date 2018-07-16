@@ -4,6 +4,7 @@ import h5py
 import astropy.units as u
 import matplotlib.pyplot as plt
 from read_subhaloData import read_subhaloData
+from calc_median import calc_median_trend
 
 sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
 from read_header import read_header
@@ -31,16 +32,25 @@ class plot_Rmax_vs_Vmax:
 
         axes.set_xscale('log')
         axes.set_yscale('log')
-        axes.scatter(self.maxVelocitiesSat, self.maxRadiiSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
-        axes.scatter(self.maxVelocitiesIsol, self.maxRadiiIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
+        axes.scatter(self.maxVelocitiesSat, self.maxRadiiSat, s=3, c='red', edgecolor='none', label='satelliittigalaksit')
+        axes.scatter(self.maxVelocitiesIsol, self.maxRadiiIsol, s=3, c='blue', edgecolor='none', label='eristetyt galaksit')
 
-        axes.legend()
-        axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$r_{max}[\mathrm{kpc}]$')
+        median = calc_median_trend(self.maxVelocitiesSat, self.maxRadiiSat)
+        axes.plot(median[0], median[1], c='red', linestyle='--')
 
-        plt.show()
-#        plt.savefig('rmax_vs_vmax%s.png'%self.dataset)
-#        plt.close()
+        median = calc_median_trend(self.maxVelocitiesIsol, self.maxRadiiIsol)
+        axes.plot(median[0], median[1], c='blue', linestyle='--')
+
+        plt.xlim(20, 150);
+        plt.ylim(1, 50);
+
+        axes.legend(loc=4)
+        axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
+        axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$')
+
+#        plt.show()
+        plt.savefig('Figures/rmax_vs_vmax_%s.png'%self.dataset)
+        plt.close()
 
 slice = plot_Rmax_vs_Vmax(dataset='MR')
 slice.plot()

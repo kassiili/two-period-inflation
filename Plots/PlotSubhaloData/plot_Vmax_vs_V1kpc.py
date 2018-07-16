@@ -7,6 +7,7 @@ from astropy.constants import G
 import matplotlib.pyplot as plt
 import matplotlib.colors as clrs
 from read_subhaloData import read_subhaloData
+from calc_median import calc_median_trend
 
 sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/PlotPartPos/')
 from read_dataset import read_dataset
@@ -46,14 +47,14 @@ class plot_Vmax_vs_V1kpc:
                 massWithin1kpc[idx] = mass[r1kpc_mask].sum()
 
         # Exclude haloes with less than 10 particles within 1kpc:
-        notTooNoisy_mask = massWithin1kpc > 0
+        noiseReduction_mask = massWithin1kpc > 0
 
         for key in self.subhaloData.keys():
-            self.subhaloData[key] = self.subhaloData[key][notTooNoisy_mask]
+            self.subhaloData[key] = self.subhaloData[key][noiseReduction_mask]
 
         myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
 
-        return np.sqrt(massWithin1kpc[notTooNoisy_mask] * myG)
+        return np.sqrt(massWithin1kpc[noiseReduction_mask] * myG)
 
     def __init__(self, dataset='LR'):
 
@@ -132,32 +133,38 @@ class plot_Vmax_vs_V1kpc:
         axes.scatter(V1kpcSat, VmaxSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
         axes.scatter(V1kpcIsol, VmaxIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
 
-#        start = time.clock()
-#        median = self.calc_median_trend2(self.maxVelocitiesSat, self.stellarMassesSat)
-#        axes.plot(median[0], median[1], c='red', linestyle='--')
+        start = time.clock()
+        median = calc_median_trend(V1kpcSat, VmaxSat, bars=20)
+        axes.plot(median[0], median[1], c='red', linestyle='--')
 
-        mask = self.subhaloData['V1kpc'] > self.subhaloData['Vmax']
-        oddOnes = {}
-        oddOnes['SGN'] = self.subhaloData['subGroupNumber'][mask]
-        oddOnes['GN'] = self.subhaloData['groupNumber'][mask]
+        median = calc_median_trend(V1kpcIsol, VmaxIsol, bars=20)
+        axes.plot(median[0], median[1], c='blue', linestyle='--')
+        print(time.clock() - start)
 
-        for gn, sgn in zip(oddOnes['GN'], oddOnes['SGN']):
-            mask2 = np.logical_and(self.subhaloData['groupNumber'] == gn, self.subhaloData['subGroupNumber'] == sgn)
-            axes.scatter(self.subhaloData['V1kpc'][mask2], self.subhaloData['Vmax'][mask2], s=5, c='green', edgecolor='none')
-            print(gn, sgn)
+#        mask = self.subhaloData['V1kpc'] > self.subhaloData['Vmax']
+#        oddOnes = {}
+#        oddOnes['SGN'] = self.subhaloData['subGroupNumber'][mask]
+#        oddOnes['GN'] = self.subhaloData['groupNumber'][mask]
+#
+#        for gn, sgn in zip(oddOnes['GN'], oddOnes['SGN']):
+#            mask2 = np.logical_and(self.subhaloData['groupNumber'] == gn, self.subhaloData['subGroupNumber'] == sgn)
+#            axes.scatter(self.subhaloData['V1kpc'][mask2], self.subhaloData['Vmax'][mask2], s=5, c='green', edgecolor='none')
+#            print(gn, sgn)
 
         # Plot identity function. No physically meaningful data point should lay below this line.
-        x = np.arange(10,100)
-        y = np.arange(10,100)
-        axes.plot(x, y, c='black')
+        #x = np.arange(10,100)
+        #y = np.arange(10,100)
+        #axes.plot(x, y, c='black')
 
-        axes.legend()
-        axes.set_xlabel('$v_{1kpc}[\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$v_{max}[\mathrm{km s^{-1}}]$')
+        plt.xlim(10, 110)
+        plt.ylim(10, 110)
 
-        plt.show()
-#        plt.savefig('Vmax_vs_V1kpc_%s.png'%self.dataset)
-#        plt.close()
+        axes.legend(loc=4)
+        axes.set_xlabel('$v_{\mathrm{1kpc}}[\mathrm{km s^{-1}}]$')
+        axes.set_ylabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
+
+        plt.savefig('Figures/Vmax_vs_V1kpc_withMedian_%s.png'%self.dataset)
+        plt.close()
 
 
 plot = plot_Vmax_vs_V1kpc(dataset='MR') 

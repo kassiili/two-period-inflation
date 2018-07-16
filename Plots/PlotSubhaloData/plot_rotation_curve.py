@@ -128,7 +128,7 @@ class RotationCurve:
         # Save plot.
         plt.legend(loc='center right')
         plt.minorticks_on()
-        #plt.title('Rotation curve of halo with GN = %i and SGN = %i (%s)'%(gn,sgn,self.dataset))
+        plt.title('Rotation curve of halo with GN = %i and SGN = %i (%s)'%(gn,sgn,self.dataset))
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
         plt.xlim(0, 80); # plt.tight_layout()
 
@@ -137,7 +137,7 @@ class RotationCurve:
         plt.show()
         plt.close()
 
-RotationCurve(1, 0, dataset='MR')
+RotationCurve(12, 2, dataset='MR')
 
 
 
