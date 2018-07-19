@@ -1,9 +1,10 @@
 import numpy as np
 
-def calc_median_trend(x, y, bars=10):
+def calc_median_trend(x, y, points_per_bar=10):
     xy = np.vstack([x,y])
     xy = xy[:,xy[0,:].argsort()]
     datapoints = xy[0,:].size
+    bars = datapoints//points_per_bar
 
     #Excĺude first elements (if necessary) to allow reshaping:
     if (datapoints%bars != 0):

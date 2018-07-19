@@ -16,7 +16,7 @@ from read_dataset_dm_mass import read_dataset_dm_mass
 sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
 from read_header import read_header
 
-class plot_Vmax_vs_V1kpc:
+class plot_starmass_vs_V1kpc:
 
     def calcVelocitiesAt1kpc(self):
         """ For each subhalo, calculate the circular velocity at 1kpc. """
@@ -98,15 +98,10 @@ class plot_Vmax_vs_V1kpc:
 
         data = {}
 
-        data['Vmax'] = read_subhaloData('Vmax', dataset=self.dataset)/100000  # cm/s to km/s
-
-        # Exclude unphysical haloes with Vmax non-positive:
-        mask = data['Vmax'] > 0
-
-        data['Vmax'] = data['Vmax'][mask]
-        data['COP'] = read_subhaloData('CentreOfPotential', dataset=self.dataset)[mask] * u.cm.to(u.kpc)
-        data['groupNumber'] = read_subhaloData('GroupNumber', dataset=self.dataset)[mask]
-        data['subGroupNumber'] = read_subhaloData('SubGroupNumber', dataset=self.dataset)[mask]
+        data['SM'] = read_subhaloData('Stars/Mass', dataset=self.dataset) * u.g.to(u.Msun)
+        data['COP'] = read_subhaloData('CentreOfPotential', dataset=self.dataset) * u.cm.to(u.kpc)
+        data['groupNumber'] = read_subhaloData('GroupNumber', dataset=self.dataset)
+        data['subGroupNumber'] = read_subhaloData('SubGroupNumber', dataset=self.dataset)
 
         return data
 
@@ -116,9 +111,9 @@ class plot_Vmax_vs_V1kpc:
         maskSat = self.subhaloData['subGroupNumber'] != 0
         maskIsol = self.subhaloData['subGroupNumber'] == 0
 
-        VmaxSat = self.subhaloData['Vmax'][maskSat]
+        SMSat = self.subhaloData['SM'][maskSat]
         V1kpcSat = self.subhaloData['V1kpc'][maskSat]
-        VmaxIsol = self.subhaloData['Vmax'][maskIsol]
+        SMIsol = self.subhaloData['SM'][maskIsol]
         V1kpcIsol = self.subhaloData['V1kpc'][maskIsol]
 
         fig, axes = plt.subplots()
@@ -126,41 +121,26 @@ class plot_Vmax_vs_V1kpc:
         axes.set_xscale('log')
         axes.set_yscale('log')
 
-        axes.scatter(V1kpcSat, VmaxSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
-        axes.scatter(V1kpcIsol, VmaxIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
+        axes.scatter(V1kpcSat, SMSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
+        axes.scatter(V1kpcIsol, SMIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
 
-        median = calc_median_trend(V1kpcSat, VmaxSat)
+        median = calc_median_trend(V1kpcSat, SMSat)
         axes.plot(median[0], median[1], c='red', linestyle='--')
 
-        median = calc_median_trend(V1kpcIsol, VmaxIsol)
+        median = calc_median_trend(V1kpcIsol, SMIsol)
         axes.plot(median[0], median[1], c='blue', linestyle='--')
 
-#        mask = self.subhaloData['V1kpc'] > self.subhaloData['Vmax']
-#        oddOnes = {}
-#        oddOnes['SGN'] = self.subhaloData['subGroupNumber'][mask]
-#        oddOnes['GN'] = self.subhaloData['groupNumber'][mask]
-#
-#        for gn, sgn in zip(oddOnes['GN'], oddOnes['SGN']):
-#            mask2 = np.logical_and(self.subhaloData['groupNumber'] == gn, self.subhaloData['subGroupNumber'] == sgn)
-#            axes.scatter(self.subhaloData['V1kpc'][mask2], self.subhaloData['Vmax'][mask2], s=5, c='green', edgecolor='none')
-#            print(gn, sgn)
-
-        # Plot identity function. No physically meaningful data point should lay below this line.
-        #x = np.arange(10,100)
-        #y = np.arange(10,100)
-        #axes.plot(x, y, c='black')
-
         plt.xlim(10, 110)
-        plt.ylim(10, 110)
+        plt.ylim(10**5, 10**11)
 
         axes.legend(loc=4)
         axes.set_xlabel('$v_{\mathrm{1kpc}}[\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
+        axes.set_ylabel('$M_*[M_\odot]$')
 
         plt.show()
-        fig.savefig('Figures/Vmax_vs_V1kpc_withMedian_%s.png'%self.dataset)
+        fig.savefig('Figures/Starmass_vs_V1kpc_withMedian_%s.png'%self.dataset)
         plt.close()
 
 
-plot = plot_Vmax_vs_V1kpc(dataset='MR') 
+plot = plot_starmass_vs_V1kpc(dataset='MR') 
 plot.plot()

@@ -48,9 +48,9 @@ class plot_Rmax_vs_Vmax:
         axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
         axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$')
 
-#        plt.show()
-        plt.savefig('Figures/rmax_vs_vmax_%s.png'%self.dataset)
-        plt.close()
+        plt.show()
+        #plt.savefig('Figures/rmax_vs_vmax_%s.png'%self.dataset)
+        #plt.close()
 
 slice = plot_Rmax_vs_Vmax(dataset='MR')
 slice.plot()

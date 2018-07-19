@@ -26,8 +26,7 @@ class plot_SM_vs_Vmax:
         self.stellarMassesIsol = stellarMasses[maskIsol]
 
     def plot(self):
-        fig = plt.figure()
-        axes = plt.gca()
+        fig, axes = plt.subplots()
 
         axes.set_xscale('log')
         axes.set_yscale('log')
@@ -35,8 +34,9 @@ class plot_SM_vs_Vmax:
         axes.scatter(self.maxVelocitiesSat, self.stellarMassesSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
         axes.scatter(self.maxVelocitiesIsol, self.stellarMassesIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
 
-        median = calc_median_trend(self.maxVelocitiesSat, self.stellarMassesSat)
+        median = calc_median_trend(self.maxVelocitiesSat, self.stellarMassesSat, points_per_bar=7)
         axes.plot(median[0], median[1], c='red', linestyle='--')
+        axes.scatter(median[0], median[1], s=5)
 
         median = calc_median_trend(self.maxVelocitiesIsol, self.stellarMassesIsol)
         axes.plot(median[0], median[1], c='blue', linestyle='--')
@@ -47,7 +47,7 @@ class plot_SM_vs_Vmax:
         #axes.set_title('Stellar mass of luminous subhaloes')
 
         plt.show()
-#        plt.savefig('Figures/SM_vs_Vmax_%s.png'%self.dataset)
+        fig.savefig('Figures/SM_vs_Vmax_%s.png'%self.dataset)
 #        plt.close()
 
 
