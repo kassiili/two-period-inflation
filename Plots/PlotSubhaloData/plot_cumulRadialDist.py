@@ -19,6 +19,7 @@ class plot_subhalo_dist_vs_vmax:
         sgns = read_subhaloData('SubGroupNumber', dataset=self.dataset)
         COPs = read_subhaloData('CentreOfPotential', dataset=self.dataset) * u.cm.to(u.kpc)
         SM = read_subhaloData('Stars/Mass', dataset=self.dataset)
+        mass = read_subhaloData('Mass', dataset=self.dataset) * u.g.to(u.Msun)
 
         # Get COP of the central halo:
         centre = COPs[np.logical_and(gns == 1, sgns == 0)]
@@ -26,7 +27,8 @@ class plot_subhalo_dist_vs_vmax:
         # Calculate distances to centre:
         r = np.linalg.norm(COPs - centre, axis=1)
 
-        mask = np.logical_and(gns == 1, sgns != 0)
+        # Choose subhaloes belonging to the MW analogue and with total mass sufficient for galaxy formation:
+        mask = np.logical_and.reduce((gns == 1, sgns != 0, mass > 10**8))
         r = r[mask]
         SM = SM[mask]
 
