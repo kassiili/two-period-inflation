@@ -6,15 +6,13 @@ import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt
 import matplotlib.colors as clrs
-from read_subhaloData import read_subhaloData
 from calc_median import calc_median_trend
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/PlotPartPos/')
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
+from read_header import read_header
 from read_dataset import read_dataset
 from read_dataset_dm_mass import read_dataset_dm_mass
-
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
-from read_header import read_header
+from read_subhaloData import read_subhaloData
 
 class plot_starmass_vs_V1kpc:
 

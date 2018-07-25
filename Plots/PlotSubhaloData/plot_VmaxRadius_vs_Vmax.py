@@ -3,11 +3,11 @@ import numpy as np
 import h5py
 import astropy.units as u
 import matplotlib.pyplot as plt
-from read_subhaloData import read_subhaloData
 from calc_median import calc_median_trend
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
 from read_header import read_header
+from read_subhaloData import read_subhaloData
 
 class plot_Rmax_vs_Vmax:
 

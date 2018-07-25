@@ -3,22 +3,20 @@ import numpy as np
 import h5py
 import astropy.units as u
 import matplotlib.pyplot as plt
-from read_dataset import read_dataset
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/ReadData/')
 from read_header import read_header
-
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/PlotSubhaloData')
+from read_dataset import read_dataset
 from read_subhaloData import read_subhaloData
 
 class plot_slice:
 
-    def __init__(self, part_type, slice_axis, dataset='LR'):
+    def __init__(self, part_type, slice_axis, width, dataset='V1_LR_fix/snapshot_127_z000p000'):
         self.part_type = part_type
         self.slice_axis = slice_axis
         self.dataset = dataset
         self.a, self.h, mass, self.boxsize = read_header(dataset=self.dataset) 
-        self.width = 0.03
+        self.width = width
         self.coords = read_dataset(self.part_type, 'Coordinates', dataset=self.dataset) * u.cm.to(u.Mpc)
 
         self.cm = self.calcCM()
@@ -67,7 +65,7 @@ class plot_slice:
 #        plt.savefig('slice_partType%i%s.png'%(self.part_type, self.dataset)) 
 #        plt.close()
 
-slice = plot_slice(1, 2, dataset='MR')
+slice = plot_slice(1, 2, 0.03) #, dataset='snapshots/V1_MR_mock_fix/snapshot_082_z001p941'
 slice.plot()
 #part_types = [0,1,4]
 #for n in part_types:

@@ -1,16 +1,20 @@
 import numpy as np
 import h5py
 
-def read_dataset(itype, att, nfiles=16, dataset='LR'):
+def read_dataset(itype, att, nfiles=16, dataset='V1_LR_fix/snapshot_127_z000p000'):
     """ Read a selected dataset, itype is the PartType and att is the attribute name. """
 
     # Output array.
     data = []
 
+    path = '/home/kassiili/SummerProject/practise-with-datasets/%s'%dataset
+    file_prefix = list(dataset.split("/")[-1])
+    file_prefix = "".join(file_prefix[:4]) + "".join(file_prefix[8:])   # 'snapshot' -> 'snap'
+
     # Loop over each file and extract the data.
     for i in range(nfiles):
-        path = '/home/kassiili/SummerProject/practise-with-datasets/V1_%s_fix/snapshot_127_z000p000'%dataset
-        f = h5py.File('%s/snap_127_z000p000.%i.hdf5'%(path, i), 'r')
+        filename = '%s/%s.%i.hdf5'%(path, file_prefix, i)
+        f = h5py.File(filename, 'r')
         tmp = f['PartType%i/%s'%(itype, att)][...]
         data.append(tmp)
 

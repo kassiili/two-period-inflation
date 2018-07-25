@@ -6,10 +6,10 @@ import time
 import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib.colors as clrs
-from read_dataset import read_dataset
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/ReadData/')
 from read_header import read_header
+from read_dataset import read_dataset
 
 class plot_slice:
 

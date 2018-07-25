@@ -5,10 +5,10 @@ import time
 import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib
-from read_subhaloData import read_subhaloData
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/')
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
 from read_header import read_header
+from read_subhaloData import read_subhaloData
 
 class plot_subhalo_dist_vs_vmax:
 

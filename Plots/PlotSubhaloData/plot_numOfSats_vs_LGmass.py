@@ -2,6 +2,8 @@ import numpy as np
 import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt
+
+sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
 from read_subhaloData import read_subhaloData
 
 def calc_satellites(dataset='LR'):
