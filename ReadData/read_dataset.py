@@ -1,5 +1,9 @@
 import numpy as np
 import h5py
+import os
+
+# Numbers of files for different datasets:
+#   - V1_LR_fix and V1_MR_fix: 16
 
 def read_dataset(itype, att, nfiles=16, dataset='V1_LR_fix/snapshot_127_z000p000'):
     """ Read a selected dataset, itype is the PartType and att is the attribute name. """
@@ -7,7 +11,13 @@ def read_dataset(itype, att, nfiles=16, dataset='V1_LR_fix/snapshot_127_z000p000
     # Output array.
     data = []
 
-    path = '/home/kassiili/SummerProject/practise-with-datasets/%s'%dataset
+    # Add relative path from current directory to the directory where the script is located:
+    dirname = os.path.dirname(__file__)
+    if not dirname:
+        path = '../%s'%dataset 
+    else:
+        path = '%s/../%s'%(dirname,dataset)
+
     file_prefix = list(dataset.split("/")[-1])
     file_prefix = "".join(file_prefix[:4]) + "".join(file_prefix[8:])   # 'snapshot' -> 'snap'
 
@@ -41,3 +51,5 @@ def read_dataset(itype, att, nfiles=16, dataset='V1_LR_fix/snapshot_127_z000p000
 
     return data
 
+#data = read_dataset(1, 'Coordinates')
+#print(data[0,:])

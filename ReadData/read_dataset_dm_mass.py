@@ -1,10 +1,22 @@
 import numpy as np
 import h5py
+import os
 
-def read_dataset_dm_mass(dataset='LR'):
+def read_dataset_dm_mass(dataset='V1_LR_fix/snapshot_127_z000p000'):
     """ Special case for the mass of dark matter particles. """
-    path = '/home/kassiili/SummerProject/practise-with-datasets/V1_%s_fix/snapshot_127_z000p000'%dataset
-    f           = h5py.File('%s/snap_127_z000p000.0.hdf5'%path, 'r')
+
+    # Add relative path from current directory to the directory where the script is located:
+    dirname = os.path.dirname(__file__)
+    if not dirname:
+        path = '../%s'%dataset 
+    else:
+        path = '%s/../%s'%(dirname,dataset)
+
+    file_prefix = list(dataset.split("/")[-1])
+    file_prefix = "".join(file_prefix[:4]) + "".join(file_prefix[8:])   # 'snapshot' -> 'snap'
+
+    filename = '%s/%s.0.hdf5'%(path, file_prefix)
+    f = h5py.File(filename, 'r')
     h           = f['Header'].attrs.get('HubbleParam')
     a           = f['Header'].attrs.get('Time')
     dm_mass     = f['Header'].attrs.get('MassTable')[1]
@@ -24,3 +36,5 @@ def read_dataset_dm_mass(dataset='LR'):
 
     return m
 
+#data = read_dataset_dm_mass()
+#print(data[0])

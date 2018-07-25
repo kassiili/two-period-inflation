@@ -6,11 +6,13 @@ import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt 
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
-from read_header import read_header
-from read_dataset import read_dataset
-from read_dataset_dm_mass import read_dataset_dm_mass
-from read_subhaloData import read_subhaloData
+from practise-with-datasets.ReadData.read_header import read_header
+
+#sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
+#from read_header import read_header
+#from read_dataset import read_dataset
+#from read_dataset_dm_mass import read_dataset_dm_mass
+#from read_subhaloData import read_subhaloData
 
 class RotationCurve:
 
@@ -135,17 +137,17 @@ class RotationCurve:
         plt.show()
         plt.close()
 
-RotationCurve(12, 2, dataset='MR')
+RotationCurve(12, 2, dataset='LR')
 
 
 
-oddg = [5, 17, 51, 80, 80]
-oddsg = [11, 2, 1, 1, 2]
-
+#oddg = [5, 17, 51, 80, 80]
+#oddsg = [11, 2, 1, 1, 2]
+#
 #for g, sg in zip(oddg, oddsg):
 #    RotationCurve(g,sg)
-
-oddgIsol = [121, 258, 270, 299, 519]    # 5 of many 
-
+#
+#oddgIsol = [121, 258, 270, 299, 519]    # 5 of many 
+#
 #for gn in oddgIsol:
 #    RotationCurve(gn, 0)

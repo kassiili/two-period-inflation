@@ -1,17 +1,27 @@
 import numpy as np
 import h5py
+import os
 
-def read_partIDs(att, nfiles=95, dataset='LR'):
+def read_partIDs(att, nfiles=95, dataset='V1_LR_fix/groups_127_z000p000'):
     """ Read a selected dataset from the IDs group of the group data files, att is the attribute name.  """
 
-    path = '/home/kassiili/SummerProject/practise-with-datasets/V1_%s_fix/groups_127_z000p000'%dataset
+    # Add relative path from current directory to the directory where the script is located:
+    dirname = os.path.dirname(__file__)
+    if not dirname:
+        path = '../%s'%dataset 
+    else:
+        path = '%s/../%s'%(dirname,dataset)
+
+    file_prefix = list(dataset.split("/")[-1])
+    file_prefix = "eagle_subfind_tab" + "".join(file_prefix[6:])
 
     # Output array.
     data = []
 
     # Loop over each file and extract the data.
     for i in range(nfiles):
-        f = h5py.File('%s/eagle_subfind_tab_127_z000p000.%i.hdf5'%(path, i), 'r')
+        filename = '%s/%s.%i.hdf5'%(path, file_prefix, i)
+        f = h5py.File(filename, 'r')
         tmp = f['IDs/%s'%att][...]
         data.append(tmp)
 
@@ -38,3 +48,5 @@ def read_partIDs(att, nfiles=95, dataset='LR'):
 
     return data
 
+#data = read_partIDs('ParticleID')
+#print(data[0])
