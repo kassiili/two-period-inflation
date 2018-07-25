@@ -25,7 +25,6 @@ class SatRotationCurves:
         self.boxsize = self.boxsize*1000/self.h # Mpc/h -> kpc
 
         self.sat_data, self.sat_cnt = self.read_satellite_data()
-        print('satellites: ', self.sat_cnt)
         self.read_particles()
 
         # Plot.
@@ -43,7 +42,8 @@ class SatRotationCurves:
         dists_to_centre = np.linalg.norm(sat_data['COPs'] - halo_centre, axis=1)
         
         # Choose satellites (by definition d < 300 kpc) with vmax > 12 km/s
-        sat_mask = np.logical_and.reduce((sat_data['GNs']==self.gn, sat_data['SGNs']!=0, dists_to_centre<300, sat_data['vmax']>12))
+        sat_mask = np.logical_and.reduce((sat_data['GNs']==self.gn, sat_data['SGNs']!=0, 
+            dists_to_centre<300, sat_data['vmax']>12))
         for attr in sat_data.keys():
             sat_data[attr] = sat_data[attr][sat_mask]
 
@@ -63,7 +63,6 @@ class SatRotationCurves:
 
         # Combine into arrays by attribute:
         for attr in data.keys():
-            print(attr)
             if attr == 'Coordinates':
                 data[attr] = np.vstack((read_dataset(0, attr, dataset=self.dataset),
                     read_dataset(1, attr, dataset=self.dataset),
@@ -93,15 +92,12 @@ class SatRotationCurves:
 
         # Find offsets in the coords and masses arrays for each satellite (Counter returns a dict object. A value behind a certain key gives the number of instances of the key in argument array):
         part_cnt = Counter(data['SubGroupNumber']).values()
-        print(Counter(data['SubGroupNumber']))
 
         # Convert from dict_values to ndarray:
         part_cnt = np.asarray(list(part_cnt))
 
-        print('satellites: ', part_cnt.size)
-
         # Zero must be added to the beginning of the array, since the offset of the first satellite must be zero:
-        self.sat_data['offsets'] = np.cumsum(np.insert(part_cnt, 0, 0))
+        self.sat_data['offsets'] = np.insert(np.cumsum(part_cnt[:-1]), 0, 0)
 
     def compute_rotation_curve(self, sat_idx):
         """ Compute the rotation curve of given satellite. """
@@ -109,15 +105,19 @@ class SatRotationCurves:
         start = self.sat_data['offsets'][sat_idx]
                                     #  == sat_idx + 1
         end = self.sat_data['offsets'][sat_idx-self.sat_cnt+1] # Handles special case of last item
-        print(end-start)
 
         # Compute distance to centre.
-        r = np.linalg.norm(self.sat_data['coords'][start:end] - self.sat_data['COPs'][sat_idx], axis=1)
+        if end==0:
+            r = np.linalg.norm(self.sat_data['coords'][start:] - self.sat_data['COPs'][sat_idx], axis=1)
+            mass = self.sat_data['masses'][start:]
+        else:
+            r = np.linalg.norm(self.sat_data['coords'][start:end] - self.sat_data['COPs'][sat_idx], axis=1)
+            mass = self.sat_data['masses'][start:end]
 
         mask = np.argsort(r)
         r = r[mask]
 
-        cmass = np.cumsum(self.sat_data['masses'][start:end][mask])
+        cmass = np.cumsum(mass[mask])
 
         # Begin rotation curve from the 10th particle to reduce noise at the low end of the curve.
         r = r[10:]
@@ -139,13 +139,13 @@ class SatRotationCurves:
 
         # Save plot.
         plt.minorticks_on()
-        #plt.title('Rotation curve of halo with GN = %i and SGN = %i (%s)'%(gn,sgn,self.dataset))
+        plt.title('Satellite rotation profiles of halo with GN = %i (%s)'%(self.gn,self.dataset))
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
-        plt.xlim(0, 80); # plt.tight_layout()
+        plt.xlim(0,1.5); plt.ylim(5,35)
 
         #fig.savefig('Figures/RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
         plt.show()
         plt.close()
 
-SatRotationCurves(1, dataset='LR')
+SatRotationCurves(1, dataset='MR')
 
