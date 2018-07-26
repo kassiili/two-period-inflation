@@ -1,4 +1,4 @@
-import sys
+import os, sys
 import h5py
 import numpy as np
 import time
@@ -6,20 +6,19 @@ import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt 
 
-from practise-with-datasets.ReadData.read_header import read_header
-
-#sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
-#from read_header import read_header
-#from read_dataset import read_dataset
-#from read_dataset_dm_mass import read_dataset_dm_mass
-#from read_subhaloData import read_subhaloData
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
+import read_data as read_data
 
 class RotationCurve:
 
-    def __init__(self, gn, sgn, dataset='LR'):
+    def __init__(self, gn, sgn, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
 
         self.dataset = dataset
-        self.a, self.h, self.massTable, self.boxsize = read_header(dataset=self.dataset)
+        self.nfiles_part = nfiles_part
+        self.nfiles_group = nfiles_group
+        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
+
+        self.a, self.h, self.massTable, self.boxsize = self.reader.read_header()
         self.boxsize = self.boxsize*1000/self.h # Mpc/h -> kpc
         self.centre = self.find_centre_of_potential(gn, sgn) 
 
@@ -35,9 +34,9 @@ class RotationCurve:
     def find_centre_of_potential(self, gn, sgn):
         """ Obtain the centre of potential of the given galaxy from the subhalo catalogues. """
 
-        subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
-        groupNumbers = read_subhaloData('GroupNumber', dataset=self.dataset)
-        cop = read_subhaloData('CentreOfPotential', dataset=self.dataset)
+        subGroupNumbers = self.reader.read_subhaloData('SubGroupNumber')
+        groupNumbers = self.reader.read_subhaloData('GroupNumber')
+        cop = self.reader.read_subhaloData('CentreOfPotential')
 
         return cop[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
 
@@ -49,15 +48,15 @@ class RotationCurve:
         data = {}
 
         # Load data, then mask to selected GroupNumber and SubGroupNumber.
-        gns  = read_dataset(itype, 'GroupNumber', dataset=self.dataset)
-        sgns = read_dataset(itype, 'SubGroupNumber', dataset=self.dataset)
+        gns  = self.reader.read_dataset(itype, 'GroupNumber')
+        sgns = self.reader.read_dataset(itype, 'SubGroupNumber')
 
         mask = np.logical_and(gns == gn, sgns == sgn)
         if itype == 1:
-            data['mass'] = read_dataset_dm_mass(dataset=self.dataset)[mask] * u.g.to(u.Msun)
+            data['mass'] = self.reader.read_dataset_dm_mass()[mask] * u.g.to(u.Msun)
         else:
-            data['mass'] = read_dataset(itype, 'Masses', dataset=self.dataset)[mask] * u.g.to(u.Msun)
-        data['coords'] = read_dataset(itype, 'Coordinates', dataset=self.dataset)[mask] * u.cm.to(u.kpc)
+            data['mass'] = self.reader.read_dataset(itype, 'Masses')[mask] * u.g.to(u.Msun)
+        data['coords'] = self.reader.read_dataset(itype, 'Coordinates')[mask] * u.cm.to(u.kpc)
 
         # Periodic wrap coordinates around centre.
         data['coords'] = np.mod(data['coords']-self.centre+0.5*self.boxsize,self.boxsize)+self.centre-0.5*self.boxsize
@@ -100,7 +99,7 @@ class RotationCurve:
         return np.sqrt(myG * arr['mass'][mask].sum())
 
     def plot(self, gn, sgn):
-        plt.figure()
+        fig, axes = plt.subplots()
 
         # All parttypes together.
         combined = {}
@@ -110,35 +109,33 @@ class RotationCurve:
             self.stars['coords'], self.bh['coords']))
 
         r, v = self.compute_rotation_curve(combined)
-        plt.plot(r, v)
+        axes.plot(r, v)
 
         # Get Vmax and Rmax:
-        subGroupNumbers = read_subhaloData('SubGroupNumber', dataset=self.dataset)
-        groupNumbers = read_subhaloData('GroupNumber', dataset=self.dataset)
-        vmax = read_subhaloData('Vmax', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
-        rmax = read_subhaloData('VmaxRadius', dataset=self.dataset)[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
+        subGroupNumbers = self.reader.read_subhaloData('SubGroupNumber')
+        groupNumbers = self.reader.read_subhaloData('GroupNumber')
+        vmax = self.reader.read_subhaloData('Vmax')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
+        rmax = self.reader.read_subhaloData('VmaxRadius')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
 
         v1kpc = self.calc_V1kpc(combined)
 
-        plt.axhline(vmax, linestyle='dashed', c='red', label='Vmax=%1.3f'%vmax)
-        plt.axvline(rmax, linestyle='dashed', c='red', label='Rmax=%1.3f'%rmax)
-        plt.axhline(v1kpc, linestyle='dashed', c='green', label='V1kpc=%1.3f'%v1kpc)
-        plt.axvline(1, linestyle='dashed', c='green')
+        axes.axhline(vmax, linestyle='dashed', c='red', label='Vmax=%1.3f'%vmax)
+        axes.axvline(rmax, linestyle='dashed', c='red', label='Rmax=%1.3f'%rmax)
+        axes.axhline(v1kpc, linestyle='dashed', c='green', label='V1kpc=%1.3f'%v1kpc)
+        axes.axvline(1, linestyle='dashed', c='green')
         
         # Save plot.
-        plt.legend(loc='center right')
-        plt.minorticks_on()
-        plt.title('Rotation curve of halo with GN = %i and SGN = %i (%s)'%(gn,sgn,self.dataset))
-        plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
-        plt.xlim(0, 80); # plt.tight_layout()
+        axes.legend(loc=0)
+        axes.minorticks_on()
+        axes.set_title('Rotation curve of halo with GN = %i and SGN = %i\n(%s)'%(gn,sgn,self.dataset))
+        axes.set_ylabel('Velocity [km/s]'); axes.set_xlabel('r [kpc]')
+        axes.set_xlim(0, 80); # axes.tight_layout()
 
-        fig = plt.gcf()
-        fig.savefig('Figures/RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
         plt.show()
+        fig.savefig('../Figures/%s/RotationCurve_g%i-sg%i.png'%(self.dataset,gn,sgn))
         plt.close()
 
-RotationCurve(12, 2, dataset='LR')
-
+RotationCurve(1, 0, dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64) 
 
 
 #oddg = [5, 17, 51, 80, 80]

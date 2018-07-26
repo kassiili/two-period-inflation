@@ -1,4 +1,4 @@
-import sys
+import os, sys
 import numpy as np
 import h5py
 import time
@@ -6,20 +6,23 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
-from read_header import read_header
-from read_subhaloData import read_subhaloData
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
+import read_data as read_data
 
-class plot_subhalo_dist_vs_vmax:
+class plot_subhalo_dist_by_distance:
 
-    def __init__(self, dataset='LR'):
+    def __init__(self, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
+
         self.dataset = dataset
+        self.nfiles_part = nfiles_part
+        self.nfiles_group = nfiles_group
+        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
 
-        gns = read_subhaloData('GroupNumber', dataset=self.dataset)
-        sgns = read_subhaloData('SubGroupNumber', dataset=self.dataset)
-        COPs = read_subhaloData('CentreOfPotential', dataset=self.dataset) * u.cm.to(u.kpc)
-        SM = read_subhaloData('Stars/Mass', dataset=self.dataset)
-        mass = read_subhaloData('Mass', dataset=self.dataset) * u.g.to(u.Msun)
+        gns = self.reader.read_subhaloData('GroupNumber')
+        sgns = self.reader.read_subhaloData('SubGroupNumber')
+        COPs = self.reader.read_subhaloData('CentreOfPotential') * u.cm.to(u.kpc)
+        SM = self.reader.read_subhaloData('Stars/Mass')
+        mass = self.reader.read_subhaloData('Mass') * u.g.to(u.Msun)
 
         # Get COP of the central halo:
         centre = COPs[np.logical_and(gns == 1, sgns == 0)]
@@ -45,15 +48,15 @@ class plot_subhalo_dist_vs_vmax:
         axes.plot(self.rLum, np.arange(1,self.rLum.size+1)/self.rLum.size, c="black")
         axes.plot(self.rDark, np.arange(1,self.rDark.size+1)/self.rDark.size, c="grey")
 
-        axes.legend()
+        axes.legend(loc=0)
         axes.set_xlabel('$r[\mathrm{kpc}]$')
         axes.set_ylabel('$N(<r)/N_\mathrm{tot}$')
-        #axes.set_title('Distribution of luminous subhaloes as a function of $v_{max}$')
+        axes.set_title('Distribution of luminous subhaloes by distance from halo centre\n(%s)'%self.dataset)
 
         plt.show()
-#        plt.savefig('Figures/Dist-of-subhaloes_vs_Vmax_%s.png'%self.dataset)
-#        plt.close()
+        fig.savefig('../Figures/%s/Radial-dist-of-subhaloes.png'%self.dataset)
+        plt.close()
 
-plot = plot_subhalo_dist_vs_vmax(dataset='MR') 
+plot = plot_subhalo_dist_by_distance(dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64) 
 plot.plot()
 

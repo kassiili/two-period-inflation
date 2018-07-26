@@ -1,4 +1,4 @@
-import sys
+import os, sys
 import numpy as np
 import h5py
 import time
@@ -8,13 +8,35 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as clrs
 from calc_median import calc_median_trend
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
-from read_header import read_header
-from read_dataset import read_dataset
-from read_dataset_dm_mass import read_dataset_dm_mass
-from read_subhaloData import read_subhaloData
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
+import read_data as read_data
 
 class plot_Vmax_vs_V1kpc:
+
+    def __init__(self, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
+
+        self.dataset = dataset
+        self.nfiles_part = nfiles_part
+        self.nfiles_group = nfiles_group
+        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
+
+        self.a, self.h, self.massTable, self.boxsize = self.reader.read_header() 
+
+        # Read particle data of all particle types:
+        gas = self.read_particle_data(0)
+        dm = self.read_particle_data(1)
+        stars = self.read_particle_data(4)
+        BHs = self.read_particle_data(5)
+
+        # Combine particle data into single array:
+        self.combined = {}
+        self.combined['coords'] = np.vstack((gas['coords'], dm['coords'], stars['coords'], BHs['coords']))
+        self.combined['mass'] = np.concatenate((gas['mass'], dm['mass'], stars['mass'], BHs['mass']))
+        self.combined['groupNumber'] = np.concatenate((gas['groupNumber'], dm['groupNumber'], stars['groupNumber'], BHs['groupNumber']))
+        self.combined['subGroupNumber'] = np.concatenate((gas['subGroupNumber'], dm['subGroupNumber'], stars['subGroupNumber'], BHs['subGroupNumber']))
+
+        self.subhaloData = self.read_subhalo_data()
+        self.subhaloData['V1kpc'] = self.calcVelocitiesAt1kpc()
 
     def calcVelocitiesAt1kpc(self):
         """ For each subhalo, calculate the circular velocity at 1kpc. """
@@ -53,41 +75,20 @@ class plot_Vmax_vs_V1kpc:
         myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
 
         return np.sqrt(massWithin1kpc[noiseReduction_mask] * myG)
-
-    def __init__(self, dataset='LR'):
-
-        self.dataset = dataset
-        self.a, self.h, self.massTable, self.boxsize = read_header(dataset=self.dataset) 
-
-        # Read particle data of all particle types:
-        gas = self.read_particle_data(0)
-        dm = self.read_particle_data(1)
-        stars = self.read_particle_data(4)
-        BHs = self.read_particle_data(5)
-
-        # Combine particle data into single array:
-        self.combined = {}
-        self.combined['coords'] = np.vstack((gas['coords'], dm['coords'], stars['coords'], BHs['coords']))
-        self.combined['mass'] = np.concatenate((gas['mass'], dm['mass'], stars['mass'], BHs['mass']))
-        self.combined['groupNumber'] = np.concatenate((gas['groupNumber'], dm['groupNumber'], stars['groupNumber'], BHs['groupNumber']))
-        self.combined['subGroupNumber'] = np.concatenate((gas['subGroupNumber'], dm['subGroupNumber'], stars['subGroupNumber'], BHs['subGroupNumber']))
-
-        self.subhaloData = self.read_subhalo_data()
-        self.subhaloData['V1kpc'] = self.calcVelocitiesAt1kpc()
         
     def read_particle_data(self, part_type):
         """ Read group numbers, subgroup numbers, particle masses and coordinates of all the particles of a certain type. """
 
         data = {}
 
-        data['groupNumber']  = read_dataset(part_type, 'GroupNumber', dataset=self.dataset)
-        data['subGroupNumber'] = read_dataset(part_type, 'SubGroupNumber', dataset=self.dataset)
+        data['groupNumber']  = self.reader.read_dataset(part_type, 'GroupNumber')
+        data['subGroupNumber'] = self.reader.read_dataset(part_type, 'SubGroupNumber')
 
         if part_type == 1:
-            data['mass'] = read_dataset_dm_mass(dataset=self.dataset) * u.g.to(u.Msun)
+            data['mass'] = self.reader.read_dataset_dm_mass() * u.g.to(u.Msun)
         else:
-            data['mass'] = read_dataset(part_type, 'Masses', dataset=self.dataset) * u.g.to(u.Msun)
-        data['coords'] = read_dataset(part_type, 'Coordinates', dataset=self.dataset) * u.cm.to(u.kpc)
+            data['mass'] = self.reader.read_dataset(part_type, 'Masses') * u.g.to(u.Msun)
+        data['coords'] = self.reader.read_dataset(part_type, 'Coordinates') * u.cm.to(u.kpc)
 
         return data
 
@@ -96,15 +97,15 @@ class plot_Vmax_vs_V1kpc:
 
         data = {}
 
-        data['Vmax'] = read_subhaloData('Vmax', dataset=self.dataset)/100000  # cm/s to km/s
+        data['Vmax'] = self.reader.read_subhaloData('Vmax')/100000  # cm/s to km/s
 
         # Exclude unphysical haloes with Vmax non-positive:
         mask = data['Vmax'] > 0
 
         data['Vmax'] = data['Vmax'][mask]
-        data['COP'] = read_subhaloData('CentreOfPotential', dataset=self.dataset)[mask] * u.cm.to(u.kpc)
-        data['groupNumber'] = read_subhaloData('GroupNumber', dataset=self.dataset)[mask]
-        data['subGroupNumber'] = read_subhaloData('SubGroupNumber', dataset=self.dataset)[mask]
+        data['COP'] = self.reader.read_subhaloData('CentreOfPotential')[mask] * u.cm.to(u.kpc)
+        data['groupNumber'] = self.reader.read_subhaloData('GroupNumber')[mask]
+        data['subGroupNumber'] = self.reader.read_subhaloData('SubGroupNumber')[mask]
 
         return data
 
@@ -151,14 +152,14 @@ class plot_Vmax_vs_V1kpc:
         plt.xlim(10, 110)
         plt.ylim(10, 110)
 
-        axes.legend(loc=4)
+        axes.legend(loc=0)
         axes.set_xlabel('$v_{\mathrm{1kpc}}[\mathrm{km s^{-1}}]$')
         axes.set_ylabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
 
         plt.show()
-        fig.savefig('Figures/Vmax_vs_V1kpc_withMedian_%s.png'%self.dataset)
+        fig.savefig('../Figures/%s/Vmax_vs_V1kpc.png'%self.dataset)
         plt.close()
 
 
-plot = plot_Vmax_vs_V1kpc(dataset='MR') 
+plot = plot_Vmax_vs_V1kpc() # dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64) 
 plot.plot()

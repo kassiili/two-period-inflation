@@ -1,4 +1,4 @@
-import sys
+import os, sys
 import h5py
 import numpy as np
 from collections import Counter
@@ -7,19 +7,20 @@ import astropy.units as u
 from astropy.constants import G
 import matplotlib.pyplot as plt 
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/Plots/ReadData/')
-from read_header import read_header
-from read_dataset import read_dataset
-from read_dataset_dm_mass import read_dataset_dm_mass
-from read_subhaloData import read_subhaloData
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
+import read_data as read_data
 
 class SatRotationCurves:
 
-    def __init__(self, gn, dataset='LR'):
+    def __init__(self, gn, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
+
+        self.dataset = dataset
+        self.nfiles_part = nfiles_part
+        self.nfiles_group = nfiles_group
+        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
 
         self.gn = gn
-        self.dataset = dataset
-        self.a, self.h, self.massTable, self.boxsize = read_header(dataset=self.dataset)
+        self.a, self.h, self.massTable, self.boxsize = self.reader.read_header()
         self.boxsize = self.boxsize*1000/self.h # Mpc/h -> kpc
 
         self.sat_data, self.sat_cnt = self.read_satellite_data()
@@ -31,10 +32,10 @@ class SatRotationCurves:
     def read_satellite_data(self):
 
         sat_data = {}
-        sat_data['GNs'] = read_subhaloData('GroupNumber', dataset=self.dataset)
-        sat_data['SGNs'] = read_subhaloData('SubGroupNumber', dataset=self.dataset)
-        sat_data['vmax'] = read_subhaloData('Vmax', dataset=self.dataset)/100000  # cm/s to km/s
-        sat_data['COPs'] = read_subhaloData('CentreOfPotential', dataset=self.dataset) * u.cm.to(u.kpc)
+        sat_data['GNs'] = self.reader.read_subhaloData('GroupNumber')
+        sat_data['SGNs'] = self.reader.read_subhaloData('SubGroupNumber')
+        sat_data['vmax'] = self.reader.read_subhaloData('Vmax')/100000  # cm/s to km/s
+        sat_data['COPs'] = self.reader.read_subhaloData('CentreOfPotential') * u.cm.to(u.kpc)
 
         halo_centre = sat_data['COPs'][np.logical_and(sat_data['GNs']==self.gn, sat_data['SGNs']==0)]
         dists_to_centre = np.linalg.norm(sat_data['COPs'] - halo_centre, axis=1)
@@ -62,20 +63,20 @@ class SatRotationCurves:
         # Combine into arrays by attribute:
         for attr in data.keys():
             if attr == 'Coordinates':
-                data[attr] = np.vstack((read_dataset(0, attr, dataset=self.dataset),
-                    read_dataset(1, attr, dataset=self.dataset),
-                    read_dataset(4, attr, dataset=self.dataset),
-                    read_dataset(5, attr, dataset=self.dataset)))
+                data[attr] = np.vstack((self.reader.read_dataset(0, attr),
+                    self.reader.read_dataset(1, attr),
+                    self.reader.read_dataset(4, attr),
+                    self.reader.read_dataset(5, attr)))
             elif attr == 'Masses':
-                data[attr] = np.concatenate((read_dataset(0, attr, dataset=self.dataset),
-                    read_dataset_dm_mass(dataset=self.dataset),
-                    read_dataset(4, attr, dataset=self.dataset),
-                    read_dataset(5, attr, dataset=self.dataset)))
+                data[attr] = np.concatenate((self.reader.read_dataset(0, attr),
+                    self.reader.read_dataset_dm_mass(),
+                    self.reader.read_dataset(4, attr),
+                    self.reader.read_dataset(5, attr)))
             else:
-                data[attr] = np.concatenate((read_dataset(0, attr, dataset=self.dataset),
-                    read_dataset(1, attr, dataset=self.dataset),
-                    read_dataset(4, attr, dataset=self.dataset),
-                    read_dataset(5, attr, dataset=self.dataset)))
+                data[attr] = np.concatenate((self.reader.read_dataset(0, attr),
+                    self.reader.read_dataset(1, attr),
+                    self.reader.read_dataset(4, attr),
+                    self.reader.read_dataset(5, attr)))
 
         # Exclude particles not belonging to some of the halo's satellites: 
         mask_halo = np.logical_and(data['GroupNumber'] == self.gn, 
@@ -141,9 +142,9 @@ class SatRotationCurves:
         plt.ylabel('Velocity [km/s]'); plt.xlabel('r [kpc]')
         plt.xlim(0,1.5); plt.ylim(5,35)
 
-        #fig.savefig('Figures/RotationCurve_g%i-sg%i_%s.png'%(gn,sgn,self.dataset))
+        #fig.savefig('../Figures/%s/RotationCurve_g%i-sg%i.png'%(self.dataset,gn,sgn))
         plt.show()
         plt.close()
 
-SatRotationCurves(1, dataset='MR')
+SatRotationCurves(1,dataset='V1_LR_fix_127_z000p000', nfiles_part=16, nfiles_group=96)
 

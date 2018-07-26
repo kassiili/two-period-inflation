@@ -1,23 +1,25 @@
-import sys
+import os, sys
 import numpy as np
 import h5py
 import astropy.units as u
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, '/home/kassiili/SummerProject/practise-with-datasets/ReadData/')
-from read_header import read_header
-from read_dataset import read_dataset
-from read_subhaloData import read_subhaloData
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
+import read_data as read_data
 
 class plot_slice:
 
-    def __init__(self, part_type, slice_axis, width, dataset='V1_LR_fix/snapshot_127_z000p000'):
+    def __init__(self, part_type, slice_axis, width, dataset='V1_LR_fix_127_z000p000', nfiles=16):
+
+        self.dataset = dataset
+        self.nfiles = nfiles
+        self.reader = read_data.read_data(dataset=self.dataset, nfiles=self.nfiles)
+
         self.part_type = part_type
         self.slice_axis = slice_axis
-        self.dataset = dataset
-        self.a, self.h, mass, self.boxsize = read_header(dataset=self.dataset) 
+        self.a, self.h, mass, self.boxsize = self.reader.read_header() 
         self.width = width
-        self.coords = read_dataset(self.part_type, 'Coordinates', dataset=self.dataset) * u.cm.to(u.Mpc)
+        self.coords = self.reader.read_dataset(self.part_type, 'Coordinates') * u.cm.to(u.Mpc)
 
         self.cm = self.calcCM()
 
@@ -27,7 +29,7 @@ class plot_slice:
     def calcCM(self):
 
         if (self.part_type != 1):
-            dmCoords = read_dataset(1, 'Coordinates', dataset=self.dataset) * u.cm.to(u.Mpc)
+            dmCoords = self.reader.read_dataset(1, 'Coordinates') * u.cm.to(u.Mpc)
         else:
             dmCoords = self.coords
 
@@ -49,9 +51,9 @@ class plot_slice:
 
         axes.scatter(self.coords[:,x], self.coords[:,y], s=0.01)
 
-        gns = read_subhaloData("GroupNumber", dataset=self.dataset)
-        sgns = read_subhaloData("SubGroupNumber", dataset=self.dataset)
-        COPs = read_subhaloData("CentreOfPotential", dataset=self.dataset)
+        gns = self.reader.read_subhaloData("GroupNumber")
+        sgns = self.reader.read_subhaloData("SubGroupNumber")
+        COPs = self.reader.read_subhaloData("CentreOfPotential")
 
         mask = np.logical_or(np.logical_and(gns == 1, sgns == 0), np.logical_and(gns == 2, sgns == 0))
         centrals = COPs[mask] * u.cm.to(u.Mpc)
@@ -61,12 +63,15 @@ class plot_slice:
 
 #        axes.set_title('Particles (type %i) in a volume slice centered on a LG analogue'%self.part_type)
 
-        plt.show()
-#        plt.savefig('slice_partType%i%s.png'%(self.part_type, self.dataset)) 
-#        plt.close()
+#        plt.show()
+        plt.savefig('../Figures/V1_MR_mock_1_fix_082_z001p941/slice_partType%i.png'%self.part_type) 
+        plt.close()
 
-slice = plot_slice(1, 2, 0.03) #, dataset='snapshots/V1_MR_mock_fix/snapshot_082_z001p941'
+slice = plot_slice(1, 2, 0.03, dataset='V1_MR_mock_1_fix_082_z001p941', nfiles=1)
 slice.plot()
+
+#slice = plot_slice(1, 2, 0.03) #, dataset='snapshots/V1_MR_mock_fix/snapshot_082_z001p941'
+#slice.plot()
 #part_types = [0,1,4]
 #for n in part_types:
 #    slice = plot_slice(n, dataset='MR') 

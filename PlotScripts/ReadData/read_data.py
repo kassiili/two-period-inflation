@@ -4,22 +4,27 @@ import os
 
 # Numbers of files for different datasets:
 #   - Particle data:
-#       * V1_LR_fix and V1_MR_fix: 16
+#       * V1_LR_fix and V1_MR_fix(z=0): 16
+#       * V1_MR_fix(z~2): 16
+#       * V1_MR_mock_1_fix(z~2): 1
 #   - Group data:
-#       * V1_LR_fix: 96
-#       * V1_MR_fix: 192
+#       * V1_LR_fix(z=0): 96
+#       * V1_MR_fix(z=0): 192
+#       * V1_MR_fix(z~2): 192
+#       * V1_MR_mock_1_fix(z~2): 64
 
 class read_data:
 
     # The path (from the project's "home directory" practise-with-datasets) to the dataset is given as an argument:
-    def __init__(self, dataset='snapshots/V1_LR_fix_127_z000p000', nfiles=16):
+    def __init__(self, dataset='V1_LR_fix_127_z000p000', nfiles_part=16, nfiles_group=96):
 
-        self.nfiles=nfiles
+        self.nfiles_part=nfiles_part
+        self.nfiles_group=nfiles_group
         fields = dataset.split("_")
 
         # Set relative paths to data files:
-        self.part_data_path = dataset + "/" + "snapshot_" + fields[-2] + "_" + fields[-1]
-        self.group_data_path = dataset + "/" + "groups_" + fields[-2] + "_" + fields[-1]
+        self.part_data_path = "snapshots/" + dataset + "/" + "snapshot_" + fields[-2] + "_" + fields[-1]
+        self.group_data_path = "snapshots/" + dataset + "/" + "groups_" + fields[-2] + "_" + fields[-1]
 
         # Set file prefixes:
         self.part_file_prefix = "snap_" + fields[-2] + "_" + fields[-1]
@@ -49,22 +54,27 @@ class read_data:
         path = self.get_path(self.part_data_path)
     
         # Loop over each file and extract the data.
-        for i in range(self.nfiles):
-            filename = '%s/%s.%i.hdf5'%(path, self.part_file_prefix, i)
-            f = h5py.File(filename, 'r')
-            tmp = f['PartType%i/%s'%(itype, att)][...]
-            data.append(tmp)
-    
-            # Get conversion factors.
-            cgs     = f['PartType%i/%s'%(itype, att)].attrs.get('CGSConversionFactor')
-            aexp    = f['PartType%i/%s'%(itype, att)].attrs.get('aexp-scale-exponent')
-            hexp    = f['PartType%i/%s'%(itype, att)].attrs.get('h-scale-exponent')
-    
-            # Get expansion factor and Hubble parameter from the header.
-            a       = f['Header'].attrs.get('Time')
-            h       = f['Header'].attrs.get('HubbleParam')
-    
-            f.close()
+        for i in range(self.nfiles_part):
+
+            # The z~2 MR LCDM dataset is missing data in file number 6:
+            test1 = self.part_data_path.split("_")[1]
+            test2 = self.part_data_path.split("_")[3]
+            if not (test1=='MR' and test2=='082' and itype==5 and i==6):
+                filename = '%s/%s.%i.hdf5'%(path, self.part_file_prefix, i)
+                f = h5py.File(filename, 'r')
+                tmp = f['PartType%i/%s'%(itype, att)][...]
+                data.append(tmp)
+        
+                # Get conversion factors.
+                cgs     = f['PartType%i/%s'%(itype, att)].attrs.get('CGSConversionFactor')
+                aexp    = f['PartType%i/%s'%(itype, att)].attrs.get('aexp-scale-exponent')
+                hexp    = f['PartType%i/%s'%(itype, att)].attrs.get('h-scale-exponent')
+        
+                # Get expansion factor and Hubble parameter from the header.
+                a       = f['Header'].attrs.get('Time')
+                h       = f['Header'].attrs.get('HubbleParam')
+        
+                f.close()
     
         # Combine to a single array.
         if len(tmp.shape) > 1:
@@ -113,7 +123,7 @@ class read_data:
         data = []
     
         # Loop over each file and extract the data.
-        for i in range(self.nfiles):
+        for i in range(self.nfiles_group):
             filename = '%s/%s.%i.hdf5'%(path, self.group_file_prefix, i)
             f = h5py.File(filename, 'r')
             tmp = f['Subhalo/%s'%att][...]
@@ -151,7 +161,7 @@ class read_data:
         data = []
     
         # Loop over each file and extract the data.
-        for i in range(self.nfiles):
+        for i in range(self.nfiles_group):
             filename = '%s/%s.%i.hdf5'%(path, self.group_file_prefix, i)
             f = h5py.File(filename, 'r')
             tmp = f['IDs/%s'%att][...]
@@ -190,5 +200,5 @@ class read_data:
     
         return new_path
     
-#reader = Read_data()
-#print(reader.read_dataset_dm_mass())
+#reader = read_data(dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64)
+#print(reader.read_subhaloData("CentreOfPotential"))

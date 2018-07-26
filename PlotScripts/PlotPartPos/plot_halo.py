@@ -12,9 +12,11 @@ import read_data as read_data
 
 class plot_slice:
 
-    def __init__(self, gn, sgn, slice_axis, dataset='snapshots/V1_LR_fix_127_z000p000'):
+    def __init__(self, gn, sgn, slice_axis, dataset='snapshots/V1_LR_fix_127_z000p000', nfiles=16):
         self.dataset = dataset
-        self.reader = read_data.read_data(dataset=self.dataset)
+        self.nfiles = nfiles
+        self.reader = read_data.read_data(dataset=self.dataset, nfiles=self.nfiles)
+
         self.gn = gn
         self.sgn = sgn
         self.slice_axis = slice_axis
