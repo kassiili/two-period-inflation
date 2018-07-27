@@ -6,56 +6,77 @@ import matplotlib.pyplot as plt
 from calc_median import calc_median_trend
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
-import read_data as read_data
+import read_data
 
-class plot_Rmax_vs_Vmax:
+class rmax_vs_vmax_data:
 
-    def __init__(self, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
+    def __init__(self, dataset):
 
         self.dataset = dataset
-        self.nfiles_part = nfiles_part
-        self.nfiles_group = nfiles_group
-        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
+        self.reader = read_data.read_data(dataset=self.dataset.dir, nfiles_part=self.dataset.nfiles_part, nfiles_group=self.dataset.nfiles_group)
 
-        maxVelocities = self.reader.read_subhaloData('Vmax') / 100000   # cm/s to km/s
-        maxRadii = self.reader.read_subhaloData('VmaxRadius') * u.cm.to(u.kpc)
-        self.stellarMasses = self.reader.read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
-        self.subGroupNumbers = self.reader.read_subhaloData('SubGroupNumber')
+        self.read_galaxies()
 
-        maskSat = np.logical_and.reduce((maxVelocities > 0, maxRadii > 0, self.subGroupNumbers != 0, self.stellarMasses > 0))
-        maskIsol = np.logical_and.reduce((maxVelocities > 0, maxRadii > 0, self.subGroupNumbers == 0, self.stellarMasses > 0))
+    def read_galaxies(self):
 
-        self.maxVelocitiesSat = maxVelocities[maskSat]
-        self.maxRadiiSat = maxRadii[maskSat]
-        self.maxVelocitiesIsol = maxVelocities[maskIsol]
-        self.maxRadiiIsol = maxRadii[maskIsol]
+        vmax = self.reader.read_subhaloData('Vmax') / 100000   # cm/s to km/s
+        rmax = self.reader.read_subhaloData('VmaxRadius') * u.cm.to(u.kpc)
+        self.SM = self.reader.read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
+        self.SGNs = self.reader.read_subhaloData('SubGroupNumber')
 
-    def plot(self):
-        fig,axes = plt.subplots()
+        maskSat = np.logical_and.reduce((vmax > 0, rmax > 0, self.SGNs != 0, self.SM > 0))
+        maskIsol = np.logical_and.reduce((vmax > 0, rmax > 0, self.SGNs == 0, self.SM > 0))
 
-        axes.set_xscale('log')
-        axes.set_yscale('log')
-        axes.scatter(self.maxVelocitiesSat, self.maxRadiiSat, s=3, c='red', edgecolor='none', label='satelliittigalaksit')
-        axes.scatter(self.maxVelocitiesIsol, self.maxRadiiIsol, s=3, c='blue', edgecolor='none', label='eristetyt galaksit')
+        self.vmaxSat = vmax[maskSat]
+        self.rmaxSat = rmax[maskSat]
+        self.vmaxIsol = vmax[maskIsol]
+        self.rmaxIsol = rmax[maskIsol]
 
-        median = calc_median_trend(self.maxVelocitiesSat, self.maxRadiiSat)
-        axes.plot(median[0], median[1], c='red', linestyle='--')
 
-        median = calc_median_trend(self.maxVelocitiesIsol, self.maxRadiiIsol)
-        axes.plot(median[0], median[1], c='blue', linestyle='--')
+class plot_rmax_vs_vmax:
 
-        plt.xlim(20, 150);
-        plt.ylim(1, 50);
+    def __init__(self):
+        """ Create new figure with stellar mass on y-axis and Vmax on x-axis. """
+    
+        self.fig, self.axes = plt.subplots()
+        self.set_axes()
+        self.set_labels()
+        
+    def set_axes(self):
+        """ Set shapes for axes. """
 
-        axes.legend(loc=0)
-        axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$')
-        axes.set_title('Max circular velocities and corresponding radii\n(%s)'%self.dataset)
+        self.axes.set_xscale('log')
+        self.axes.set_yscale('log')
 
+        self.axes.set_xlim(20, 150);
+        self.axes.set_ylim(1, 50);
+        
+    def set_labels(self):
+        """ Set labels. """
+
+        self.axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
+        self.axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$')
+        self.axes.set_title('Max circular velocities and corresponding radii')
+
+    def add_data(self, data, satellites, col):
+        """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
+
+        x = 0; y = 0
+        if satellites:
+            x = data.vmaxSat; y = data.rmaxSat
+            median = calc_median_trend(data.vmaxSat, data.rmaxSat)
+        else:
+            x = data.vmaxIsol; y = data.rmaxIsol
+            median = calc_median_trend(data.vmaxIsol, data.rmaxIsol)
+
+        self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
+        self.axes.plot(median[0], median[1], c=col, linestyle='--')
+    
+    def save_figure(self):
+        """ Save figure. """
+        
+        self.axes.legend(loc=0)
         plt.show()
-        fig.savefig('../Figures/%s/rmax_vs_vmax.png'%self.dataset)
+        self.fig.savefig('../Figures/Comparisons_082_z001p941/rmax_vs_vmax.png')
         plt.close()
-
-plot = plot_Rmax_vs_Vmax() #dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64) 
-plot.plot()
 

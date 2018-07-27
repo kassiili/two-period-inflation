@@ -7,50 +7,84 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
-import read_data as read_data
+import read_data
+
+class subhalo_dist_vs_vmax_data:
+
+    def __init__(self, dataset):
+
+        self.dataset = dataset
+        self.reader = read_data.read_data(dataset=self.dataset.dir, nfiles_part=self.dataset.nfiles_part, nfiles_group=self.dataset.nfiles_group)
+
+        self.read_galaxies()
+
+    def read_galaxies(self):
+
+        vmax = self.reader.read_subhaloData('Vmax') / 100000 # cm/s to km/s
+        SM = self.reader.read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
+        SGNs = self.reader.read_subhaloData('SubGroupNumber')
+        self.vmaxLumSat = vmax[np.logical_and.reduce((vmax > 0, SM > 0, SGNs != 0))]
+        self.vmaxDarkSat = vmax[np.logical_and.reduce((vmax > 0, SM == 0, SGNs != 0))]
+        self.vmaxLumIsol = vmax[np.logical_and.reduce((vmax > 0, SM > 0, SGNs == 0))]
+        self.vmaxDarkIsol = vmax[np.logical_and.reduce((vmax > 0, SM == 0, SGNs == 0))]
+
+        #Sort arrays in descending order:
+        self.vmaxLumSat[::-1].sort()
+        self.vmaxDarkSat[::-1].sort()
+        self.vmaxLumIsol[::-1].sort()
+        self.vmaxDarkIsol[::-1].sort()
+
 
 class plot_subhalo_dist_vs_vmax:
 
-    def __init__(self, dataset='V1_LR_fix_127_z000p000', nfiles_part=16, nfiles_group=96):
+    def __init__(self):
+        """ Create new figure with stellar mass on y-axis and Vmax on x-axis. """
+    
+        self.fig, self.axes = plt.subplots()
+        self.set_axes()
+        self.set_labels()
+        
+    def set_axes(self):
+        """ Set shapes for axes. """
 
-        self.dataset = dataset
-        self.nfiles_part = nfiles_part
-        self.nfiles_group = nfiles_group
-        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
+        self.axes.set_xscale('log')
+        self.axes.set_yscale('log')
+#        self.axes.set_xlim(10, 100)
+#        self.axes.set_ylim(10**6, 10**10)
+        
+    def set_labels(self):
+        """ Set labels. """
 
-        maxVelocities = self.reader.read_subhaloData('Vmax') / 100000 # cm/s to km/s
-        stellarMasses = self.reader.read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
-        subGroupNumbers = self.reader.read_subhaloData('SubGroupNumber')
-        self.maxVelocitiesSatLum = maxVelocities[np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, subGroupNumbers != 0))]
-        self.maxVelocitiesSatDark = maxVelocities[np.logical_and.reduce((maxVelocities > 0, stellarMasses == 0, subGroupNumbers != 0))]
-        self.maxVelocitiesIsolLum = maxVelocities[np.logical_and.reduce((maxVelocities > 0, stellarMasses > 0, subGroupNumbers == 0))]
-        self.maxVelocitiesIsolDark = maxVelocities[np.logical_and.reduce((maxVelocities > 0, stellarMasses == 0, subGroupNumbers == 0))]
+        self.axes.set_xlabel('$v_{\mathrm{max}} [\mathrm{km s^{-1}}]$')
+        self.axes.set_ylabel('$N(>v_{\mathrm{max}})$')
+        self.axes.set_title('Distribution of subhaloes as a function of $v_{max}$')
 
-        #Sort arrays in descending order:
-        self.maxVelocitiesSatLum[::-1].sort()
-        self.maxVelocitiesSatDark[::-1].sort()
-        self.maxVelocitiesIsolLum[::-1].sort()
-        self.maxVelocitiesIsolDark[::-1].sort()
+    def add_data(self, data, satellites, colors):
+        """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
-    def plot(self):
-        fig,axes = plt.subplots()
+        x = 0; y = 0
+        if satellites:
+            lum = data.vmaxLumSat; dark = data.vmaxDarkSat
+        else:
+            lum = data.vmaxLumIsol; dark = data.vmaxDarkIsol
 
-        axes.set_xscale('log')
-        axes.set_yscale('log')
-        axes.plot(self.maxVelocitiesSatLum, np.arange(1, self.maxVelocitiesSatLum.size + 1), c='lightblue', label='Kirkkaat satelliittigalaksit')
-        axes.plot(self.maxVelocitiesSatDark, np.arange(1, self.maxVelocitiesSatDark.size + 1), c='blue', label='Pimeät satelliittigalaksit')
-        axes.plot(self.maxVelocitiesIsolLum, np.arange(1, self.maxVelocitiesIsolLum.size + 1), c='pink', label='Kirkkaat eristetyt galaksit')
-        axes.plot(self.maxVelocitiesIsolDark, np.arange(1, self.maxVelocitiesIsolDark.size + 1), c='red', label='Pimeät eristetyt galaksit')
-
-        axes.legend(loc=0)
-        axes.set_xlabel('$v_{\mathrm{max}} [\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$N(>v_{\mathrm{max}})$')
-        axes.set_title('Distribution of luminous subhaloes as a function of $v_{max}$\n(%s)'%self.dataset)
-
-        #plt.show()
-        fig.savefig('../Figures/%s/Dist-of-subhaloes_vs_Vmax.png'%self.dataset)
+        self.axes.plot(lum, np.arange(1, lum.size + 1), c=colors[0], label=data.dataset.name+": luminous")
+        self.axes.plot(dark, np.arange(1, dark.size + 1), c=colors[1], label=data.dataset.name+": dark")
+    
+    def save_figure(self):
+        """ Save figure. """
+        
+        self.axes.legend(loc=0)
+        plt.show()
+        self.fig.savefig('../Figures/Comparisons_082_z001p941/Dist-of-subhaloes_vs_Vmax.png')
         plt.close()
 
-plot = plot_subhalo_dist_vs_vmax(dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192)
-plot.plot()
 
+#plot = plot_subhalo_dist_vs_vmax()
+#LCDM = subhalo_dist_vs_vmax_data(dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192)
+#curvaton = subhalo_dist_vs_vmax_data(dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64)
+#
+#plot.add_data(LCDM, 1, ['lightblue', 'blue'])
+#plot.add_data(curvaton, 1, ['pink', 'red'])
+#plot.save_figure() 
+    

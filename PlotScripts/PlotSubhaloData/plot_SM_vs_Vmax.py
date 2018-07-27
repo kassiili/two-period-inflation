@@ -4,19 +4,17 @@ import h5py
 import time
 import astropy.units as u
 import matplotlib.pyplot as plt
-from calc_median import calc_median_trend
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
-import read_data as read_data
+import read_data
+from calc_median import calc_median_trend
 
 class SM_vs_Vmax_data:
 
-    def __init__(self, dataset='V1_LR_fix_127_z000p000', nfiles_part=16, nfiles_group=96):
+    def __init__(self, dataset):
 
         self.dataset = dataset
-        self.nfiles_part = nfiles_part
-        self.nfiles_group = nfiles_group
-        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
+        self.reader = read_data.read_data(dataset=self.dataset.dir, nfiles_part=self.dataset.nfiles_part, nfiles_group=self.dataset.nfiles_group)
 
         self.read_galaxies()
 
@@ -70,7 +68,7 @@ class plot_SM_vs_Vmax:
         else:
             x = data.vmaxIsol; y = data.SMIsol
 
-        self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset)
+        self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
         median = calc_median_trend(x, y, points_per_bar=7)
         self.axes.plot(median[0], median[1], c=col, linestyle='--')
         #self.axes.scatter(median[0], median[1], s=5)
@@ -83,13 +81,13 @@ class plot_SM_vs_Vmax:
         self.fig.savefig('../Figures/Comparisons_082_z001p941/SM_vs_Vmax.png')
         plt.close()
 
-
-plot = plot_SM_vs_Vmax()
-LCDM = SM_vs_Vmax_data(dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192)
-curvaton = SM_vs_Vmax_data(dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64)
-
-plot.add_data(LCDM, 1, 'red')
-plot.add_data(curvaton, 1, 'blue')
-plot.save_figure() 
+#
+#plot = plot_SM_vs_Vmax()
+#LCDM = SM_vs_Vmax_data(dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192)
+#curvaton = SM_vs_Vmax_data(dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64)
+#
+#plot.add_data(LCDM, 1, 'red')
+#plot.add_data(curvaton, 1, 'blue')
+#plot.save_figure() 
     
 

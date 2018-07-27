@@ -9,36 +9,50 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
 import read_data as read_data
 
-class RotationCurve:
+class rotation_curve:
 
-    def __init__(self, gn, sgn, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
+    def __init__(self, gn, sgn, dataset):
 
+        self.gn = gn; self.sgn = sgn
         self.dataset = dataset
-        self.nfiles_part = nfiles_part
-        self.nfiles_group = nfiles_group
-        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
+        self.reader = read_data.read_data(dataset=self.dataset.dir, nfiles_part=self.dataset.nfiles_part, nfiles_group=self.dataset.nfiles_group)
 
         self.a, self.h, self.massTable, self.boxsize = self.reader.read_header()
         self.boxsize = self.boxsize*1000/self.h # Mpc/h -> kpc
-        self.centre = self.find_centre_of_potential(gn, sgn) 
+
+        self.read_galaxies()
+
+        self.r, self.v = self.compute_rotation_curve(self.combined)
+
+        self.v1kpc = self.calc_V1kpc(self.combined)
+        
+    def read_galaxies(self):
+
+        # Get Vmax and Rmax:
+        self.SGNs = self.reader.read_subhaloData('SubGroupNumber')
+        self.GNs = self.reader.read_subhaloData('GroupNumber')
+        self.vmax = self.reader.read_subhaloData('Vmax')[np.logical_and(self.SGNs == self.sgn, self.GNs == self.gn)]/100000  # cm/s to km/s
+        self.rmax = self.reader.read_subhaloData('VmaxRadius')[np.logical_and(self.SGNs == self.sgn, self.GNs == self.gn)] * u.cm.to(u.kpc)
+
+        self.centre = self.find_centre_of_potential(self.gn, self.sgn) 
 
         # Load data.
-        self.gas    = self.read_galaxy(0, gn, sgn)
-        self.dm     = self.read_galaxy(1, gn, sgn)
-        self.stars  = self.read_galaxy(4, gn, sgn)
-        self.bh     = self.read_galaxy(5, gn, sgn)
+        gas    = self.read_galaxy(0, self.gn, self.sgn)
+        dm     = self.read_galaxy(1, self.gn, self.sgn)
+        stars  = self.read_galaxy(4, self.gn, self.sgn)
+        bh     = self.read_galaxy(5, self.gn, self.sgn)
 
-        # Plot.
-        self.plot(gn, sgn)
+        # All parttypes together.
+        self.combined = {}
+        self.combined['mass'] = np.concatenate((gas['mass'], dm['mass'], stars['mass'], bh['mass']))
+        self.combined['coords'] = np.vstack((gas['coords'], dm['coords'], stars['coords'], bh['coords']))
 
     def find_centre_of_potential(self, gn, sgn):
         """ Obtain the centre of potential of the given galaxy from the subhalo catalogues. """
 
-        subGroupNumbers = self.reader.read_subhaloData('SubGroupNumber')
-        groupNumbers = self.reader.read_subhaloData('GroupNumber')
         cop = self.reader.read_subhaloData('CentreOfPotential')
 
-        return cop[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
+        return cop[np.logical_and(self.SGNs == sgn, self.GNs == gn)] * u.cm.to(u.kpc)
 
     def read_galaxy(self, itype, gn, sgn):
         """ For a given galaxy (identified by its GroupNumber and SubGroupNumber),
@@ -98,44 +112,47 @@ class RotationCurve:
         myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
         return np.sqrt(myG * arr['mass'][mask].sum())
 
-    def plot(self, gn, sgn):
-        fig, axes = plt.subplots()
 
-        # All parttypes together.
-        combined = {}
-        combined['mass'] = np.concatenate((self.gas['mass'], self.dm['mass'],
-            self.stars['mass'], self.bh['mass']))
-        combined['coords'] = np.vstack((self.gas['coords'], self.dm['coords'],
-            self.stars['coords'], self.bh['coords']))
+class plot_rotation_curve:
 
-        r, v = self.compute_rotation_curve(combined)
-        axes.plot(r, v)
-
-        # Get Vmax and Rmax:
-        subGroupNumbers = self.reader.read_subhaloData('SubGroupNumber')
-        groupNumbers = self.reader.read_subhaloData('GroupNumber')
-        vmax = self.reader.read_subhaloData('Vmax')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)]/100000  # cm/s to km/s
-        rmax = self.reader.read_subhaloData('VmaxRadius')[np.logical_and(subGroupNumbers == sgn, groupNumbers == gn)] * u.cm.to(u.kpc)
-
-        v1kpc = self.calc_V1kpc(combined)
-
-        axes.axhline(vmax, linestyle='dashed', c='red', label='Vmax=%1.3f'%vmax)
-        axes.axvline(rmax, linestyle='dashed', c='red', label='Rmax=%1.3f'%rmax)
-        axes.axhline(v1kpc, linestyle='dashed', c='green', label='V1kpc=%1.3f'%v1kpc)
-        axes.axvline(1, linestyle='dashed', c='green')
+    def __init__(self, gn, sgn):
+        """ Create new figure. """
+    
+        self.fig, self.axes = plt.subplots()
+        self.gn = gn; self.sgn = sgn
+        self.set_axes()
+        self.set_labels()
         
-        # Save plot.
-        axes.legend(loc=0)
-        axes.minorticks_on()
-        axes.set_title('Rotation curve of halo with GN = %i and SGN = %i\n(%s)'%(gn,sgn,self.dataset))
-        axes.set_ylabel('Velocity [km/s]'); axes.set_xlabel('r [kpc]')
-        axes.set_xlim(0, 80); # axes.tight_layout()
+    def set_axes(self):
+        """ Set shapes for axes. """
 
-        plt.show()
-        fig.savefig('../Figures/%s/RotationCurve_g%i-sg%i.png'%(self.dataset,gn,sgn))
+        self.axes.set_xlim(0, 80); # self.axes.tight_layout()
+        self.axes.minorticks_on()
+
+    def set_labels(self):
+        """ Set labels. """
+
+        self.axes.set_title('Rotation curve of halo with GN = %i and SGN = %i'%(self.gn,self.sgn))
+        self.axes.set_ylabel('Velocity [km/s]'); self.axes.set_xlabel('r [kpc]')
+
+    def add_data(self, data):
+        """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
+
+        self.axes.plot(data.r, data.v)
+        self.axes.axhline(data.vmax, linestyle='dashed', c='red', label='Vmax=%1.3f'%data.vmax)
+        self.axes.axvline(data.rmax, linestyle='dashed', c='red', label='Rmax=%1.3f'%data.rmax)
+        self.axes.axhline(data.v1kpc, linestyle='dashed', c='green', label='V1kpc=%1.3f'%data.v1kpc)
+        self.axes.axvline(1, linestyle='dashed', c='green')
+        
         plt.close()
 
-RotationCurve(1, 0, dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64) 
+    def save_figure(self):
+        """ Save figure. """
+        
+        self.axes.legend(loc=0)
+        plt.show()
+        self.fig.savefig('../Figures/Comparisons_082_z001p941/RotationCurve_g%i-sg%i.png'%(self.gn,self.sgn))
+        plt.close()
 
 
 #oddg = [5, 17, 51, 80, 80]
