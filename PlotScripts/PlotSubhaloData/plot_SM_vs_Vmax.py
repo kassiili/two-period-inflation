@@ -4,10 +4,10 @@ import h5py
 import time
 import astropy.units as u
 import matplotlib.pyplot as plt
+from calc_median import calc_median_trend
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
 import read_data
-from calc_median import calc_median_trend
 
 class SM_vs_Vmax_data:
 
@@ -37,10 +37,11 @@ class SM_vs_Vmax_data:
 
 class plot_SM_vs_Vmax:
 
-    def __init__(self):
+    def __init__(self, satellites):
         """ Create new figure with stellar mass on y-axis and Vmax on x-axis. """
     
         self.fig, self.axes = plt.subplots()
+        self.satellites = satellites
         self.set_axes()
         self.set_labels()
         
@@ -57,13 +58,16 @@ class plot_SM_vs_Vmax:
 
         self.axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
         self.axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
-        self.axes.set_title('Stellar mass of luminous subhaloes')
+        if (self.satellites):
+            self.axes.set_title('Stellar mass of satellites')
+        else:
+            self.axes.set_title('Stellar mass of isolated galaxies')
 
-    def add_data(self, data, satellites, col):
+    def add_data(self, data, col):
         """ Plot data (object of type SM_vs_Vmax_data) into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
         x = 0; y = 0
-        if satellites:
+        if self.satellites:
             x = data.vmaxSat; y = data.SMSat
         else:
             x = data.vmaxIsol; y = data.SMIsol
@@ -73,12 +77,22 @@ class plot_SM_vs_Vmax:
         self.axes.plot(median[0], median[1], c=col, linestyle='--')
         #self.axes.scatter(median[0], median[1], s=5)
     
-    def save_figure(self):
+    def save_figure(self, dir):
         """ Save figure. """
         
         self.axes.legend(loc=0)
         plt.show()
-        self.fig.savefig('../Figures/Comparisons_082_z001p941/SM_vs_Vmax.png')
+        filename=""
+        if self.satellites:
+            filename = 'SM_vs_Vmax_sat.png'
+        else:
+            filename = 'SM_vs_Vmax_isol.png'
+
+        path = '../Figures/%s'%dir
+        # If the directory does not exist, create it
+        if not os.path.exists(path):
+            os.makedirs(path)
+        self.fig.savefig(os.path.join(path,filename))
         plt.close()
 
 #

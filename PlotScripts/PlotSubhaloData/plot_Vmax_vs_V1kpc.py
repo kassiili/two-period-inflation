@@ -11,14 +11,12 @@ from calc_median import calc_median_trend
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
 import read_data as read_data
 
-class plot_Vmax_vs_V1kpc:
+class Vmax_vs_V1kpc_data:
 
-    def __init__(self, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
+    def __init__(self, dataset):
 
         self.dataset = dataset
-        self.nfiles_part = nfiles_part
-        self.nfiles_group = nfiles_group
-        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
+        self.reader = read_data.read_data(dataset=self.dataset.dir, nfiles_part=self.dataset.nfiles_part, nfiles_group=self.dataset.nfiles_group)
 
         self.a, self.h, self.massTable, self.boxsize = self.reader.read_header() 
 
@@ -109,30 +107,64 @@ class plot_Vmax_vs_V1kpc:
 
         return data
 
-    def plot(self):
 
-        # Plot satellites and isolated galaxies separately:
-        maskSat = self.subhaloData['subGroupNumber'] != 0
-        maskIsol = self.subhaloData['subGroupNumber'] == 0
+class plot_Vmax_vs_V1kpc:
 
-        VmaxSat = self.subhaloData['Vmax'][maskSat]
-        V1kpcSat = self.subhaloData['V1kpc'][maskSat]
-        VmaxIsol = self.subhaloData['Vmax'][maskIsol]
-        V1kpcIsol = self.subhaloData['V1kpc'][maskIsol]
+    def __init__(self, satellites):
+        """ Create new figure with stellar mass on y-axis and Vmax on x-axis. """
+    
+        self.fig, self.axes = plt.subplots()
+        self.satellites = satellites
+        self.set_axes()
+        self.set_labels()
+        
+    def set_axes(self):
+        """ Set shapes for axes. """
 
-        fig, axes = plt.subplots()
+        self.axes.set_xscale('log')
+        self.axes.set_yscale('log')
+        self.axes.set_xlim(10, 100)
+        self.axes.set_ylim(10, 200)
+        
+    def set_labels(self):
+        """ Set labels. """
 
-        axes.set_xscale('log')
-        axes.set_yscale('log')
+        self.axes.set_xlabel('$v_{\mathrm{1kpc}}[\mathrm{km s^{-1}}]$')
+        self.axes.set_ylabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
 
-        axes.scatter(V1kpcSat, VmaxSat, s=3, c='red', edgecolor='none', label='satellite galaxies')
-        axes.scatter(V1kpcIsol, VmaxIsol, s=3, c='blue', edgecolor='none', label='isolated galaxies')
+        if (self.satellites):
+            self.axes.set_title('Satellite central densities')
+        else:
+            self.axes.set_title('Isolated galaxy central densities')
 
-        median = calc_median_trend(V1kpcSat, VmaxSat)
-        axes.plot(median[0], median[1], c='red', linestyle='--')
+    def add_data(self, data, col):
+        """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
-        median = calc_median_trend(V1kpcIsol, VmaxIsol)
-        axes.plot(median[0], median[1], c='blue', linestyle='--')
+        if self.satellites:
+            mask = data.subhaloData['subGroupNumber'] != 0
+        else:
+            mask = data.subhaloData['subGroupNumber'] == 0
+
+        x = data.subhaloData['V1kpc'][mask]
+        y = data.subhaloData['Vmax'][mask]
+
+        self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
+        median = calc_median_trend(x, y)
+        self.axes.plot(median[0], median[1], c=col, linestyle='--')
+    
+    def save_figure(self):
+        """ Save figure. """
+        
+        self.axes.legend(loc=0)
+        plt.show()
+        filename=""
+        if self.satellites:
+            filename = 'Vmax_vs_V1kpc_sat.png'
+        else:
+            filename = 'Vmax_vs_V1kpc_isol.png'
+        self.fig.savefig('../Figures/Comparisons_082_z001p941/%s'%filename)
+        plt.close()
+
 
 #        mask = self.subhaloData['V1kpc'] > self.subhaloData['Vmax']
 #        oddOnes = {}
@@ -148,18 +180,3 @@ class plot_Vmax_vs_V1kpc:
         #x = np.arange(10,100)
         #y = np.arange(10,100)
         #axes.plot(x, y, c='black')
-
-        plt.xlim(10, 110)
-        plt.ylim(10, 110)
-
-        axes.legend(loc=0)
-        axes.set_xlabel('$v_{\mathrm{1kpc}}[\mathrm{km s^{-1}}]$')
-        axes.set_ylabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
-
-        plt.show()
-        fig.savefig('../Figures/%s/Vmax_vs_V1kpc.png'%self.dataset)
-        plt.close()
-
-
-plot = plot_Vmax_vs_V1kpc() # dataset='V1_MR_mock_1_fix_082_z001p941', nfiles_part=1, nfiles_group=64) 
-plot.plot()

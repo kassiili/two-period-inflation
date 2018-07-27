@@ -35,10 +35,11 @@ class rmax_vs_vmax_data:
 
 class plot_rmax_vs_vmax:
 
-    def __init__(self):
+    def __init__(self, satellites):
         """ Create new figure with stellar mass on y-axis and Vmax on x-axis. """
     
         self.fig, self.axes = plt.subplots()
+        self.satellites = satellites
         self.set_axes()
         self.set_labels()
         
@@ -56,13 +57,16 @@ class plot_rmax_vs_vmax:
 
         self.axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
         self.axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$')
-        self.axes.set_title('Max circular velocities and corresponding radii')
+        if self.satellites:
+            self.axes.set_title('Satellite max circular velocities and corresponding radii')
+        else:
+            self.axes.set_title('Isolated galaxy max circular velocities and corresponding radii')
 
-    def add_data(self, data, satellites, col):
+    def add_data(self, data, col):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
         x = 0; y = 0
-        if satellites:
+        if self.satellites:
             x = data.vmaxSat; y = data.rmaxSat
             median = calc_median_trend(data.vmaxSat, data.rmaxSat)
         else:
@@ -72,11 +76,20 @@ class plot_rmax_vs_vmax:
         self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
         self.axes.plot(median[0], median[1], c=col, linestyle='--')
     
-    def save_figure(self):
+    def save_figure(self, dir):
         """ Save figure. """
         
         self.axes.legend(loc=0)
         plt.show()
-        self.fig.savefig('../Figures/Comparisons_082_z001p941/rmax_vs_vmax.png')
-        plt.close()
+        filename=""
+        if self.satellites:
+            filename = 'rmax_vs_vmax_sat.png'
+        else:
+            filename = 'rmax_vs_vmax_isol.png'
 
+        path = '../Figures/%s'%dir
+        # If the directory does not exist, create it
+        if not os.path.exists(path):
+            os.makedirs(path)
+        self.fig.savefig(os.path.join(path,filename))
+        plt.close()
