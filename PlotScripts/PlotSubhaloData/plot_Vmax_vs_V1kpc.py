@@ -152,7 +152,7 @@ class plot_Vmax_vs_V1kpc:
         median = calc_median_trend(x, y)
         self.axes.plot(median[0], median[1], c=col, linestyle='--')
     
-    def save_figure(self):
+    def save_figure(self, dir):
         """ Save figure. """
         
         self.axes.legend(loc=0)
@@ -162,7 +162,12 @@ class plot_Vmax_vs_V1kpc:
             filename = 'Vmax_vs_V1kpc_sat.png'
         else:
             filename = 'Vmax_vs_V1kpc_isol.png'
-        self.fig.savefig('../Figures/Comparisons_082_z001p941/%s'%filename)
+
+        path = '../Figures/%s'%dir
+        # If the directory does not exist, create it
+        if not os.path.exists(path):
+            os.makedirs(path)
+        self.fig.savefig(os.path.join(path,filename))
         plt.close()
 
 

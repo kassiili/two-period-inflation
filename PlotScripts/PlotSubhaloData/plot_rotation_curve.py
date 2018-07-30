@@ -20,13 +20,13 @@ class rotation_curve:
         self.a, self.h, self.massTable, self.boxsize = self.reader.read_header()
         self.boxsize = self.boxsize*1000/self.h # Mpc/h -> kpc
 
-        self.read_galaxies()
+        self.read_galaxy()
 
         self.r, self.v = self.compute_rotation_curve(self.combined)
 
         self.v1kpc = self.calc_V1kpc(self.combined)
         
-    def read_galaxies(self):
+    def read_galaxy(self):
 
         # Get Vmax and Rmax:
         self.SGNs = self.reader.read_subhaloData('SubGroupNumber')
@@ -37,10 +37,10 @@ class rotation_curve:
         self.centre = self.find_centre_of_potential(self.gn, self.sgn) 
 
         # Load data.
-        gas    = self.read_galaxy(0, self.gn, self.sgn)
-        dm     = self.read_galaxy(1, self.gn, self.sgn)
-        stars  = self.read_galaxy(4, self.gn, self.sgn)
-        bh     = self.read_galaxy(5, self.gn, self.sgn)
+        gas    = self.read_particles(0, self.gn, self.sgn)
+        dm     = self.read_particles(1, self.gn, self.sgn)
+        stars  = self.read_particles(4, self.gn, self.sgn)
+        bh     = self.read_particles(5, self.gn, self.sgn)
 
         # All parttypes together.
         self.combined = {}
@@ -54,7 +54,7 @@ class rotation_curve:
 
         return cop[np.logical_and(self.SGNs == sgn, self.GNs == gn)] * u.cm.to(u.kpc)
 
-    def read_galaxy(self, itype, gn, sgn):
+    def read_particles(self, itype, gn, sgn):
         """ For a given galaxy (identified by its GroupNumber and SubGroupNumber),
         extract the coordinates and mass of all particles of a selected type.
         Coordinates are then wrapped around the centre to account for periodicity. """
@@ -135,23 +135,27 @@ class plot_rotation_curve:
         self.axes.set_title('Rotation curve of halo with GN = %i and SGN = %i'%(self.gn,self.sgn))
         self.axes.set_ylabel('Velocity [km/s]'); self.axes.set_xlabel('r [kpc]')
 
-    def add_data(self, data):
+    def add_data(self, data, col):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
-        self.axes.plot(data.r, data.v)
-        self.axes.axhline(data.vmax, linestyle='dashed', c='red', label='Vmax=%1.3f'%data.vmax)
-        self.axes.axvline(data.rmax, linestyle='dashed', c='red', label='Rmax=%1.3f'%data.rmax)
-        self.axes.axhline(data.v1kpc, linestyle='dashed', c='green', label='V1kpc=%1.3f'%data.v1kpc)
-        self.axes.axvline(1, linestyle='dashed', c='green')
-        
-        plt.close()
+        self.axes.plot(data.r, data.v, c=col, label='%s: Vmax=%1.3f, Rmax=%1.3f, V1kpc=%1.3f'%(data.dataset.name, data.vmax, data.rmax, data.v1kpc))
+        self.axes.axhline(data.vmax, linestyle='dashed', c=col)
+        self.axes.axvline(data.rmax, linestyle='dashed', c=col)
+        self.axes.axhline(data.v1kpc, linestyle='dashed', c='black')
+        self.axes.axvline(1, linestyle='dashed', c='black')
 
-    def save_figure(self):
+    def save_figure(self,dir):
         """ Save figure. """
         
         self.axes.legend(loc=0)
         plt.show()
-        self.fig.savefig('../Figures/Comparisons_082_z001p941/RotationCurve_g%i-sg%i.png'%(self.gn,self.sgn))
+
+        path = '../Figures/%s'%dir
+        # If the directory does not exist, create it
+        if not os.path.exists(path):
+            os.makedirs(path)
+        filename = 'RotationCurve_g%i-sg%i.png'%(self.gn,self.sgn)
+        self.fig.savefig(os.path.join(path,filename))
         plt.close()
 
 
