@@ -64,19 +64,27 @@ class plot_rmax_vs_vmax:
             #self.axes.set_title('Isolated galaxy max circular velocities and corresponding radii')
             self.axes.text(13, 10, 'eristetyt galaksit')
 
-    def add_data(self, data, col):
+    def add_data(self, data, plot_style):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
         x = 0; y = 0
         if self.satellites:
             x = data.vmaxSat; y = data.rmaxSat
-            median = calc_median_trend(data.vmaxSat, data.rmaxSat)
         else:
             x = data.vmaxIsol; y = data.rmaxIsol
-            median = calc_median_trend(data.vmaxIsol, data.rmaxIsol)
 
-        self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
-        self.axes.plot(median[0], median[1], c=col, linestyle='--')
+        # Plot data points:
+        self.axes.scatter(x, y, marker=plot_style[0], c=plot_style[1], edgecolor='none', label=data.dataset.name)
+
+        if not self.satellites:
+            # Plot satellite median curves:
+            xSat = data.vmaxSat; ySat = data.rmaxSat
+            median = calc_median_trend(xSat, ySat)
+            self.axes.plot(median[0], median[1], c='grey', linestyle='--')
+        
+        # Plot median:
+        median = calc_median_trend(x, y)
+        self.axes.plot(median[0], median[1], c=plot_style[2], linestyle='--')
     
     def save_figure(self, dir):
         """ Save figure. """

@@ -65,7 +65,7 @@ class plot_SM_vs_Vmax:
 #            self.axes.set_title('Stellar mass of isolated galaxies')
             self.axes.text(11, 2*10**9, 'eristetyt galaksit')
 
-    def add_data(self, data, col):
+    def add_data(self, data, plot_style):
         """ Plot data (object of type SM_vs_Vmax_data) into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
         x = 0; y = 0
@@ -73,13 +73,19 @@ class plot_SM_vs_Vmax:
             x = data.vmaxSat; y = data.SMSat
         else:
             x = data.vmaxIsol; y = data.SMIsol
+
+        # Plot data points:
+        self.axes.scatter(x, y, marker=plot_style[0], c=plot_style[1], edgecolor='none', label=data.dataset.name)
+
+        if not self.satellites:
+            # Plot satellite median curves:
             xSat = data.vmaxSat; ySat = data.SMSat
             median = calc_median_trend(xSat, ySat, points_per_bar=7)
             self.axes.plot(median[0], median[1], c='grey', linestyle='--')
 
-        self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
+        # Plot median:
         median = calc_median_trend(x, y, points_per_bar=7)
-        self.axes.plot(median[0], median[1], c=col, linestyle='--')
+        self.axes.plot(median[0], median[1], c=plot_style[2], linestyle='--')
         #self.axes.scatter(median[0], median[1], s=5)
     
     def save_figure(self, dir):
