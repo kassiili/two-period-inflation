@@ -49,8 +49,8 @@ class plot_rmax_vs_vmax:
         self.axes.set_xscale('log')
         self.axes.set_yscale('log')
 
-        self.axes.set_xlim(20, 150);
-        self.axes.set_ylim(1, 50);
+        self.axes.set_xlim(10, 130);
+        self.axes.set_ylim(0.5, 15);
         
     def set_labels(self):
         """ Set labels. """
@@ -58,9 +58,11 @@ class plot_rmax_vs_vmax:
         self.axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
         self.axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$')
         if self.satellites:
-            self.axes.set_title('Satellite max circular velocities and corresponding radii')
+            #self.axes.set_title('Satellite max circular velocities and corresponding radii')
+            self.axes.text(13, 10, 'satelliittigalaksit')
         else:
-            self.axes.set_title('Isolated galaxy max circular velocities and corresponding radii')
+            #self.axes.set_title('Isolated galaxy max circular velocities and corresponding radii')
+            self.axes.text(13, 10, 'eristetyt galaksit')
 
     def add_data(self, data, col):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
@@ -79,13 +81,13 @@ class plot_rmax_vs_vmax:
     def save_figure(self, dir):
         """ Save figure. """
         
-        self.axes.legend(loc=0)
-        plt.show()
         filename=""
         if self.satellites:
             filename = 'rmax_vs_vmax_sat.png'
+            self.axes.legend(loc=0)
         else:
             filename = 'rmax_vs_vmax_isol.png'
+        plt.show()
 
         path = '../Figures/%s'%dir
         # If the directory does not exist, create it

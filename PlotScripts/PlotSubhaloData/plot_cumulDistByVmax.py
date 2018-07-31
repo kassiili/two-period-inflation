@@ -26,14 +26,21 @@ class subhalo_dist_vs_vmax_data:
         GNs = self.reader.read_subhaloData('GroupNumber')
 
         mask_MW_or_M31 = np.logical_or(GNs == 1, GNs == 2)
-        self.vmaxLumSat = vmax[np.logical_and.reduce((vmax > 0, SM > 0, SGNs != 0, mask_MW_or_M31))]
-        self.vmaxDarkSat = vmax[np.logical_and.reduce((vmax > 0, SM == 0, SGNs != 0, mask_MW_or_M31))]
-        self.vmaxLumIsol = vmax[np.logical_and.reduce((vmax > 0, SM > 0, SGNs == 0))]
-        self.vmaxDarkIsol = vmax[np.logical_and.reduce((vmax > 0, SM == 0, SGNs == 0))]
+        self.vmaxSat = vmax[np.logical_and.reduce((vmax > 0, SGNs != 0, mask_MW_or_M31))]
+        SMSat = SM[np.logical_and.reduce((vmax > 0, SGNs != 0, mask_MW_or_M31))]
+        self.vmaxLumSat = self.vmaxSat[SMSat > 0]
+        self.vmaxDarkSat = self.vmaxSat[SMSat == 0]
+
+        self.vmaxIsol = vmax[np.logical_and(vmax > 0, SGNs == 0)]
+        SMIsol = SM[np.logical_and(vmax > 0, SGNs == 0)]
+        self.vmaxLumIsol = self.vmaxIsol[SMIsol > 0]
+        self.vmaxDarkIsol = self.vmaxIsol[SMIsol == 0]
 
         #Sort arrays in descending order:
+        self.vmaxSat[::-1].sort()
         self.vmaxLumSat[::-1].sort()
         self.vmaxDarkSat[::-1].sort()
+        self.vmaxIsol[::-1].sort()
         self.vmaxLumIsol[::-1].sort()
         self.vmaxDarkIsol[::-1].sort()
 
@@ -54,29 +61,30 @@ class plot_subhalo_dist_vs_vmax:
         self.axes.set_xscale('log')
         self.axes.set_yscale('log')
         self.axes.set_xlim(7, 100)
-        self.axes.set_ylim(1, 200)
+        self.axes.set_ylim(1, 400)
         
     def set_labels(self):
         """ Set labels. """
 
         self.axes.set_xlabel('$v_{\mathrm{max}} [\mathrm{km s^{-1}}]$')
         self.axes.set_ylabel('$N(>v_{\mathrm{max}})$')
-        if (self.satellites):
-            self.axes.set_title('Distribution of satellites as a function of $v_{max}$')
-        else:
-            self.axes.set_title('Distribution of isolated galaxies as a function of $v_{max}$')
+#        if (self.satellites):
+#            self.axes.set_title('Distribution of satellites as a function of $v_{max}$')
+#        else:
+#            self.axes.set_title('Distribution of isolated galaxies as a function of $v_{max}$')
 
     def add_data(self, data, colors):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
         x = 0; y = 0
         if self.satellites:
-            lum = data.vmaxLumSat; dark = data.vmaxDarkSat
+            all = data.vmaxSat; lum = data.vmaxLumSat; dark = data.vmaxDarkSat
         else:
-            lum = data.vmaxLumIsol; dark = data.vmaxDarkIsol
+            all = data.vmaxIsol; lum = data.vmaxLumIsol; dark = data.vmaxDarkIsol
 
-        self.axes.plot(lum, np.arange(1, lum.size + 1), c=colors[0], label=data.dataset.name+": luminous")
-        self.axes.plot(dark, np.arange(1, dark.size + 1), c=colors[1], label=data.dataset.name+": dark")
+        self.axes.plot(lum, np.arange(1, lum.size + 1), c=colors[0], label=data.dataset.name+": kirkkaat")
+        self.axes.plot(dark, np.arange(1, dark.size + 1), c=colors[1], label=data.dataset.name+": pimeät")
+        self.axes.plot(all, np.arange(1, all.size + 1), linestyle=':', c=colors[1], label=data.dataset.name+": kaikki")
     
     def save_figure(self, dir):
         """ Save figure. """

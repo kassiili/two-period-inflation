@@ -51,7 +51,7 @@ class plot_SM_vs_Vmax:
         self.axes.set_xscale('log')
         self.axes.set_yscale('log')
         self.axes.set_xlim(10, 100)
-        self.axes.set_ylim(10**6, 10**10)
+        self.axes.set_ylim(10**5, 5*10**9)
         
     def set_labels(self):
         """ Set labels. """
@@ -59,9 +59,11 @@ class plot_SM_vs_Vmax:
         self.axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
         self.axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
         if (self.satellites):
-            self.axes.set_title('Stellar mass of satellites')
+#            self.axes.set_title('Stellar mass of satellites')
+            self.axes.text(11, 2*10**9, 'satelliittigalaksit')
         else:
-            self.axes.set_title('Stellar mass of isolated galaxies')
+#            self.axes.set_title('Stellar mass of isolated galaxies')
+            self.axes.text(11, 2*10**9, 'eristetyt galaksit')
 
     def add_data(self, data, col):
         """ Plot data (object of type SM_vs_Vmax_data) into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
@@ -71,6 +73,9 @@ class plot_SM_vs_Vmax:
             x = data.vmaxSat; y = data.SMSat
         else:
             x = data.vmaxIsol; y = data.SMIsol
+            xSat = data.vmaxSat; ySat = data.SMSat
+            median = calc_median_trend(xSat, ySat, points_per_bar=7)
+            self.axes.plot(median[0], median[1], c='grey', linestyle='--')
 
         self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
         median = calc_median_trend(x, y, points_per_bar=7)
@@ -79,14 +84,14 @@ class plot_SM_vs_Vmax:
     
     def save_figure(self, dir):
         """ Save figure. """
-        
-        self.axes.legend(loc=0)
-        plt.show()
+
         filename=""
         if self.satellites:
             filename = 'SM_vs_Vmax_sat.png'
+            self.axes.legend(loc=0)
         else:
             filename = 'SM_vs_Vmax_isol.png'
+        plt.show()
 
         path = '../Figures/%s'%dir
         # If the directory does not exist, create it
