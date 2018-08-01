@@ -132,7 +132,7 @@ class plot_rotation_curve:
     def set_labels(self):
         """ Set labels. """
 
-        self.axes.set_title('Rotation curve of halo with GN = %i and SGN = %i'%(self.gn,self.sgn))
+        #self.axes.set_title('Rotation curve of halo with GN = %i and SGN = %i'%(self.gn,self.sgn))
         self.axes.set_ylabel('Velocity [km/s]'); self.axes.set_xlabel('r [kpc]')
 
     def add_data(self, data, col, lines):
@@ -148,14 +148,15 @@ class plot_rotation_curve:
     def save_figure(self,dir):
         """ Save figure. """
         
-        self.axes.legend(loc=0)
+        #self.axes.legend(loc=0)
         plt.show()
 
         path = '../Figures/%s'%dir
         # If the directory does not exist, create it
         if not os.path.exists(path):
             os.makedirs(path)
-        filename = 'RotationCurve_g%i-sg%i.png'%(self.gn,self.sgn)
+        #filename = 'RotationCurve_g%i-sg%i.png'%(self.gn,self.sgn)
+        filename = 'RotationCurves_vmax20.png'
         self.fig.savefig(os.path.join(path,filename))
         plt.close()
 
