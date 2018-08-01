@@ -135,14 +135,15 @@ class plot_rotation_curve:
         self.axes.set_title('Rotation curve of halo with GN = %i and SGN = %i'%(self.gn,self.sgn))
         self.axes.set_ylabel('Velocity [km/s]'); self.axes.set_xlabel('r [kpc]')
 
-    def add_data(self, data, col):
+    def add_data(self, data, col, lines):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
         self.axes.plot(data.r, data.v, c=col, label='%s: Vmax=%1.3f, Rmax=%1.3f, V1kpc=%1.3f'%(data.dataset.name, data.vmax, data.rmax, data.v1kpc))
-        self.axes.axhline(data.vmax, linestyle='dashed', c=col)
-        self.axes.axvline(data.rmax, linestyle='dashed', c=col)
-        self.axes.axhline(data.v1kpc, linestyle='dashed', c='black')
-        self.axes.axvline(1, linestyle='dashed', c='black')
+        if lines:
+            self.axes.axhline(data.vmax, linestyle='dashed', c=col)
+            self.axes.axvline(data.rmax, linestyle='dashed', c=col)
+            self.axes.axhline(data.v1kpc, linestyle='dashed', c='black')
+            self.axes.axvline(1, linestyle='dashed', c='black')
 
     def save_figure(self,dir):
         """ Save figure. """
