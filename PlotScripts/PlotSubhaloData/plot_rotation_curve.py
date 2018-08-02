@@ -89,9 +89,9 @@ class rotation_curve:
 
         cmass = np.cumsum(arr['mass'][mask])
 
-        # Begin rotation curve from the 10th particle to reduce noise at the low end of the curve.
-        r = r[10:]
-        cmass = cmass[10:]
+        # Begin rotation curve from the 10th particle to reduce noise at the low end of the curve.include only every 10th particle for cleaner curves.
+        r = r[10::10]
+        cmass = cmass[10::10]
 
         # Compute velocity.
         myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
@@ -126,7 +126,7 @@ class plot_rotation_curve:
     def set_axes(self):
         """ Set shapes for axes. """
 
-        self.axes.set_xlim(0, 80); # self.axes.tight_layout()
+        #self.axes.set_xlim(0, 80); # self.axes.tight_layout()
         self.axes.minorticks_on()
 
     def set_labels(self):

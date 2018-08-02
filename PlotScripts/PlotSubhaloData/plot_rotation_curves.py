@@ -10,7 +10,8 @@ import read_data
 LCDM_dataset = dataset('V1_MR_fix_082_z001p941', 'standard', 16, 192)
 mock_dataset = dataset('V1_MR_mock_1_fix_082_z001p941', 'curvaton', 1, 64)
 
-reader = read_data.read_data(LCDM_dataset.dir, LCDM_dataset.nfiles_part, LCDM_dataset.nfiles_group)
+reader = read_data.read_data(mock_dataset.dir, mock_dataset.nfiles_part, mock_dataset.nfiles_group)
+#reader = read_data.read_data(mock_dataset.dir, mock_dataset.nfiles_part, mock_dataset.nfiles_group)
 vmax = reader.read_subhaloData('Vmax') * u.cm.to(u.km)
 SM = reader.read_subhaloData('Stars/Mass') * u.g.to(u.Msun)
 gns = reader.read_subhaloData('GroupNumber')
@@ -23,7 +24,7 @@ d_M31 = np.linalg.norm(cops - cop_M31, axis=1)
 d_MW = np.linalg.norm(cops - cop_MW, axis=1)
 
 # Choose luminous satellites with vmax=size+-range:
-size = 20; range = 1
+size = 25; range = 2
 mask = np.logical_and.reduce((vmax > size-range, 
     vmax < size+range, 
     SM > 0, 
@@ -35,6 +36,6 @@ print(gns.size)
 plot = plot_rotation_curve(-1, -1)
 for gn,sgn in zip(gns, sgns):
     print(gn, ', ', sgn)
-    plot.add_data(rotation_curve(gn, sgn, LCDM_dataset), 'black', 0)
+    plot.add_data(rotation_curve(gn, sgn, mock_dataset), 'blue', 0)
 
 plot.save_figure('RotationCurves/Comparisons_082_z001p941') 
