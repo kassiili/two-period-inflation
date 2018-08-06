@@ -57,8 +57,8 @@ class plot_subhalo_dist_vs_vmax:
     def set_labels(self):
         """ Set labels. """
 
-        self.axes.set_xlabel('$v_{\mathrm{max}} [\mathrm{km s^{-1}}]$')
-        self.axes.set_ylabel('$N(>v_{\mathrm{max}})$')
+        self.axes.set_xlabel('$v_{\mathrm{max}} [\mathrm{km s^{-1}}]$', fontsize=16)
+        self.axes.set_ylabel('$N(>v_{\mathrm{max}})$', fontsize=16)
         if all(item.gn == 1 for item in self.data):
             galaxy = 'M31 satelliitit'
             self.axes.text(8, 300, galaxy)

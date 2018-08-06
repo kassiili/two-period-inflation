@@ -55,14 +55,14 @@ class plot_rmax_vs_vmax:
     def set_labels(self):
         """ Set labels. """
 
-        self.axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
-        self.axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$')
+        self.axes.set_xlabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$', fontsize=16)
+        self.axes.set_ylabel('$r_{\mathrm{max}}[\mathrm{kpc}]$', fontsize=16)
         if self.satellites:
             #self.axes.set_title('Satellite max circular velocities and corresponding radii')
-            self.axes.text(13, 10, 'satelliittigalaksit')
+            self.axes.text(11, 11, 'satelliittigalaksit')
         else:
             #self.axes.set_title('Isolated galaxy max circular velocities and corresponding radii')
-            self.axes.text(13, 10, 'eristetyt galaksit')
+            self.axes.text(11, 11, 'eristetyt galaksit')
 
     def add_data(self, data, plot_style):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """

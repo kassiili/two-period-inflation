@@ -129,15 +129,15 @@ class plot_Vmax_vs_V1kpc:
     def set_labels(self):
         """ Set labels. """
 
-        self.axes.set_xlabel('$v_{\mathrm{1kpc}}[\mathrm{km s^{-1}}]$')
-        self.axes.set_ylabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$')
+        self.axes.set_xlabel('$v_{\mathrm{1kpc}}[\mathrm{km s^{-1}}]$', fontsize=16)
+        self.axes.set_ylabel('$v_{\mathrm{max}}[\mathrm{km s^{-1}}]$', fontsize=16)
 
-        if (self.satellites):
-            self.axes.set_title('Satellite central densities')
-        else:
-            self.axes.set_title('Isolated galaxy central densities')
+#        if (self.satellites):
+#            self.axes.set_title('Satellite central densities')
+#        else:
+#            self.axes.set_title('Isolated galaxy central densities')
 
-    def add_data(self, data, col):
+    def add_data(self, data, plot_style):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
         if self.satellites:
@@ -148,20 +148,29 @@ class plot_Vmax_vs_V1kpc:
         x = data.subhaloData['V1kpc'][mask]
         y = data.subhaloData['Vmax'][mask]
 
-        self.axes.scatter(x, y, s=3, c=col, edgecolor='none', label=data.dataset.name)
+        # Plot data points:
+        self.axes.scatter(x, y, marker=plot_style[0], c=plot_style[1], edgecolor='none', label=data.dataset.name)
+
+        if not self.satellites:
+            # Plot satellite median curves:
+            xSat = data.vmaxSat; ySat = data.SMSat
+            median = calc_median_trend(xSat, ySat, points_per_bar=7)
+            self.axes.plot(median[0], median[1], c='grey', linestyle='--')
+
+        # Plot median:
         median = calc_median_trend(x, y)
-        self.axes.plot(median[0], median[1], c=col, linestyle='--')
+        self.axes.plot(median[0], median[1], c=plot_style[2], linestyle='--')
     
     def save_figure(self, dir):
         """ Save figure. """
         
-        self.axes.legend(loc=0)
-        plt.show()
         filename=""
         if self.satellites:
             filename = 'Vmax_vs_V1kpc_sat.png'
+            self.axes.legend(loc=0)
         else:
             filename = 'Vmax_vs_V1kpc_isol.png'
+        #plt.show()
 
         path = '../Figures/%s'%dir
         # If the directory does not exist, create it

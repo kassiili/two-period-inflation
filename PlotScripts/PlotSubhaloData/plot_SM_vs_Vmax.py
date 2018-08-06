@@ -56,8 +56,8 @@ class plot_SM_vs_Vmax:
     def set_labels(self):
         """ Set labels. """
 
-        self.axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$')
-        self.axes.set_ylabel('$M_*[\mathrm{M_\odot}]$')
+        self.axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$', fontsize=16)
+        self.axes.set_ylabel('$M_*[\mathrm{M_\odot}]$', fontsize=16)
         if (self.satellites):
 #            self.axes.set_title('Stellar mass of satellites')
             self.axes.text(11, 2*10**9, 'satelliittigalaksit')
