@@ -133,12 +133,17 @@ class plot_rotation_curve:
         """ Set labels. """
 
         #self.axes.set_title('Rotation curve of halo with GN = %i and SGN = %i'%(self.gn,self.sgn))
-        self.axes.set_ylabel('Velocity [km/s]'); self.axes.set_xlabel('r [kpc]')
+        self.axes.set_ylabel('$v_{\mathrm{circ}}[\mathrm{km/s}]$', fontsize=16)
+        self.axes.set_xlabel('$r[\mathrm{kpc}]$', fontsize=16)
 
-    def add_data(self, data, col, lines):
+    def add_data(self, data, col, lines, label):
         """ Plot data into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
-        self.axes.plot(data.r, data.v, c=col, label='%s: Vmax=%1.3f, Rmax=%1.3f, V1kpc=%1.3f'%(data.dataset.name, data.vmax, data.rmax, data.v1kpc))
+        if label:
+            self.axes.plot(data.r, data.v, c=col, label=data.dataset.name)
+        else:
+            self.axes.plot(data.r, data.v, c=col)
+        #self.axes.plot(data.r, data.v, c=col, label='%s: Vmax=%1.3f, Rmax=%1.3f, V1kpc=%1.3f'%(data.dataset.name, data.vmax, data.rmax, data.v1kpc))
         if lines:
             self.axes.axhline(data.vmax, linestyle='dashed', c=col)
             self.axes.axvline(data.rmax, linestyle='dashed', c=col)
@@ -148,7 +153,7 @@ class plot_rotation_curve:
     def save_figure(self,dir):
         """ Save figure. """
         
-        #self.axes.legend(loc=0)
+        self.axes.legend(loc=0)
         plt.show()
 
         path = '../Figures/%s'%dir
@@ -156,7 +161,7 @@ class plot_rotation_curve:
         if not os.path.exists(path):
             os.makedirs(path)
         #filename = 'RotationCurve_g%i-sg%i.png'%(self.gn,self.sgn)
-        filename = 'RotationCurves_vmax20.png'
+        filename = 'sat_rotation_profiles_vmax20.png'
         self.fig.savefig(os.path.join(path,filename))
         plt.close()
 
