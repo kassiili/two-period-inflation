@@ -17,12 +17,8 @@ LCDM_z2_dataset = dataset('V1_MR_fix_082_z001p941', 'z~2', 16, 192)
 #plot.add_data(SM_vs_Vmax_data(mock_dataset), ['^', 'lightblue', 'blue'])
 
 #plot = plot_subhalo_dist_vs_vmax()
-#plot.add_data(subhalo_dist_vs_vmax_data(LCDM_dataset, 2), ['pink', 'red'], 'dataset')
-#plot.add_data(subhalo_dist_vs_vmax_data(mock_dataset, 2), ['lightblue', 'blue'], 'dataset')
-
-plot = plot_subhalo_dist_vs_vmax()
-plot.add_data(subhalo_dist_vs_vmax_data(LCDM_dataset, 2), ['pink', 'red'], 'dataset')
-plot.add_data(subhalo_dist_vs_vmax_data(mock_dataset, 2), ['lightblue', 'blue'], 'dataset')
+#plot.add_data(subhalo_dist_vs_vmax_data(LCDM_dataset, 1), ['pink', 'red'], 'dataset')
+#plot.add_data(subhalo_dist_vs_vmax_data(mock_dataset, 1), ['lightblue', 'blue'], 'dataset')
 
 #plot = plot_rmax_vs_vmax(0)
 #plot.add_data(rmax_vs_vmax_data(LCDM_dataset), ['o', 'pink', 'red'])
@@ -30,7 +26,9 @@ plot.add_data(subhalo_dist_vs_vmax_data(mock_dataset, 2), ['lightblue', 'blue'],
 
 #gns = [1,1,2,2,3,7]
 #sgns = [4,9,3,11,3,2]
-##gn = 1; sgn = 0
+gn = 2; sgn = 0
+plot = plot_rotation_curve(gn, sgn)
+plot.add_data(rotation_curve(gn, sgn, LCDM_z0_dataset), 'red', 0, 0)
 #for gn,sgn in zip(gns, sgns):
 #    plot = plot_rotation_curve(gn, sgn)
 #    plot.add_data(rotation_curve(gn, sgn, LCDM_dataset), 'red')
@@ -46,6 +44,6 @@ plot.add_data(subhalo_dist_vs_vmax_data(mock_dataset, 2), ['lightblue', 'blue'],
 #plot.add_data(satellites_count(300, LCDM_dataset), 'red')
 #plot.add_data(satellites_count(300, mock_dataset), 'blue')
 
-#plot.save_figure('V1_LR_fix_127_z000p000')
-plot.save_figure('Comparisons_082_z001p941') 
+plot.save_figure('V1_MR_fix_127_z000p000')
+#plot.save_figure('Comparisons_082_z001p941') 
 #plot.save_figure('Comparisons_CDM_z0_vs_z2')

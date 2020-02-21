@@ -79,7 +79,7 @@ class plot_subhalo_dist_vs_vmax:
                 label_prefix = 'MW'
         elif label=='dataset':
             label_prefix = data.dataset.name
-        self.axes.plot(data.vmaxDark, np.arange(1, data.vmaxDark.size + 1), linestyle=':', c=colours[1], label=label_prefix+": pimeät")
+        self.axes.plot(data.vmaxDark, np.arange(1, data.vmaxDark.size + 1), linestyle='dashed', c=colours[1], label=label_prefix+": pimeät")
         self.axes.plot(data.vmaxLum, np.arange(1, data.vmaxLum.size + 1), c=colours[0], label=label_prefix+": kirkkaat")
         self.axes.plot(data.vmaxAll, np.arange(1, data.vmaxAll.size + 1), c=colours[1], label=label_prefix+": kaikki")
     

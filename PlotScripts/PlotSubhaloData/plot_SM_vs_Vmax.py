@@ -4,7 +4,7 @@ import h5py
 import time
 import astropy.units as u
 import matplotlib.pyplot as plt
-from calc_median import calc_median_trend
+from PlotSubhaloData.calc_median import calc_median_trend
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../ReadData"))
 import read_data
@@ -99,12 +99,12 @@ class plot_SM_vs_Vmax:
             filename = 'SM_vs_Vmax_isol.png'
         plt.show()
 
-        path = '../Figures/%s'%dir
-        # If the directory does not exist, create it
-        if not os.path.exists(path):
-            os.makedirs(path)
-        self.fig.savefig(os.path.join(path,filename))
-        plt.close()
+#        path = '../Figures/%s'%dir
+#        # If the directory does not exist, create it
+#        if not os.path.exists(path):
+#            os.makedirs(path)
+#        self.fig.savefig(os.path.join(path,filename))
+#        plt.close()
 
 #
 #plot = plot_SM_vs_Vmax()

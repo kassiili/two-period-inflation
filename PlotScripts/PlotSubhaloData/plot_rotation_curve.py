@@ -144,6 +144,7 @@ class plot_rotation_curve:
         else:
             self.axes.plot(data.r, data.v, c=col)
         #self.axes.plot(data.r, data.v, c=col, label='%s: Vmax=%1.3f, Rmax=%1.3f, V1kpc=%1.3f'%(data.dataset.name, data.vmax, data.rmax, data.v1kpc))
+        self.axes.axhline(data.vmax, linestyle='dashed', c='black')
         if lines:
             self.axes.axhline(data.vmax, linestyle='dashed', c=col)
             self.axes.axvline(data.rmax, linestyle='dashed', c=col)
