@@ -1,6 +1,6 @@
 import numpy as np
 
-def calc_median_trend(x, y, points_per_bar=10):
+def calc_median(x, y, points_per_bar=10):
     xy = np.vstack([x,y])
     xy = xy[:,xy[0,:].argsort()]
     datapoints = xy[0,:].size
@@ -24,16 +24,4 @@ def calc_median_trend(x, y, points_per_bar=10):
     medianY = np.median(tmpY, axis=1)
 
     return [medianX, medianY]
-
-#def calc_median_trend(x, y):
-#    minX = min(x)
-#    maxX = max(x)
-#    bars = 10
-#    tmpX = np.linspace(minX, maxX, num=bars)
-#    medianTrend = np.empty([bars-1,])
-#    for i in range(bars-1):
-#        print(y[np.logical_and(tmpX[i] < x, x < tmpX[i+1])], '\n')
-#        medianTrend[i] = np.median(y[np.logical_and(tmpX[i] < x, x < tmpX[i+1])])
-#
-#    return [tmpX[:-1] + (maxX-minX)/(2*bars), medianTrend] 
 
