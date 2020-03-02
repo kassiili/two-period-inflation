@@ -1,4 +1,5 @@
 import sys,os 
+import numpy as np
 import h5py
 
 sys.path.append(os.path.join(os.path.dirname(__file__),".."))
@@ -25,6 +26,8 @@ def test_make_group_file(dataset):
 def test_read_subhalo_attr(dataset):
     attr = 'Vmax'
     print(len(dataset.read_subhalo_attr(attr)))
+    attr = 'Stars/Mass'
+    print(len(dataset.read_subhalo_attr(attr)))
 
 def test_get_subhalos(dataset):
     attr = "Vmax"
@@ -33,10 +36,20 @@ def test_get_subhalos(dataset):
     print(len(sat))
     print(len(isol))
 
+def test_jupyter():
+    # Get data:
+    LCDM = Dataset("V1_LR_fix_127_z000p000", "LCDM")
+    vmaxSat, vmaxIsol = LCDM.get_subhalos("Vmax",True)
+    SMSat, SMIsol = LCDM.get_subhalos("Stars/Mass",True)
+    
+    maskSat = np.logical_and.reduce((vmaxSat>0, SMSat>0))
+    maskIsol = np.logical_and.reduce((vmaxIsol>0, SMIsol>0))
+
 
 LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
 #test_get_data_path(LCDM)
 #test_count_files(LCDM)
 #test_make_group_file(LCDM)
-test_read_subhalo_attr(LCDM)
+#test_read_subhalo_attr(LCDM)
 test_get_subhalos(LCDM)
+#test_jupyter()

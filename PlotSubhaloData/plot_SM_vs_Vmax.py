@@ -37,74 +37,64 @@ class SM_vs_Vmax_data:
 
 class plot_SM_vs_Vmax:
 
-    def __init__(self, satellites):
+    def __init__(self, ax, satellites):
         """ Create new figure with stellar mass on y-axis and Vmax on x-axis. """
     
-        self.fig, self.axes = plt.subplots()
-        self.satellites = satellites
-        self.set_axes()
-        self.set_labels()
+        self.ax = ax
+        #self.set_axes()
+        self.set_labels(satellites)
+        self.n_datasets = 0
         
     def set_axes(self):
         """ Set shapes for axes. """
 
-        self.axes.set_xscale('log')
-        self.axes.set_yscale('log')
-        self.axes.set_xlim(10, 100)
-        self.axes.set_ylim(10**5, 5*10**9)
+        self.ax.set_xscale('log')
+        self.ax.set_yscale('log')
+        self.ax.set_xlim(10, 100)
+        self.ax.set_ylim(10**5, 5*10**9)
         
-    def set_labels(self):
+    def set_labels(self, satellites):
         """ Set labels. """
 
-        self.axes.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$', fontsize=16)
-        self.axes.set_ylabel('$M_*[\mathrm{M_\odot}]$', fontsize=16)
-        if (self.satellites):
+        self.ax.set_xlabel('$v_{max}[\mathrm{km s^{-1}}]$', fontsize=16)
+        self.ax.set_ylabel('$M_*[\mathrm{M_\odot}]$', fontsize=16)
+        if (satellites):
 #            self.axes.set_title('Stellar mass of satellites')
-            self.axes.text(11, 2*10**9, 'satelliittigalaksit')
+            self.ax.text(11, 2*10**9, 'satelliittigalaksit')
         else:
 #            self.axes.set_title('Stellar mass of isolated galaxies')
-            self.axes.text(11, 2*10**9, 'eristetyt galaksit')
+            self.ax.text(11, 2*10**9, 'eristetyt galaksit')
 
-    def add_data(self, data, plot_style):
+    def add_scatter(self, data, color, label):
         """ Plot data (object of type SM_vs_Vmax_data) into an existing figure. Satellites is a boolean variable with value 1, if satellites are to be plotted, and 0, if instead isolated galaxies are to be plotted. """
 
-        x = 0; y = 0
-        if self.satellites:
-            x = data.vmaxSat; y = data.SMSat
-        else:
-            x = data.vmaxIsol; y = data.SMIsol
+        marker = (3, self.n_datasets % 4, 0)
 
-        # Plot data points:
-        self.axes.scatter(x, y, marker=plot_style[0], c=plot_style[1], edgecolor='none', label=data.dataset.name)
+        self.ax.scatter(data[0], data[1], marker=marker, c=color, \
+                edgecolor='none', label=label)
 
-        if not self.satellites:
-            # Plot satellite median curves:
-            xSat = data.vmaxSat; ySat = data.SMSat
-            median = calc_median_trend(xSat, ySat, points_per_bar=7)
-            self.axes.plot(median[0], median[1], c='grey', linestyle='--')
+        self.n_datasets += 1
 
-        # Plot median:
+    def add_median(self, data, color):
+
         median = calc_median_trend(x, y, points_per_bar=7)
-        self.axes.plot(median[0], median[1], c=plot_style[2], linestyle='--')
-        #self.axes.scatter(median[0], median[1], s=5)
+        self.ax.plot(median[0], median[1], c=color, linestyle='--')
     
-    def save_figure(self, dir):
-        """ Save figure. """
-
-        filename=""
-        if self.satellites:
-            filename = 'SM_vs_Vmax_sat.png'
-            self.axes.legend(loc=0)
-        else:
-            filename = 'SM_vs_Vmax_isol.png'
-        plt.show()
-
+#    def get_filename(self, dir):
+#        """ Save figure. """
+#
+#        filename=""
+#        if self.satellites:
+#            filename = 'SM_vs_Vmax_sat.png'
+#            self.ax.legend(loc=0)
+#        else:
+#            filename = 'SM_vs_Vmax_isol.png'
+#
 #        path = '../Figures/%s'%dir
 #        # If the directory does not exist, create it
 #        if not os.path.exists(path):
 #            os.makedirs(path)
 #        self.fig.savefig(os.path.join(path,filename))
-#        plt.close()
 
 #
 #plot = plot_SM_vs_Vmax()

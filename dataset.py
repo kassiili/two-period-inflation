@@ -61,7 +61,7 @@ class Dataset:
             path to data directory
         """
 
-        home = os.path.dirname(os.getcwd())
+        home = os.path.dirname(os.path.realpath(__file__))
         path = os.path.join(home,"snapshots",self.ID)
         direc = ""
         if datatype == "part":
@@ -127,7 +127,6 @@ class Dataset:
 
         if divided:
             SGNs = self.read_subhalo_attr('SubGroupNumber')
-            print(len(SGNs))
 
             # Divide into satellites and isolated galaxies:
             dataSat = data[SGNs != 0]
@@ -162,23 +161,21 @@ class Dataset:
                 tmp = f['Subhalo/{}'.format(attr)][...]
                 out.append(tmp)
         
-                # Get conversion factors.
-                cgs     = f['Subhalo/{}'.format(attr)].attrs\
-                        .get('CGSConversionFactor')
-                aexp    = f['Subhalo/{}'.format(attr)].attrs\
-                        .get('aexp-scale-exponent')
-                hexp    = f['Subhalo/{}'.format(attr)].attrs\
-                        .get('h-scale-exponent')
+            # Get conversion factors.
+            cgs     = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('CGSConversionFactor')
+            aexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('aexp-scale-exponent')
+            hexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('h-scale-exponent')
         
-                # Get expansion factor and Hubble parameter from the 
-                # header.
-                a       = f['Header'].attrs.get('Time')
-                h       = f['Header'].attrs.get('HubbleParam')
-        
-#                f.close() # Do I need to close external links???
+            # Get expansion factor and Hubble parameter from the 
+            # header.
+            a       = grpf['link1/Header'].attrs.get('Time')
+            h       = grpf['link1/Header'].attrs.get('HubbleParam')
         
             # Combine to a single array.
-            if len(tmp.shape) > 1:
+            if len(out[0].shape) > 1:
                 out = np.vstack(out)
             else:
                 out = np.concatenate(out)

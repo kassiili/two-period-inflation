@@ -4,4 +4,6 @@ V1_MR_fix/
 __pycache__
 Figures/
 snapshots/
-Test/*.hdf5
+*.hdf5
+*.ipynb
+*.txt
