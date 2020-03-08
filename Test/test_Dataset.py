@@ -83,6 +83,14 @@ def test_get_subhalo_part_idx(dataset):
             print(sum(l))
             i+=1
     print(i)
+    
+def test_group_name(dataset):
+    filename = dataset.grp_file
+    with h5py.File(filename,'r') as grpf:
+        for (name,f) in grpf.items():
+            if ('link' in name):
+                print(name)
+
 
 LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
 #test_get_data_path(LCDM)
@@ -95,3 +103,4 @@ LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
 #test_calcVelocitiesAt1kpc(LCDM)
 test_get_subhalos_V1kpc(LCDM)
 #test_get_subhalo_part_idx(LCDM)
+#test_group_name(LCDM)
