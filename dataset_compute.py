@@ -50,7 +50,7 @@ def calculate_V1kpc(dataset):
     return v1kpc
     
 def get_subhalo_part_idx(dataset):
-    """ Finds indeces of the particles in each halo. """
+    """ Finds indices of the particles in each halo. """
 
     # Get subhalos:
     halo_gns = dataset.get_subhalos('GroupNumber',\

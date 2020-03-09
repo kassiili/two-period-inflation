@@ -25,5 +25,5 @@ def test_get_subhalo_part_idx(dataset):
             i+=1
     print(i)
 
-LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
+LCDM = Dataset("V1_MR_fix_127_z000p000","LCDM")
 test_calculate_V1kpc(LCDM)

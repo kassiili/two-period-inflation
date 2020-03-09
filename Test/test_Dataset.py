@@ -90,9 +90,21 @@ def test_group_name(dataset):
         for (name,f) in grpf.items():
             if ('link' in name):
                 print(name)
+    
+def test_gn_counts(dataset):
+#    sat, isol = dataset.get_subhalos('GroupNumber')
+#    print(np.bincount(sat.astype(int)))
+#    print(sum(sat))
+#    print(np.bincount(isol.astype(int)))
+
+    a = dataset.get_subhalos('GroupNumber',divided=False)[0].astype(int)
+    cnt = np.bincount(a)
+    print(cnt)
+    print(sum(cnt==0))
 
 
-LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
+
+LCDM = Dataset("V1_MR_fix_127_z000p000","LCDM")
 #test_get_data_path(LCDM)
 #test_count_files(LCDM)
 #test_make_group_file(LCDM)
@@ -101,6 +113,7 @@ LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
 #test_make_part_file(LCDM)
 #test_get_particles(LCDM)
 #test_calcVelocitiesAt1kpc(LCDM)
-test_get_subhalos_V1kpc(LCDM)
+#test_get_subhalos_V1kpc(LCDM)
 #test_get_subhalo_part_idx(LCDM)
 #test_group_name(LCDM)
+test_gn_counts(LCDM)

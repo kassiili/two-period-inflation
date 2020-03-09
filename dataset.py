@@ -5,9 +5,6 @@ import glob
 import numpy as np
 import h5py
 
-import astropy.units as u
-from astropy.constants import G
-
 import dataset_compute
 
 class Dataset:
@@ -310,3 +307,4 @@ class Dataset:
                 self.get_particles('Masses',part_type=[5])))
 
         return mass
+
