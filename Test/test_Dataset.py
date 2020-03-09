@@ -54,12 +54,10 @@ def test_make_part_file(dataset):
 #                partf['link12/PartType1/SubGroupNumber'])
 
 def test_get_particles(dataset):
-#    attr = "Coordinates"
-#    data = dataset.get_particles(attr)
-#    print(len(data))
-#    print(data[:10])
-    attr = "Header/MassTable"
-    print(dataset.get_particles(attr))
+    attr = "Coordinates"
+    data = dataset.get_particles(attr)
+    print(len(data))
+    print(data[:10])
 
 def test_calcVelocitiesAt1kpc(dataset):
     v1kpc = dataset.calcVelocitiesAt1kpc()
@@ -102,6 +100,16 @@ def test_gn_counts(dataset):
     print(cnt)
     print(sum(cnt==0))
 
+def test_get_particle_masses(dataset):
+    masses = dataset.get_particle_masses()
+    print(masses[:100])
+    print(min(masses),max(masses)) 
+    print(sum(masses==0)) # compare to type 2,3 part numbers
+
+def test_convert_to_cgs_part(dataset):
+    gns = dataset.get_particles('GroupNumber')
+    print(len(gns))
+        
 
 
 LCDM = Dataset("V1_MR_fix_127_z000p000","LCDM")
@@ -116,4 +124,6 @@ LCDM = Dataset("V1_MR_fix_127_z000p000","LCDM")
 #test_get_subhalos_V1kpc(LCDM)
 #test_get_subhalo_part_idx(LCDM)
 #test_group_name(LCDM)
-test_gn_counts(LCDM)
+#test_gn_counts(LCDM)
+#test_get_particle_masses(LCDM)
+test_convert_to_cgs_part(LCDM)

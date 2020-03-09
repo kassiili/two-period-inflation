@@ -224,7 +224,7 @@ class Dataset:
 
         return out
 
-    def get_particles(self, attr, part_type=[0,1,2,3,4,5]):
+    def get_particles(self, attr, part_type=[0,1,4,5]):
         """ Reads the data files for the attribute "attr" of each particle.
         
         Parameters
@@ -255,56 +255,67 @@ class Dataset:
                     if attr in f['PartType{}'.format(pt)].keys():
                         tmp = f['PartType{}/{}'.format(pt,attr)][...]
                         out.append(tmp)
+
+        # Combine to a single array.
+        if len(out[0].shape) > 1:
+            out = np.vstack(out)
+        else:
+            out = np.concatenate(out)
             
-            # Get conversion factors.
-            cgs     = partf['link1/PartType{}/{}'.format(\
-                    part_type[0],attr)].attrs.get('CGSConversionFactor')
-            aexp    = partf['link1/PartType{}/{}'.format(\
-                    part_type[0],attr)].attrs.get('aexp-scale-exponent')
-            hexp    = partf['link1/PartType{}/{}'.format(\
-                    part_type[0],attr)].attrs.get('h-scale-exponent')
-            
-            # Get expansion factor and Hubble parameter from the 
-            # header.
-            a       = partf['link1/Header'].attrs.get('Time')
-            h       = partf['link1/Header'].attrs.get('HubbleParam')
-        
-            # Combine to a single array.
-            if len(out[0].shape) > 1:
-                out = np.vstack(out)
-            else:
-                out = np.concatenate(out)
-            
-            # Convert to physical and return in cgs units.
-            if out.dtype != np.int32 and out.dtype != np.int64:
-                out = np.multiply(out, cgs * a**aexp * h**hexp, dtype='f8')
+        out = self.convert_to_cgs_part(out,attr)
             
         return out
 
-    def get_particle_masses(self):
-        """ Reads particle masses
+    def convert_to_cgs_part(self,data,attr):
+
+        converted = data
+
+        with h5py.File(self.part_file,'r') as partf:
+
+            # Get conversion factors (same for all types):
+            cgs     = partf['link1/PartType0/{}'.format(attr)]\
+                    .attrs.get('CGSConversionFactor')
+            aexp    = partf['link1/PartType0/{}'.format(attr)]\
+                    .attrs.get('aexp-scale-exponent')
+            hexp    = partf['link1/PartType0/{}'.format(attr)]\
+                    .attrs.get('h-scale-exponent')
+            
+            # Get expansion factor and Hubble parameter from the header:
+            a       = partf['link1/Header'].attrs.get('Time')
+            h       = partf['link1/Header'].attrs.get('HubbleParam')
+        
+            # Convert to physical and return in cgs units.
+            if data.dtype != np.int32 and data.dtype != np.int64:
+                converted = np.multiply(data, cgs * a**aexp * h**hexp, dtype='f8')
+
+        return converted
+
+    def get_particle_masses(self,part_type=[0,1,4,5]):
+        """ Reads particle masses, ignoring types 2,3!!
         
         Returns
         -------
         mass : HDF5 dataset
             masses of each particle
         """
-        # Get gas particle masses:
-        mass = self.get_particles('Masses',part_type=[0])
 
-        # Get dm particle masses:
-        with h5py.File(self.part_file,'r') as partf:
-            for i in range(1,4):
-                dm_mass = partf['link1/Header'].attrs.get('MassTable')[i]
-                dm_n = partf['link1/Header'].attrs.get('NumPart_Total')[i]
+        mass = []
+
+        for pt in part_type:
+            if pt in [1,2,3]:
+                # Get dm particle masses:
+                with h5py.File(self.part_file,'r') as partf:
+                    dm_mass = partf['link1/Header']\
+                            .attrs.get('MassTable')[1]
+                    dm_n = partf['link1/Header']\
+                            .attrs.get('NumPart_Total')[1]
+                    mass = np.concatenate((mass,\
+                                np.ones(dm_n, dtype='f8')*dm_mass))
+            else:
                 mass = np.concatenate((mass,\
-                        np.ones(dm_n, dtype='f8')*dm_mass))
-        
-        # Get star and BH particle masses:
-        mass = np.concatenate((mass,\
-                self.get_particles('Masses',part_type=[4])))
-        mass = np.concatenate((mass,\
-                self.get_particles('Masses',part_type=[5])))
+                        self.get_particles('Masses',part_type=[4])))
+
+        mass = self.convert_to_cgs_part(mass,'Masses')
 
         return mass
 

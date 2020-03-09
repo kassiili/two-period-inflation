@@ -13,6 +13,50 @@ def calculate_attr(dataset,attr):
 
     return None
 
+def calculate_V1kpc_slow(dataset):
+    """ For each subhalo, calculate the circular velocity at 1kpc. """
+
+    # Get particle data:
+    part = {}
+    part['gns'] = dataset.get_particles('GroupNumber')
+    part['sgns'] = dataset.get_particles('SubGroupNumber')
+    part['coords'] = dataset.get_particles('Coordinates')\
+            * u.cm.to(u.kpc)
+    part['mass'] = dataset.get_particle_masses() * u.g.to(u.Msun)
+
+    # Get subhalodata:
+    halo = {}
+    halo['gns'] = dataset.get_subhalos('GroupNumber',divided=False)[0]
+    halo['sgns'] = \
+            dataset.get_subhalos('SubGroupNumber',divided=False)[0]
+    halo['COPs'] = dataset.get_subhalos(\
+            'CentreOfPotential',divided=False)[0] * u.cm.to(u.kpc)
+
+    massWithin1kpc = np.zeros((halo['gns'].size))
+
+    # Loop through subhalos:
+    for idx, (gn, sgn, cop) in \
+            enumerate(zip(halo['gns'],halo['sgns'],halo['COPs'])):
+
+        # Get coordinates and masses of the particles in the halo:
+        halo_mask = np.logical_and(part['gns'] == gn, \
+                part['sgns'] == sgn)
+        coords = part['coords'][halo_mask]
+        mass = part['mass'][halo_mask]
+
+        # Calculate distances to COP:
+        r = np.linalg.norm(coords - cop, axis=1)
+
+        # Get coordinates within 1kpc from COP:
+        r1kpc_mask = np.logical_and(r > 0, r < 1)
+
+        massWithin1kpc[idx] = mass[r1kpc_mask].sum()
+
+    myG = G.to(u.km**2 * u.kpc * u.Msun**-1 * u.s**-2).value
+    v1kpc = np.sqrt(massWithin1kpc * myG)
+
+    return v1kpc
+
 def calculate_V1kpc(dataset):
     """ For each subhalo, calculate the circular velocity at 1kpc. 
     Assume that there are no jumps in the SubGroupNumber values in any
@@ -64,6 +108,7 @@ def get_subhalo_part_idx(dataset):
 
     # Get halo indices:
     sorting = np.lexsort((halo_sgns,halo_gns))
+    print(halo_gns.size)
 
     # Invert sorting:
     inv_sorting = [0] * len(sorting)
@@ -74,11 +119,22 @@ def get_subhalo_part_idx(dataset):
     # list behind the part_idx key are arranged in ascending order 
     # with gn and sgn, i.e. in the order lexsort would arrange them:
     gn_count = np.bincount(halo_gns)
-    part_idx = [[] for i in range(halo_gns.size)]
+    print(halo_gns.size + sum(gn_count==0))
+    print(gn_count.sum() + sum(gn_count==0))
+    part_idx = [[] for i in range(halo_gns.size + sum(gn_count==0))]
     for idx, (gn,sgn) in enumerate(zip(part_gns,part_sgns)):
         # Exclude unbounded particles (for unbounded: sgn = max_int):
         if sgn < 10**6:
-            part_idx[(gn-1)*gn_count[gn]+sgn].append(idx)
+            i = gn_count[:gn].sum()+sgn
+            if i >= len(part_idx):
+                print(i)
+                print(gn,sgn)
+            part_idx[i].append(idx)
+
+    print(len(part_idx))
+    # Strip from empty lists:
+    part_idx = [l for l in part_idx if not (not l)]
+    print(len(part_idx))
 
     # Convert to ndarray and sort in order corresponding to the halo
     # datasets:
