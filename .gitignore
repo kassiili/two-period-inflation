@@ -1,6 +1,6 @@
 OldVersions/
-V1_LR_fix/
-V1_MR_fix/
 __pycache__
 Figures/
 snapshots/
+*.hdf5
+Dump/

@@ -9,11 +9,12 @@ import read_data as read_data
 
 class plot_slice:
 
-    def __init__(self, part_type, slice_axis, width, dataset='V1_LR_fix_127_z000p000', nfiles=16):
+    def __init__(self, part_type, slice_axis, width, dataset='V1_MR_fix_127_z000p000', nfiles_part=16, nfiles_group=96):
 
         self.dataset = dataset
-        self.nfiles = nfiles
-        self.reader = read_data.read_data(dataset=self.dataset, nfiles=self.nfiles)
+        self.nfiles_part = nfiles_part
+        self.nfiles_group = nfiles_group
+        self.reader = read_data.read_data(dataset=self.dataset, nfiles_part=self.nfiles_part, nfiles_group=self.nfiles_group)
 
         self.part_type = part_type
         self.slice_axis = slice_axis
@@ -62,12 +63,14 @@ class plot_slice:
         print(self.cm[self.slice_axis], ', ', centrals[:,self.slice_axis])
 
 #        axes.set_title('Particles (type %i) in a volume slice centered on a LG analogue'%self.part_type)
+        axes.set_xlabel('x [Mpc]', fontsize=16)
+        axes.set_ylabel('y [Mpc]', fontsize=16)
 
-#        plt.show()
-        plt.savefig('../Figures/V1_MR_mock_1_fix_082_z001p941/slice_partType%i.png'%self.part_type) 
+        #plt.show()
+        plt.savefig('../Figures/V1_MR_fix_127_z000p000/slice_partType%i.png'%self.part_type) 
         plt.close()
 
-slice = plot_slice(1, 2, 0.03, dataset='V1_MR_mock_1_fix_082_z001p941', nfiles=1)
+slice = plot_slice(1, 0, 0.03)
 slice.plot()
 
 #slice = plot_slice(1, 2, 0.03) #, dataset='snapshots/V1_MR_mock_fix/snapshot_082_z001p941'

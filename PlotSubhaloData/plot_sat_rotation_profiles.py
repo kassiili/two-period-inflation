@@ -12,7 +12,7 @@ import read_data as read_data
 
 class SatRotationCurves:
 
-    def __init__(self, gn, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
+    def __init__(self, dataset='V1_MR_fix_082_z001p941', nfiles_part=16, nfiles_group=192):
 
         self.dataset = dataset
         self.nfiles_part = nfiles_part
@@ -40,9 +40,10 @@ class SatRotationCurves:
         halo_centre = sat_data['COPs'][np.logical_and(sat_data['GNs']==self.gn, sat_data['SGNs']==0)]
         dists_to_centre = np.linalg.norm(sat_data['COPs'] - halo_centre, axis=1)
         
-        # Choose satellites (by definition d < 300 kpc) with vmax > 12 km/s
-        sat_mask = np.logical_and.reduce((sat_data['GNs']==self.gn, sat_data['SGNs']!=0, 
-            dists_to_centre<300, sat_data['vmax']>12))
+        # Choose satellites (by definition d < 300 kpc) with vmax = point+-range:
+        point=20; range=0.5
+        sat_mask = np.logical_and.reduce((sat_data['SGNs']!=0, dists_to_centre<300,
+            np.logical_or(sat_data['vmax']>point-range, sat_data['vmax']<point+range)))
         for attr in sat_data.keys():
             sat_data[attr] = sat_data[attr][sat_mask]
 
@@ -78,19 +79,18 @@ class SatRotationCurves:
                     self.reader.read_dataset(4, attr),
                     self.reader.read_dataset(5, attr)))
 
-        # Exclude particles not belonging to some of the halo's satellites: 
-        mask_halo = np.logical_and(data['GroupNumber'] == self.gn, 
-                np.isin(data['SubGroupNumber'], self.sat_data['SGNs']))
+        # Exclude particles not belonging to some of the satellites: 
+        mask_satellite = np.isin(data['SubGroupNumber'], self.sat_data['SGNs'])
         for attr in data.keys():
-            data[attr] = data[attr][mask_halo]
+            data[attr] = data[attr][mask_satellite]
 
-        # Sort by sgn:
-        sort_mask = np.argsort(data['SubGroupNumber'])
+        # Sort by satellite: first by gn, then by sgn:
+        sort_mask = np.lexsort((data['SubGroupNumber'], data['GroupNumber']))
         self.sat_data['coords'] = data['Coordinates'][sort_mask] * u.cm.to(u.kpc)
         self.sat_data['masses'] = data['Masses'][sort_mask] * u.g.to(u.Msun)
 
         # Find offsets in the coords and masses arrays for each satellite (Counter returns a dict object. A value behind a certain key gives the number of instances of the key in argument array):
-        part_cnt = Counter(data['SubGroupNumber']).values()
+        part_cnt = Counter(np.concatenate(data['GroupNumber'], data['SubGroupNumber'])).values()
 
         # Convert from dict_values to ndarray:
         part_cnt = np.asarray(list(part_cnt))
