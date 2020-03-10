@@ -3,11 +3,11 @@ import numpy as np
 import h5py
 from astropy import units
 
-from dataset import Dataset
+from dataset import Snapshot
 from PlotSubhaloData.plot_SM_vs_Vmax import plot_SM_vs_Vmax
 
 # Get data:
-LCDM = Dataset("V1_LR_fix_127_z000p000", "LCDM")
+LCDM = Snapshot("V1_LR_fix_127_z000p000", "LCDM")
 vmaxSat, vmaxIsol = LCDM.get_subhalos("Vmax",True)
 SMSat, SMIsol = LCDM.get_subhalos("Stars/Mass",True)
 

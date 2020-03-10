@@ -7,23 +7,30 @@ import h5py
 
 import dataset_compute
 
-class Dataset:
+class Snapshot:
 
-    def __init__(self, ID, name):
+    def __init__(self, simID, snapID, name):
         """
         Parameters
         ----------
-        ID : str
-            identifier of the simulation data -- should be equivalent to
-            the directory name of the snapshot
+        simID : str
+            Identifier of the simulation data -- should be equivalent to
+            the directory name of the directory containing all the data 
+            of the simulation.
+        snapID : int
+            The number identifying the snapshot.
         name : str
-            label of the data set
+            Label of the data set
         """
 
-        self.ID = ID
+        # Define class attributes:
+        self.simID = simID
+        self.snapID = snapID
         self.name = name
         self.grp_file = 'groups_{}.hdf5'.format(name)
         self.part_file = 'particles_{}.hdf5'.format(name)
+
+        # Initialize HDF5 files:
         self.make_group_file()
         self.make_part_file()
 
@@ -115,19 +122,22 @@ class Dataset:
         """
 
         home = os.path.dirname(os.path.realpath(__file__))
-        path = os.path.join(home,"snapshots",self.ID)
-        direc = ""
+        path = os.path.join(home,"snapshots",self.simID)
+
+        prefix = ""
         if datatype == "part":
-            direc = "snapshot_"
+            prefix = "snapshot_"
         elif datatype == "group":
-            direc += "groups_"
+            prefix += "groups_"
         else:
             return None
 
-        fields = self.ID.split("_")
-        direc += fields[-2] + "_" + fields[-1]
+        # Find the snapshot directory and add to path:
+        for dirname in os.listdir(path):
+            if prefix + str(self.snapID) in dirname:
+                path = os.path.join(path,dirname) 
 
-        return os.path.join(path,direc)
+        return path
 
     def get_subhalos(self, attr, divided=True):
         """ Retrieves the given attribute values for subhaloes in the

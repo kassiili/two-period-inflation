@@ -3,7 +3,7 @@ import numpy as np
 import h5py
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dataset import Dataset
+from snapshot_obj import Snapshot
 from curve_fit import poly_fit
 
 def test_get_data_path(dataset):
@@ -117,8 +117,9 @@ def test_file_of_halo(dataset):
 def test_order_of_links(dataset):
     return None
 
-LCDM = Dataset("CDM_V1_LR_127_z000p000","LCDM")
-#test_get_data_path(LCDM)
+LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
+#LCDM_x = Snapshot("CDM_V1_LR", 101, "LCDM")
+#test_get_data_path(LCDM_x)
 #test_count_files(LCDM)
 #test_make_group_file(LCDM)
 #test_read_subhalo_attr(LCDM)
@@ -132,5 +133,5 @@ LCDM = Dataset("CDM_V1_LR_127_z000p000","LCDM")
 #test_gn_counts(LCDM)
 #test_get_particle_masses(LCDM)
 #test_convert_to_cgs_part(LCDM)
-test_file_of_halo(LCDM)
+#test_file_of_halo(LCDM)
 #test_order_of_links(LCDM)

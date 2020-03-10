@@ -1,4 +1,5 @@
 import numpy as np
+import h5py
 from collections import deque
 
 import astropy.units as u
@@ -164,8 +165,19 @@ def trace_halo(snapshot,gn,sgn):
         the first element of the tuples.
     """
 
-    # Initialize tracer:
-    tracer = deque()
+    with h5py.File(snapshot.grp_file,'r') as grpf:
+        z_init = grpf['link0/Header'].attrs.get('Redshift')
 
+    fnum_init = snapshot.file_of_halo(gn,sgn)
+
+    # Initialize tracer:
+    tracer = deque([(z_init,gn,sgn)])
+
+    
+
+    return tracer
+
+#LCDM = Dataset("CDM_V1_LR_z000p000","LCDM")
+#trace_halo(LCDM, 2, 8)
     
 

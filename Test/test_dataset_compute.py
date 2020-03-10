@@ -25,6 +25,10 @@ def test_get_subhalo_part_idx(dataset):
             i+=1
     print(i)
 
+def test_trace_halo(dataset):
+    print(dataset_compute.trace_halo(dataset,2,8))
+
 LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
-test_calculate_V1kpc(LCDM)
+#test_calculate_V1kpc(LCDM)
 #test_get_subhalo_part_idx(LCDM)
+test_trace_halo(LCDM)
