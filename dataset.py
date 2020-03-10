@@ -68,6 +68,38 @@ class Dataset:
                     partf['link{}'.format(i)] = \
                             h5py.ExternalLink(filename,'/')
 
+    def file_of_halo(self, gn, sgn):
+        """ Returns the file number of the file, which contains the halo
+        identified by gn and sgn.
+
+        Parameters
+        ----------
+        gn : int
+            Halo group number
+        sgn : int
+            Halo subgroup number
+
+        Returns
+        -------
+        fileNum : int
+            File number
+        """
+
+        fileNum = -1
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            links = [item for item in grpf.items() \
+                    if ('link' in item[0])]
+
+            for (name,link) in links:
+                if (gn in link['Subhalo/GroupNumber']) and \
+                        (sgn in link['Subhalo/SubGroupNumber']):
+                    fileNum = int(name[-1])
+                    break
+
+        return fileNum
+
     def get_data_path(self, datatype):
         """ Constructs the path to data directory. 
         

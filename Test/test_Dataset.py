@@ -110,9 +110,14 @@ def test_convert_to_cgs_part(dataset):
     gns = dataset.get_particles('GroupNumber')
     print(len(gns))
         
+def test_file_of_halo(dataset):
+    for (gn,sgn) in [(1,0),(1,45),(2,0),(12,0),(123,0),(3410,0)]:
+        print((gn,sgn),dataset.file_of_halo(gn,sgn))
 
+def test_order_of_links(dataset):
+    return None
 
-LCDM = Dataset("V1_MR_fix_127_z000p000","LCDM")
+LCDM = Dataset("CDM_V1_LR_127_z000p000","LCDM")
 #test_get_data_path(LCDM)
 #test_count_files(LCDM)
 #test_make_group_file(LCDM)
@@ -126,4 +131,6 @@ LCDM = Dataset("V1_MR_fix_127_z000p000","LCDM")
 #test_group_name(LCDM)
 #test_gn_counts(LCDM)
 #test_get_particle_masses(LCDM)
-test_convert_to_cgs_part(LCDM)
+#test_convert_to_cgs_part(LCDM)
+test_file_of_halo(LCDM)
+#test_order_of_links(LCDM)
