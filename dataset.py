@@ -31,14 +31,22 @@ class Dataset:
         """ Create a combined group data file and add links to all the
         actual data files """
 
+        path = self.get_data_path('group')
+
+        # Get files containing group data:
+        files = \
+                np.array(glob.glob(os.path.join(path,'eagle_subfind_tab*')))
+
+        # Sort in ascending order:
+        fnum = [int(fname.split(".")[-2]) for fname in files]
+        sorting = np.argsort(fnum)
+        files = files[sorting]
+
         # Create the file object with links to all the files:
         with h5py.File(self.grp_file,'a') as grpf:
-            path = self.get_data_path('group')
-    
-            # Iterate through group files (and dismiss irrelevant files in the
-            # directory):
-            for i,filename in \
-            enumerate(glob.glob(os.path.join(path,'eagle_subfind_tab*'))):
+
+            # Iterate through group files:
+            for i,filename in enumerate(files):
                 # Make an external link:
                 if not 'link{}'.format(i) in grpf:
                     grpf['link{}'.format(i)] = h5py.ExternalLink(filename,'/')
