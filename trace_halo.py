@@ -66,10 +66,27 @@ def find_match(snap, snap_ref, gn, sgn):
     """
 
     # Get particle IDs of reference:
-    IDs_ref = snap_ref.get_subhalos('SubOffset')
+    offset_ref = get_subhalo(snap_ref,'SubOffset',gn,sgn)
+    length_ref = get_subhalo(snap_ref,'SubLength',gn,sgn)
+
+    with h5py.File(snap_ref.grp_file,'r') as grpf:
+        grpf['link{}/'
 
 
     return None
+
+def get_subhalo_IDs(snap,gn,sgn):
+
+    fnum = snap.file_of_halo(gn,sgn)
+    gns = snap.get_subhalos(\
+            'GroupNumber',divided=False,fnums=[fnum])[0]
+    sgns = snap.get_subhalos(\
+            'SubGroupNumber',divided=False,fnums=[fnum])[0]
+    data = snap.get_subhalos(attr,divided=False,fnums=[fnum])[0]
+
+    out = data[np.logical_and(gns == gn, sgns == sgn)]
+
+    return out
 
 def get_subhalo(snap,attr,gn,sgn):
 

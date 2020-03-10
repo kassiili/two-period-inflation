@@ -288,6 +288,34 @@ class Snapshot:
 
         return out
 
+    def get_subhalo_IDs(self, fnum):
+
+        IDs = []
+            
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Get files that are in order before fnum:
+            names = [name for name in grpf.keys() \
+                    if ('link' in name)]
+            links = [f for (name,f) in grpf.items() if name in names]
+
+            # Get particle IDs:
+            particleIDs = []
+            for link in links:
+                particleIDs.append(\
+                        link['IDs/ParticleID'.format(fnum)][...])
+
+            particleIDs = np.concatenate(particleIDs)
+
+            # Get offsets relative to first halo in file:
+            offset = grpf['link{}/Subhalo/SubOffset'.format(fnum)][...]
+            partNums = grpf['link{}/Subhalo/SubLength'.format(fnum)][...]
+            offset = np.append(offset, [offset[-1]+partNums[-1]])
+
+            IDs = np.split(particleIDs,offset)[1:-1]
+
+        return IDs
+
     def get_particles(self, attr, part_type=[0,1,4,5]):
         """ Reads the data files for the attribute "attr" of each particle.
         
