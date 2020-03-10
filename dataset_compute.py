@@ -1,6 +1,4 @@
 import numpy as np
-import h5py
-from collections import deque
 
 import astropy.units as u
 from astropy.constants import G

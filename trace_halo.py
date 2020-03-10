@@ -1,6 +1,8 @@
 import numpy as np
+import h5py
+from collections import deque
 
-from Snapshot import snapshot_obj
+from snapshot_obj import Snapshot
 
 def trace_halo(snap_init,gn,sgn,stop=101):
     """ Traces a halo as far back in time as possible, starting from
@@ -63,8 +65,21 @@ def find_match(snap, snap_ref, gn, sgn):
     (gn,sgn) : tuple
     """
 
-    # Get particle IDs:
+    # Get particle IDs of reference:
+    IDs_ref = snap_ref.get_subhalos('SubOffset')
+
 
     return None
 
+def get_subhalo(snap,attr,gn,sgn):
 
+    fnum = snap.file_of_halo(gn,sgn)
+    gns = snap.get_subhalos(\
+            'GroupNumber',divided=False,fnums=[fnum])[0]
+    sgns = snap.get_subhalos(\
+            'SubGroupNumber',divided=False,fnums=[fnum])[0]
+    data = snap.get_subhalos(attr,divided=False,fnums=[fnum])[0]
+
+    out = data[np.logical_and(gns == gn, sgns == sgn)]
+
+    return out
