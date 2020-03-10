@@ -39,6 +39,11 @@ def test_get_subhalos(dataset):
     print(len(sat))
     print(len(isol))
 
+def test_get_subhalos_with_fnums(dataset):
+    attr = "Vmax"
+    print(len(dataset.get_subhalos(attr,False)[0]))
+    print(len(dataset.get_subhalos(attr,False,[0])[0]))
+
 def test_make_part_file(dataset):
     filename = dataset.part_file
     print(filename)
@@ -135,3 +140,4 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_convert_to_cgs_part(LCDM)
 #test_file_of_halo(LCDM)
 #test_order_of_links(LCDM)
+test_get_subhalos_with_fnums(LCDM)

@@ -143,7 +143,7 @@ class Snapshot:
 
         return path
 
-    def get_subhalos(self, attr, divided=True):
+    def get_subhalos(self, attr, divided=True, fnums=[]):
         """ Retrieves the given attribute values for subhaloes in the
         dataset.
         
@@ -154,6 +154,8 @@ class Snapshot:
         divided : bool, optional
             if True (default), output is divided into satellites and 
             isolated galaxies
+        fnums : list of ints, optional
+            Specifies files, which are to be read
 
         Returns
         -------
@@ -163,7 +165,7 @@ class Snapshot:
             in the first entry and isolated galaxies data in the second.
         """
 
-        data = self.read_subhalo_attr(attr)
+        data = self.read_subhalo_attr(attr, fnums=fnums)
 
         if divided:
             SGNs = self.read_subhalo_attr('SubGroupNumber')
@@ -176,13 +178,15 @@ class Snapshot:
         else:
             return (data,)
 
-    def read_subhalo_attr(self, attr):
+    def read_subhalo_attr(self, attr, fnums=[]):
         """ Reads the data files for the attribute "attr" of each subhalo.
         
         Parameters
         ----------
         attr : str
             attribute to be retrieved
+        fnums : list of ints, optional
+            Specifies files, which are to be read
 
         Returns
         -------
@@ -206,9 +210,15 @@ class Snapshot:
     
             with h5py.File(self.grp_file,'r') as grpf:
 
-                # Loop over each file and extract the data.
-                links = (f for (name,f) in grpf.items() \
-                        if ('link' in name))
+                names = [name for name in grpf.keys() \
+                        if ('link' in name)]
+
+                # Look only in the requested files:
+                if len(fnums) > 0:
+                    names = [name for name in names if \
+                            int(name.replace('link','')) in fnums]
+                
+                links = [f for (name,f) in grpf.items() if name in names]
                 for f in links:
                     tmp = f['Subhalo/{}'.format(attr)][...]
                     out.append(tmp)
