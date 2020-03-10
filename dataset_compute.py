@@ -1,4 +1,5 @@
 import numpy as np
+from collections import deque
 
 import astropy.units as u
 from astropy.constants import G
@@ -141,4 +142,30 @@ def get_subhalo_part_idx(dataset):
     part_idx = np.array(part_idx)[inv_sorting]
 
     return part_idx
+
+def trace_halo(snapshot,gn,sgn):
+    """ Traces a halo as far back in time as possible, starting from
+    the given snapshot.
+
+    Parameters
+    ----------
+    snapshot : Dataset object
+        Starting point for the tracing.
+    gn : int
+        Group number of the traced halo in the initial snapshot.
+    sgn : int
+        Subgroup number of the traced halo in the initial snapshot.
+
+    Returns
+    -------
+    tracer : collections.deque object of tuples of type (float,int,int)
+        Doubly linked list tracing the gn and sgn values of the halo
+        through snapshots. The corresponding redshifts are included as 
+        the first element of the tuples.
+    """
+
+    # Initialize tracer:
+    tracer = deque()
+
+    
 
