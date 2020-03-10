@@ -3,7 +3,7 @@ import numpy as np
 import h5py
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dataset import Dataset
+from snapshot_obj import Snapshot
 from curve_fit import poly_fit
 import dataset_compute
 
@@ -28,7 +28,7 @@ def test_get_subhalo_part_idx(dataset):
 def test_trace_halo(dataset):
     print(dataset_compute.trace_halo(dataset,2,8))
 
-LCDM = Dataset("V1_LR_fix_127_z000p000","LCDM")
+LCDM = Snapshot("V1_LR_fix",127,"LCDM")
 #test_calculate_V1kpc(LCDM)
 #test_get_subhalo_part_idx(LCDM)
 test_trace_halo(LCDM)

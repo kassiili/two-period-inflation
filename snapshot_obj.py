@@ -9,7 +9,7 @@ import dataset_compute
 
 class Snapshot:
 
-    def __init__(self, simID, snapID, name):
+    def __init__(self, simID, snapID, name=""):
         """
         Parameters
         ----------
@@ -19,14 +19,18 @@ class Snapshot:
             of the simulation.
         snapID : int
             The number identifying the snapshot.
-        name : str
-            Label of the data set
+        name : str, optional
+            Label of the data set. If not given, is generated from simID
+            and snapID.
         """
 
         # Define class attributes:
         self.simID = simID
         self.snapID = snapID
-        self.name = name
+        if not name:
+            self.name = simID + "_" + snapID
+        else:
+            self.name = name
         self.grp_file = 'groups_{}.hdf5'.format(name)
         self.part_file = 'particles_{}.hdf5'.format(name)
 
