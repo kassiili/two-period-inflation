@@ -122,8 +122,21 @@ def test_file_of_halo(dataset):
 def test_order_of_links(dataset):
     return None
 
+def test_get_subhalo_IDs_single(dataset):
+    IDs = dataset.get_subhalo_IDs([95])
+    print(len(IDs))
+    print(IDs[0].shape)
+    print(IDs[-1].shape)
+    print(IDs[1].shape)
+    #print(IDs)
+
 def test_get_subhalo_IDs(dataset):
-    IDs = dataset.get_subhalo_IDs(1)
+    IDs = dataset.get_subhalo_IDs()
+    print('s',IDs.shape)
+    print(IDs[0].shape)
+    print(IDs[-1].shape)
+    print(IDs[1].shape)
+    IDs = dataset.get_subhalo_IDs(list(range(65,67)))
     print(len(IDs))
     print(IDs[0].shape)
     print(IDs[-1].shape)
@@ -149,4 +162,9 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_file_of_halo(LCDM)
 #test_order_of_links(LCDM)
 #test_get_subhalos_with_fnums(LCDM)
+#test_get_subhalo_IDs_single(LCDM)
 test_get_subhalo_IDs(LCDM)
+
+#sgns = LCDM.get_subhalos('SubGroupNumber',False)[0]
+#print(sgns.size)
+#print(sgns[63:68])

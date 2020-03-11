@@ -288,7 +288,7 @@ class Snapshot:
 
         return out
 
-    def get_subhalo_IDs(self, fnum):
+    def get_subhalo_IDs(self, fnums=[]):
 
         IDs = []
             
@@ -302,17 +302,29 @@ class Snapshot:
             # Get particle IDs:
             particleIDs = []
             for link in links:
-                particleIDs.append(\
-                        link['IDs/ParticleID'.format(fnum)][...])
+                particleIDs.append(link['IDs/ParticleID'][...])
 
             particleIDs = np.concatenate(particleIDs)
 
-            # Get offsets relative to first halo in file:
-            offset = grpf['link{}/Subhalo/SubOffset'.format(fnum)][...]
-            partNums = grpf['link{}/Subhalo/SubLength'.format(fnum)][...]
-            offset = np.append(offset, [offset[-1]+partNums[-1]])
+            # Look only in the requested files:
+            if len(fnums) > 0:
+                names = [name for name in names if \
+                        int(name.replace('link','')) in fnums]
+            links = [f for (name,f) in grpf.items() if name in names]
 
-            IDs = np.split(particleIDs,offset)[1:-1]
+            IDs = []
+            for i,link in enumerate(links):
+                offset = link['Subhalo/SubOffset'][...]
+                partNums = link['Subhalo/SubLength'][...]
+
+                splitByStart = np.split(particleIDs,offset)[1:]
+                splitByEnd = np.split(particleIDs,offset+partNums)[:-1]
+                linkIDs = [np.intersect1d(bystart,byend) for (bystart,byend)\
+                        in zip(splitByStart,splitByEnd)]
+    
+                IDs.append(linkIDs)
+            
+            IDs = np.concatenate(IDs)
 
         return IDs
 
