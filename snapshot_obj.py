@@ -104,9 +104,11 @@ class Snapshot:
                     if ('link' in item[0])]
 
             for (name,link) in links:
-                if (gn in link['Subhalo/GroupNumber']) and \
-                        (sgn in link['Subhalo/SubGroupNumber']):
-                    fileNum = int(name[-1])
+                GNs = link['Subhalo/GroupNumber'][...]
+                SGNs = link['Subhalo/SubGroupNumber'][...]
+
+                if np.logical_and((GNs==gn),(SGNs==sgn)).sum() > 0:
+                    fileNum = int(name.replace('link',''))
                     break
 
         return fileNum
@@ -168,7 +170,7 @@ class Snapshot:
         data = self.read_subhalo_attr(attr, fnums=fnums)
 
         if divided:
-            SGNs = self.read_subhalo_attr('SubGroupNumber')
+            SGNs = self.read_subhalo_attr('SubGroupNumber', fnums=fnums)
 
             # Divide into satellites and isolated galaxies:
             dataSat = data[SGNs != 0]
