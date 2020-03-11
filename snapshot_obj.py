@@ -288,7 +288,7 @@ class Snapshot:
 
         return out
 
-    def get_subhalo_IDs(self, fnums=[]):
+    def get_subhalos_IDs(self, fnums=[]):
 
         IDs = []
             

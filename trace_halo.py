@@ -42,11 +42,11 @@ def trace_halo(snap_init,gn,sgn,stop=101):
 
     while snapID > stop:
         snap_prev = Snapshot(simID,snapID-1)
-        gn, sgn = find_match(snap_prev, snap, gn, sgn)
+        gn, sgn = match_snapshots(snap_prev, snap, gn, sgn)
 
     return tracer
     
-def find_match(snap, snap_ref, gn, sgn):
+def match_snapshots(snap, snap_ref, gn, sgn):
     """ Looks for a matching halo in snap for a given halo in snap_ref.
 
     Parameters
@@ -75,28 +75,41 @@ def find_match(snap, snap_ref, gn, sgn):
 
     return None
 
+    return False
+
+def match_subhalos(IDs_ref,mass_ref,IDs,mass):
+
+    return False
+
+def get_subhalo(snap,attr,gn,sgn):
+    """ Read snapshot for a halo and return given attribute and index.
+    """
+
+    fnum = snap.file_of_halo(gn,sgn)
+
+    # Get index of halo:
+    gns = snap.get_subhalos(\
+            'GroupNumber',divided=False,fnums=[fnum])[0]
+    sgns = snap.get_subhalos(\
+            'SubGroupNumber',divided=False,fnums=[fnum])[0]
+    idx = np.argwhere(np.logical_and((gns==gn),(sgns==sgn)))
+
+    data = snap.get_subhalos(attr,divided=False,fnums=[fnum])[0]
+
+    return (data[idx],idx)
+
 def get_subhalo_IDs(snap,gn,sgn):
 
     fnum = snap.file_of_halo(gn,sgn)
+
+    # Get index of halo:
     gns = snap.get_subhalos(\
             'GroupNumber',divided=False,fnums=[fnum])[0]
     sgns = snap.get_subhalos(\
             'SubGroupNumber',divided=False,fnums=[fnum])[0]
-    data = snap.get_subhalos(attr,divided=False,fnums=[fnum])[0]
+    idx = np.argwhere(np.logical_and((gns==gn),(sgns==sgn)))
 
-    out = data[np.logical_and(gns == gn, sgns == sgn)]
+    IDs = snap.get_subhalos_IDs(fnums=[fnum])
 
-    return out
+    return (IDs[idx],idx)
 
-def get_subhalo(snap,attr,gn,sgn):
-
-    fnum = snap.file_of_halo(gn,sgn)
-    gns = snap.get_subhalos(\
-            'GroupNumber',divided=False,fnums=[fnum])[0]
-    sgns = snap.get_subhalos(\
-            'SubGroupNumber',divided=False,fnums=[fnum])[0]
-    data = snap.get_subhalos(attr,divided=False,fnums=[fnum])[0]
-
-    out = data[np.logical_and(gns == gn, sgns == sgn)]
-
-    return out
