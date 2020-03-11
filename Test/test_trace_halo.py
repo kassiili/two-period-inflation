@@ -68,10 +68,35 @@ def test_match_halo():
     print(trace_halo.match_subhalos(IDs1,mass1,IDs5,mass5))
     print(trace_halo.match_subhalos(IDs1,mass1,IDs6,mass6))
 
+def test_match_snapshots():
+
+    snap_ref = Snapshot("CDM_V1_LR",127,"LCDM")    # Reference
+    snap = Snapshot("CDM_V1_LR",115,"LCDM")
+
+    gns = snap_ref.get_subhalos('GroupNumber',False)[0]
+    sgns = snap_ref.get_subhalos('SubGroupNumber',False)[0]
+    print(np.bincount(gns.astype(int)))
+    print(np.bincount(sgns.astype(int)))
+
+    gns = snap.get_subhalos('GroupNumber',False)[0]
+    sgns = snap.get_subhalos('SubGroupNumber',False)[0]
+    print(np.bincount(gns.astype(int)))
+    print(np.bincount(sgns.astype(int)))
+
+    gn = 2; sgn = 34
+    gn_m, sgn_m = trace_halo.match_snapshots(snap, snap_ref, gn, sgn)
+    ids,_ = trace_halo.get_subhalo_IDs(snap_ref, gn, sgn)
+    ids_m,_ = trace_halo.get_subhalo_IDs(snap, gn_m, sgn_m)
+    m,_ = trace_halo.get_subhalo(snap_ref, 'Mass', gn, sgn)
+    m_m,_ = trace_halo.get_subhalo(snap, 'Mass', gn_m, sgn_m)
+
+    print(trace_halo.match_subhalos(ids,m,ids_m,m_m))
+    print(trace_halo.get_subhalo(snap_ref,'Stars/Mass',gn,sgn))
+    print(trace_halo.get_subhalo(snap,'Stars/Mass',gn_m,sgn_m))
 
 LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_trace_halo(LCDM)
 #test_get_subhalo(LCDM,2,8)
 #test_get_subhalo_IDs(LCDM,2,8)
-test_match_halo()
-
+#test_match_halo()
+test_match_snapshots()

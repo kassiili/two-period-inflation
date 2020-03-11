@@ -1,5 +1,6 @@
 import numpy as np
 import h5py
+import math
 from collections import deque
 
 from snapshot_obj import Snapshot
@@ -62,32 +63,48 @@ def match_snapshots(snap, snap_ref, gn, sgn):
 
     Returns
     -------
-    (gn,sgn) : tuple
+    match : tuple
+        (gn,sgn) of matching halo. match==(-1,-1) if no match is found.
     """
 
     # Get particle IDs and halo mass of reference:
-    IDs_ref, = get_subhalo_IDs(snap_ref,gn,sgn)
-    mass_ref, = get_subhalo(snap_ref,'Mass',gn,sgn)
+    IDs_ref,_ = get_subhalo_IDs(snap_ref,gn,sgn)
+    mass_ref,_ = get_subhalo(snap_ref,'Mass',gn,sgn)
 
     # Get index of halo with same sgn and gn as ref:
     fnum_ref = snap_ref.file_of_halo(gn,sgn)
     gns = snap.get_subhalos('GroupNumber',False,fnums=[fnum_ref])[0]
     sgns = snap.get_subhalos('SubGroupNumber',False,fnums=[fnum_ref])[0]
-    idx = np.argwhere(np.logical_and((gns==gn),(sgns==sgn)))
-    print(gns[idx],sgns[idx])
+    idx0 = np.argwhere(np.logical_and((gns==gn),(sgns==sgn)))[0,0]
+                # !!! what if (gn,sgn) not in snap?
+    print(gns[idx0],sgns[idx0])
 
     IDs_in_file = snap.get_subhalos_IDs(fnums=[fnum_ref])
     mass_in_file = snap.get_subhalos('Mass',False,fnums=[fnum_ref])[0]
 
+    # Initial value of match is returned if no match is found:
+    match = (-1,-1)
+
+    # Finally terminate, if no match is found in term iterations:
+    term = 10000
+
     # Initial values:
-    IDs = IDs_in_file[idx] 
-    mass = mass_in_file[idx]
-    found_match = False
-    step = 0
-    while not found_match:
+    idx = idx0
+    for step in range(1,term):
+        #print(idx)
+        IDs = IDs_in_file[idx]; mass = mass_in_file[idx]
         found_match = match_subhalos(IDs_ref,mass_ref,IDs,mass)
 
-    return False
+        if found_match:
+            match = (gns[idx],sgns[idx])
+            break
+
+        # Iterate outwards from idx0, alternating between lower and higher
+        # index:
+        idx = idx0 + \
+                math.copysign(math.floor((step+1)/2), (step % 2) - 0.5)
+
+    return match
 
 def match_subhalos(IDs1,mass1,IDs2,mass2):
     """ Check if two halos in different snapshots correspond to the same
@@ -140,6 +157,8 @@ def get_subhalo(snap,attr,gn,sgn):
     return (data[idx],idx)
 
 def get_subhalo_IDs(snap,gn,sgn):
+    """ Read snapshot for a halo and return IDs of its particles and index.
+    """
 
     fnum = snap.file_of_halo(gn,sgn)
 
