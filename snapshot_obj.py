@@ -28,11 +28,11 @@ class Snapshot:
         self.simID = simID
         self.snapID = snapID
         if not name:
-            self.name = simID + "_" + snapID
+            self.name = str(simID) + "_" + str(snapID)
         else:
             self.name = name
-        self.grp_file = 'groups_{}.hdf5'.format(name)
-        self.part_file = 'particles_{}.hdf5'.format(name)
+        self.grp_file = 'groups_{}_{}.hdf5'.format(simID,snapID)
+        self.part_file = 'particles_{}_{}.hdf5'.format(simID,snapID)
 
         # Initialize HDF5 files:
         self.make_group_file()
