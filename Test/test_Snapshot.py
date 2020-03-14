@@ -143,12 +143,12 @@ def test_get_subhalos_IDs_single(dataset):
         print(el.shape)
 
 def test_get_subhalos_IDs(dataset):
-    IDs = dataset.get_subhalo_IDs()
+    IDs = dataset.get_subhalos_IDs()
     print('s',IDs.shape)
     print(IDs[0].shape)
     print(IDs[-1].shape)
     print(IDs[1].shape)
-    IDs = dataset.get_subhalo_IDs(list(range(65,67)))
+    IDs = dataset.get_subhalos_IDs(list(range(65,67)))
     print(len(IDs))
     print(IDs[0].shape)
     print(IDs[-1].shape)
@@ -157,8 +157,9 @@ def test_get_subhalos_IDs(dataset):
 
 def test_get_subhalos_IDs_DMO(snap):
     fnum=0
-    IDs = snap.get_subhalos_IDs([fnum])
-    subLengthType = snap.get_subhalos('SubLengthType',False,fnums=[fnum])[0]
+    IDs = snap.get_subhalos_IDs_DMO([fnum])
+    subLengthType = snap.get_subhalos('SubLengthType',fnums=[fnum])
+    print(subLengthType[:20].astype(int))
 
     matching_lengths = [len(ids) == typelen[1] for (ids,typelen) in\
         zip(IDs,subLengthType)]
@@ -169,12 +170,15 @@ def test_get_subhalos_IDs_DMO(snap):
         print("lengths no match")
 
     from_part_file =\
-            snap.get_particles('ParticleIDs',part_type=[1]).astype(int)
+            snap.get_particles('ParticleIDs',part_type=[1,2,4,5]).astype(int)
     print(IDs[0])
     print(from_part_file.size)
+    print(IDs.shape)
     for ids in IDs:
         print(len(ids))
-        print(contained(ids,from_part_file))
+        shared = np.intersect1d(ids,from_part_file)
+        print(len(shared))
+        print(len(ids)==len(shared))
 
 def contained(arr1,arr2):
     arr2 = set(arr2)
@@ -191,13 +195,19 @@ def test_link_select(snap):
         print(keys)
         print(sorting)
 
+def test_get_subhalos_order(snap):
+    gns = snap.get_subhalos('GroupNumber')
+    sgns = snap.get_subhalos('SubGroupNumber')
+    for gn,sgn in zip(gns,sgns):
+        print(gn,sgn)
+
 LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #LCDM_x = Snapshot("CDM_V1_LR", 101, "LCDM")
 #test_get_data_path(LCDM_x)
 #test_count_files(LCDM)
 #test_make_group_file(LCDM)
 #test_read_subhalo_attr(LCDM)
-test_get_subhalos(LCDM)
+#test_get_subhalos(LCDM)
 #test_get_subhalos_SubLengthType(LCDM)
 #test_make_part_file(LCDM)
 #test_get_particles(LCDM)
@@ -212,9 +222,10 @@ test_get_subhalos(LCDM)
 #test_order_of_links(LCDM)
 #test_get_subhalos_with_fnums(LCDM)
 #test_get_subhalos_IDs_single(LCDM)
-#test_get_subhalos_IDs(LCDM)
+test_get_subhalos_IDs(LCDM)
 #test_get_subhalos_IDs_DMO(LCDM)
 #test_link_select(LCDM)
+#test_get_subhalos_order(LCDM)
 
 #sgns = LCDM.get_subhalos('SubGroupNumber',False)[0]
 #print(sgns.size)

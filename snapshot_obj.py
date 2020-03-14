@@ -315,28 +315,29 @@ class Snapshot:
     def get_subhalos_IDs(self, fnums=[]):
 
         IDs = []
+
+        link_names_all, link_sort_all = self.link_select([])
+        link_names_sel, link_sort_sel = self.link_select(fnums)
             
         with h5py.File(self.grp_file,'r') as grpf:
 
-            # Get files that are in order before fnum:
-            names = [name for name in grpf.keys() \
-                    if ('link' in name)]
-            links = [f for (name,f) in grpf.items() if name in names]
-
-            # Get particle IDs:
+            # Get particle IDs from all files:
             particleIDs = []
+            links = [f for (name,f) in grpf.items() \
+                    if name in link_names_all]
+
             for link in links:
                 particleIDs.append(link['IDs/ParticleID'][...])
 
+            # Sort by link number:
+            particleIDs = [particleIDs[i] for i in link_sort_all]
+
             particleIDs = np.concatenate(particleIDs)
 
-            # Look only in the requested files:
-            if len(fnums) > 0:
-                names = [name for name in names if \
-                        int(name.replace('link','')) in fnums]
-            links = [f for (name,f) in grpf.items() if name in names]
-
+            # Get IDs by halo from selected files:
             IDs = []
+            links = [f for (name,f) in grpf.items() \
+                    if name in link_names_sel]
             for i,link in enumerate(links):
                 offset = link['Subhalo/SubOffset'][...]
                 partNums = link['Subhalo/SubLength'][...]
@@ -348,6 +349,8 @@ class Snapshot:
     
                 IDs.append(linkIDs)
             
+            # Sort by link number:
+            IDs = [IDs[i] for i in link_sort_sel]
             IDs = np.concatenate(IDs)
 
         return IDs

@@ -71,19 +71,19 @@ def test_match_halo():
 def test_match_snapshots():
 
     snap_ref = Snapshot("CDM_V1_LR",127,"LCDM")    # Reference
-    snap = Snapshot("CDM_V1_LR",115,"LCDM")
+    snap = Snapshot("CDM_V1_LR",126,"LCDM")
 
-    gns = snap_ref.get_subhalos('GroupNumber',False)[0]
-    sgns = snap_ref.get_subhalos('SubGroupNumber',False)[0]
-    print(np.bincount(gns.astype(int)))
-    print(np.bincount(sgns.astype(int)))
+    gns = snap_ref.get_subhalos('GroupNumber')
+    sgns = snap_ref.get_subhalos('SubGroupNumber')
+    print(np.bincount(gns.astype(int))[:15])
+    print(np.bincount(sgns.astype(int))[:15])
 
-    gns = snap.get_subhalos('GroupNumber',False)[0]
-    sgns = snap.get_subhalos('SubGroupNumber',False)[0]
-    print(np.bincount(gns.astype(int)))
-    print(np.bincount(sgns.astype(int)))
+    gns = snap.get_subhalos('GroupNumber')
+    sgns = snap.get_subhalos('SubGroupNumber')
+    print(np.bincount(gns.astype(int))[:15])
+    print(np.bincount(sgns.astype(int))[:15])
 
-    gn = 2; sgn = 34
+    gn = 2; sgn = 4
     gn_m, sgn_m = trace_halo.match_snapshots(snap, snap_ref, gn, sgn)
     ids,_ = trace_halo.get_subhalo_IDs(snap_ref, gn, sgn)
     ids_m,_ = trace_halo.get_subhalo_IDs(snap, gn_m, sgn_m)
