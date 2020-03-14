@@ -31,10 +31,12 @@ def test_read_subhalo_attr(dataset):
     print(len(dataset.read_subhalo_attr(attr)))
 
 def test_get_subhalos(dataset):
-    attr = "Vmax"
+    attr = "SubLengthType"
     print(type(dataset.get_subhalos('GroupNumber')))
-    print(type(dataset.get_subhalos(attr)))
-    print(len(dataset.get_subhalos(attr)))
+    data = dataset.get_subhalos(attr)
+    print(data.shape)
+    print(len(data))
+    print(data[:20,1])
 
 def test_get_subhalos_SubLengthType(snap):
     attr = "SubLengthType"
@@ -195,7 +197,7 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_count_files(LCDM)
 #test_make_group_file(LCDM)
 #test_read_subhalo_attr(LCDM)
-#test_get_subhalos(LCDM)
+test_get_subhalos(LCDM)
 #test_get_subhalos_SubLengthType(LCDM)
 #test_make_part_file(LCDM)
 #test_get_particles(LCDM)
@@ -208,7 +210,7 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_convert_to_cgs_part(LCDM)
 #test_file_of_halo(LCDM)
 #test_order_of_links(LCDM)
-test_get_subhalos_with_fnums(LCDM)
+#test_get_subhalos_with_fnums(LCDM)
 #test_get_subhalos_IDs_single(LCDM)
 #test_get_subhalos_IDs(LCDM)
 #test_get_subhalos_IDs_DMO(LCDM)

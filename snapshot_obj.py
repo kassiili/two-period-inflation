@@ -207,33 +207,47 @@ class Snapshot:
                     tmp = f['Subhalo/{}'.format(attr)][...]
                     out.append(tmp)
 
-                # Sort by link number:
-                out = [out[i] for i in link_sort]
-            
-                # Get conversion factors.
-                cgs     = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                        .get('CGSConversionFactor')
-                aexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                        .get('aexp-scale-exponent')
-                hexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                        .get('h-scale-exponent')
-            
-                # Get expansion factor and Hubble parameter from the 
-                # header.
-                a       = grpf['link1/Header'].attrs.get('Time')
-                h       = grpf['link1/Header'].attrs.get('HubbleParam')
+            # Sort by link number:
+            out = [out[i] for i in link_sort]
         
-                # Combine to a single array.
-                if len(out[0].shape) > 1:
-                    out = np.vstack(out)
-                else:
-                    out = np.concatenate(out)
-        
-                # Convert to physical and return in cgs units.
-                if out.dtype != np.int32 and out.dtype != np.int64:
-                    out = np.multiply(out, cgs * a**aexp * h**hexp, dtype='f8')
+            # Combine to a single array.
+            if len(out[0].shape) > 1:
+                out = np.vstack(out)
+            else:
+                out = np.concatenate(out)
 
+            out = self.convert_to_cgs_group(out,attr)
+            
         return out
+
+    def convert_to_cgs_group(self,data,attr):
+        """ Read conversion factors and convert dataset into cgs units.
+        """
+
+        converted = data
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Get conversion factors.
+            cgs     = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('CGSConversionFactor')
+            aexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('aexp-scale-exponent')
+            hexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('h-scale-exponent')
+        
+            # Get expansion factor and Hubble parameter from the 
+            # header.
+            a       = grpf['link1/Header'].attrs.get('Time')
+            h       = grpf['link1/Header'].attrs.get('HubbleParam')
+    
+            # Convert to physical and return in cgs units.
+            if data.dtype != np.int32 and data.dtype != np.int64:
+                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
+                        dtype='f8')
+
+        return converted
+
 
     def link_select(self, fnums):
         """ Selects links from file keys and constructs an index list
@@ -400,7 +414,8 @@ class Snapshot:
         
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp, dtype='f8')
+                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
+                        dtype='f8')
 
         return converted
 
