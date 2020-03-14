@@ -209,21 +209,19 @@ class Snapshot:
            out = self.read_subhalo_extended_attr(attr)
 
         else:
+
+            link_names, link_sort = self.link_select(fnums)
     
             with h5py.File(self.grp_file,'r') as grpf:
 
-                names = [name for name in grpf.keys() \
-                        if ('link' in name)]
-
-                # Look only in the requested files:
-                if len(fnums) > 0:
-                    names = [name for name in names if \
-                            int(name.replace('link','')) in fnums]
-                
-                links = [f for (name,f) in grpf.items() if name in names]
+                links = [f for (name,f) in grpf.items() \
+                        if name in link_names]
                 for f in links:
                     tmp = f['Subhalo/{}'.format(attr)][...]
                     out.append(tmp)
+
+                # Sort by link number:
+                out = [out[i] for i in link_sort]
             
                 # Get conversion factors.
                 cgs     = grpf['link1/Subhalo/{}'.format(attr)].attrs\
@@ -249,6 +247,29 @@ class Snapshot:
                     out = np.multiply(out, cgs * a**aexp * h**hexp, dtype='f8')
 
         return out
+
+    def link_select(self, fnums):
+        """ Selects links from file keys and constructs an index list
+        for sorting. """
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Set to ndarray:
+            keys = np.array(list(grpf.keys()))
+
+            mask = [False for k in keys]
+            for (idx,key) in enumerate(keys):
+                if 'link' in key:
+                    if len(fnums) == 0:
+                        mask[idx] = True
+                    elif int(key.replace('link','')) in fnums:
+                        mask[idx] = True
+
+        keys = keys[mask]
+        linknums = [int(key.replace('link','')) for key in keys]
+        sorting = np.argsort(linknums)
+
+        return keys[sorting],sorting
 
     def read_subhalo_extended_attr(self,attr):
         """ Retrieves dataset corresponding to attr from file if it is
