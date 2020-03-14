@@ -3,6 +3,33 @@ import numpy as np
 import astropy.units as u
 from astropy.constants import G
 
+def split_satellites(snap, attr, fnums=[]):
+    """ Reads an attribute from snapshot and divides into satellites and
+    isolated galaxies.
+    
+    Parameters
+    ----------
+    attr : str
+        attribute to be retrieved
+    fnums : list of ints, optional
+        Specifies files, which are to be read
+
+    Returns
+    -------
+    data : tuple of HDF5 datasets
+        Satellite data in the first entry and isolated galaxies data in
+        the second.
+    """
+
+    SGNs = snap.read_subhalo_attr('SubGroupNumber', fnums=fnums)
+    data = snap.read_subhalo_attr(attr, fnums=fnums)
+
+    # Divide into satellites and isolated galaxies:
+    dataSat = data[SGNs != 0]
+    dataIsol = data[SGNs == 0]
+
+    return (dataSat,dataIsol)
+
 def calculate_attr(dataset,attr):
     """ An interface to the functions of this module. Uses the correct
     function to construct the dataset corresponding to attr in dataset.

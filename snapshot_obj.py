@@ -145,7 +145,7 @@ class Snapshot:
 
         return path
 
-    def get_subhalos(self, attr, divided=True, fnums=[]):
+    def get_subhalos(self, attr, fnums=[]):
         """ Retrieves the given attribute values for subhaloes in the
         dataset.
         
@@ -161,24 +161,11 @@ class Snapshot:
 
         Returns
         -------
-        data : tuple of HDF5 datasets
-            tuple of one or two entries, depending on the value of the
-            argument "divided". If divided == True, return satellite data
-            in the first entry and isolated galaxies data in the second.
+        data : HDF5 datasets
+            Dataset of requested attribute values for subhalos.
         """
 
-        data = self.read_subhalo_attr(attr, fnums=fnums)
-
-        if divided:
-            SGNs = self.read_subhalo_attr('SubGroupNumber', fnums=fnums)
-
-            # Divide into satellites and isolated galaxies:
-            dataSat = data[SGNs != 0]
-            dataIsol = data[SGNs == 0]
-
-            return (dataSat,dataIsol)
-        else:
-            return (data,)
+        return self.read_subhalo_attr(attr, fnums=fnums)
 
     def read_subhalo_attr(self, attr, fnums=[]):
         """ Reads the data files for the attribute "attr" of each subhalo.
