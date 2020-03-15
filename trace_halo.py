@@ -76,25 +76,24 @@ def match_snapshots(snap, snap_ref, gn, sgn):
     IDs_ref,_ = get_subhalo_IDs(snap_ref,gn,sgn)
     mass_ref,_ = get_subhalo(snap_ref,'Mass',gn,sgn)
 
-    # Get index of halo with same sgn and gn as ref:
-    fnum_ref = snap_ref.file_of_halo(gn,sgn)
-    GNs = snap.get_subhalos('GroupNumber',fnums=[fnum_ref])
-    SGNs = snap.get_subhalos('SubGroupNumber',fnums=[fnum_ref])
-    idx0 = np.argwhere(np.logical_and((GNs==gn),(SGNs==sgn)))[0,0]
-                # !!! what if (gn,sgn) not in snap?
-    print('find match for:',GNs[idx0],SGNs[idx0],' in ',snap.snapID)
-    print('idx0=',idx0)
+    # Set maximum number of iterations:
+    term = 100
 
-    IDs_in_file = snap.get_subhalos_IDs(fnums=[fnum_ref])
-    mass_in_file = snap.get_subhalos('Mass',fnums=[fnum_ref])
+    # Read subhalos with group numbers and subgroup numbers near gn and
+    # sgn:
+    fnums = neighborhood(snap,gn,sgn,term/2)
+    GNs = snap.get_subhalos('GroupNumber',fnums=fnums)
+    SGNs = snap.get_subhalos('SubGroupNumber',fnums=fnums)
+    IDs_in_file = snap.get_subhalos_IDs(fnums=fnums)
+    mass_in_file = snap.get_subhalos('Mass',fnums=fnums)
+
+    # Get index of halo with same sgn and gn as ref:
+    idx0 = np.argwhere(np.logical_and((GNs==gn),(SGNs==sgn)))[0,0]
+    print('find match for:',GNs[idx0],SGNs[idx0],' in ',snap.snapID)
 
     # Initial value of match is returned if no match is found:
     match = (-1,-1)
 
-    # Finally terminate, if no match is found in term iterations:
-    term = 10000
-
-    # Initial values:
     idx = idx0
     for step in range(1,term):
         print('idx=',idx)
@@ -111,6 +110,37 @@ def match_snapshots(snap, snap_ref, gn, sgn):
                 math.floor((step+1)/2), (step % 2) - 0.5))
 
     return match
+
+def neighborhood(snap,gn,sgn,min_halos):
+    """ Gets file numbers of files that contain a minimum amount of
+    halos above and below a certain halo. """
+
+    fnum = snap.file_of_halo(gn,sgn)
+    GNs = snap.get_subhalos('GroupNumber',fnums=[fnum])
+    SGNs = snap.get_subhalos('SubGroupNumber',fnums=[fnum])
+    idx = np.argwhere(np.logical_and((GNs==gn),(SGNs==sgn)))[0,0]
+
+    fnums = [fnum]
+    halos_below = idx
+    for n in range(fnum-1,-1,-1):
+        if halos_below < min_halos:
+            fnums.append(n)
+            halos_below += snap.get_subhalos('GroupNumber',fnums=[n]).size
+        else:
+            break
+
+    with h5py.File(snap.grp_file,'r') as grpf:
+        n_files = grpf['link1/FOF'].attrs.get('NTask')
+
+    halos_above = GNs.size-1-idx
+    for n in range(fnum+1,n_files):
+        if halos_above < min_halos:
+            fnums.append(n)
+            halos_above += snap.get_subhalos('GroupNumber',fnums=[n]).size
+        else:
+            break
+
+    return fnums
 
 def match_subhalos(IDs1,mass1,IDs2,mass2):
     """ Check if two halos in different snapshots correspond to the same

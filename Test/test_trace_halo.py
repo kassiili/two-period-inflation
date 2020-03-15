@@ -83,8 +83,9 @@ def test_match_snapshots():
     print(np.bincount(gns.astype(int))[:15])
     print(np.bincount(sgns.astype(int))[:15])
 
-    gn = 2; sgn = 4
+    gn = 4; sgn = 4
     gn_m, sgn_m = trace_halo.match_snapshots(snap, snap_ref, gn, sgn)
+    print(gn_m,sgn_m)
     ids,_ = trace_halo.get_subhalo_IDs(snap_ref, gn, sgn)
     ids_m,_ = trace_halo.get_subhalo_IDs(snap, gn_m, sgn_m)
     m,_ = trace_halo.get_subhalo(snap_ref, 'Mass', gn, sgn)
@@ -94,9 +95,22 @@ def test_match_snapshots():
     print(trace_halo.get_subhalo(snap_ref,'Stars/Mass',gn,sgn))
     print(trace_halo.get_subhalo(snap,'Stars/Mass',gn_m,sgn_m))
 
+def test_neighborhood(snap):
+    gn=990; sgn=0
+    fnums = trace_halo.neighborhood(snap,gn,sgn,50)
+    print(fnums)
+    gns = snap.get_subhalos('GroupNumber',fnums=fnums)
+    sgns = snap.get_subhalos('SubGroupNumber',fnums=fnums)
+    print(gns.size)
+    for n in sorted(fnums):
+        gs = snap.get_subhalos('GroupNumber',fnums=[n])
+        print(gs.size)
+    print(np.argwhere(np.logical_and((gns==gn),(sgns==sgn))))
+
 LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_trace_halo(LCDM)
 #test_get_subhalo(LCDM,2,8)
 #test_get_subhalo_IDs(LCDM,2,8)
 #test_match_halo()
 test_match_snapshots()
+#test_neighborhood(LCDM)
