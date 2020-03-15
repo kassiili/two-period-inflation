@@ -9,7 +9,7 @@ from curve_fit import poly_fit
 import trace_halo
 
 def test_trace_halo(snap):
-    print(trace_halo.trace_halo(snap,2,8))
+    print(trace_halo.trace_halo(snap,12,0,direction='forward'))
 
 def test_get_subhalo(snap,gn,sgn):
     attrs = ['GroupNumber','Vmax']
@@ -107,10 +107,10 @@ def test_neighborhood(snap):
         print(gs.size)
     print(np.argwhere(np.logical_and((gns==gn),(sgns==sgn))))
 
-LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
-#test_trace_halo(LCDM)
+LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
+test_trace_halo(LCDM)
 #test_get_subhalo(LCDM,2,8)
 #test_get_subhalo_IDs(LCDM,2,8)
 #test_match_halo()
-test_match_snapshots()
+#test_match_snapshots()
 #test_neighborhood(LCDM)

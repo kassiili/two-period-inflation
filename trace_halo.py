@@ -5,7 +5,7 @@ from collections import deque
 
 from snapshot_obj import Snapshot
 
-def trace_halo(snap_init,gn,sgn,stop=101):
+def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
     """ Traces a halo as far back in time as possible, starting from
     the given snapshot.
 
@@ -28,6 +28,13 @@ def trace_halo(snap_init,gn,sgn,stop=101):
         the first element of the tuples.
     """
 
+    if direction == 'forward':
+        condition = lambda ID : ID < 127
+        add = 1
+    else:
+        condition = lambda ID : ID > stop
+        add = -1
+
     with h5py.File(snap_init.grp_file,'r') as grpf:
         z_init = grpf['link0/Header'].attrs.get('Redshift')
 
@@ -36,19 +43,18 @@ def trace_halo(snap_init,gn,sgn,stop=101):
 
     snap = snap_init
 
-    while snap.snapID > stop:
-        snap_prev = Snapshot(snap.simID,snap.snapID-1)
-        print(snap_prev.snapID,snap.snapID,gn,sgn)
-        gn, sgn = match_snapshots(snap_prev, snap, gn, sgn)
+    while condition(snap.snapID):
+        snap_next = Snapshot(snap.simID,snap.snapID+add)
+        gn, sgn = match_snapshots(snap_next, snap, gn, sgn)
 
         # No matching halo found:
         if gn == -1: break
 
-        with h5py.File(snap_prev.grp_file,'r') as grpf:
+        with h5py.File(snap_next.grp_file,'r') as grpf:
             z_prev = grpf['link0/Header'].attrs.get('Redshift')
 
         tracer.append((z_prev,gn,sgn))
-        snap = snap_prev
+        snap = snap_next
 
     return tracer
     
