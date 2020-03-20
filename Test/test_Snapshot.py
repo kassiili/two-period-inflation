@@ -112,9 +112,12 @@ def test_gn_counts(dataset):
 
 def test_get_particle_masses(dataset):
     masses = dataset.get_particle_masses()
-    print(masses[:100])
-    print(min(masses),max(masses)) 
-    print(sum(masses==0)) # compare to type 2,3 part numbers
+    IDs = dataset.get_particles('ParticleIDs')
+    print(masses.shape)
+    print(IDs.size)
+    print(masses[:20])
+#    print(min(masses),max(masses)) 
+#    print(sum(masses==0)) # compare to type 2,3 part numbers
 
 def test_convert_to_cgs_part(dataset):
     gns = dataset.get_particles('GroupNumber')
@@ -216,13 +219,13 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_get_subhalo_part_idx(LCDM)
 #test_group_name(LCDM)
 #test_gn_counts(LCDM)
-#test_get_particle_masses(LCDM)
+test_get_particle_masses(LCDM)
 #test_convert_to_cgs_part(LCDM)
 #test_file_of_halo(LCDM)
 #test_order_of_links(LCDM)
 #test_get_subhalos_with_fnums(LCDM)
 #test_get_subhalos_IDs_single(LCDM)
-test_get_subhalos_IDs(LCDM)
+#test_get_subhalos_IDs(LCDM)
 #test_get_subhalos_IDs_DMO(LCDM)
 #test_link_select(LCDM)
 #test_get_subhalos_order(LCDM)

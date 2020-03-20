@@ -31,8 +31,8 @@ class Snapshot:
             self.name = str(simID) + "_" + str(snapID)
         else:
             self.name = name
-        self.grp_file = 'groups_{}_{}.hdf5'.format(simID,snapID)
-        self.part_file = 'particles_{}_{}.hdf5'.format(simID,snapID)
+        self.grp_file = '.groups_{}_{}.hdf5'.format(simID,snapID)
+        self.part_file = '.particles_{}_{}.hdf5'.format(simID,snapID)
 
         # Initialize HDF5 files:
         self.make_group_file()
@@ -438,15 +438,14 @@ class Snapshot:
                 # Get dm particle masses:
                 with h5py.File(self.part_file,'r') as partf:
                     dm_mass = partf['link1/Header']\
-                            .attrs.get('MassTable')[1]
+                            .attrs.get('MassTable')[pt]
                     dm_n = partf['link1/Header']\
-                            .attrs.get('NumPart_Total')[1]
-                    mass = np.concatenate((mass,\
-                                np.ones(dm_n, dtype='f8')*dm_mass))
+                            .attrs.get('NumPart_Total')[pt]
+                    mass.append(np.ones(dm_n, dtype='f8')*dm_mass)
             else:
-                mass = np.concatenate((mass,\
-                        self.get_particles('Masses',part_type=[4])))
+                mass.append(self.get_particles('Masses',part_type=[pt]))
 
+        mass = np.concatenate(mass)
         mass = self.convert_to_cgs_part(mass,'Masses')
 
         return mass
