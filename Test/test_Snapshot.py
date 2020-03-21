@@ -111,11 +111,14 @@ def test_gn_counts(dataset):
     print(sum(cnt==0))
 
 def test_get_particle_masses(dataset):
-    masses = dataset.get_particle_masses()
-    IDs = dataset.get_particles('ParticleIDs')
-    print(masses.shape)
-    print(IDs.size)
-    print(masses[:20])
+    for pt in [0,1,4,5]:
+        masses = dataset.get_particle_masses(part_type=[pt])
+        print(masses[:30])
+#    masses = dataset.get_particle_masses()
+#    IDs = dataset.get_particles('ParticleIDs')
+#    print(masses.shape)
+#    print(IDs.size)
+#    print(masses[:20])
 #    print(min(masses),max(masses)) 
 #    print(sum(masses==0)) # compare to type 2,3 part numbers
 

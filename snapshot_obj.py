@@ -439,6 +439,8 @@ class Snapshot:
                 with h5py.File(self.part_file,'r') as partf:
                     dm_mass = partf['link1/Header']\
                             .attrs.get('MassTable')[pt]
+                    dm_mass = self.convert_to_cgs_part(\
+                            np.array([dm_mass]),'Masses')[0]
                     dm_n = partf['link1/Header']\
                             .attrs.get('NumPart_Total')[pt]
                     mass.append(np.ones(dm_n, dtype='f8')*dm_mass)
@@ -446,7 +448,6 @@ class Snapshot:
                 mass.append(self.get_particles('Masses',part_type=[pt]))
 
         mass = np.concatenate(mass)
-        mass = self.convert_to_cgs_part(mass,'Masses')
 
         return mass
 
