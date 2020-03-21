@@ -77,11 +77,12 @@ def test_calcVelocitiesAt1kpc(dataset):
 
 def test_get_subhalos_V1kpc(dataset):
     attr = "V1kpc"
-    v1kpc = dataset.get_subhalos(attr,divided=False)
-    vmax = dataset.get_subhalos('Vmax',divided=False)
-    print(v1kpc)
-    print(vmax)
+    v1kpc = dataset.get_subhalos(attr)
+    vmax = dataset.get_subhalos('Vmax')
+    print(np.median(v1kpc))
+    print(np.median(vmax))
     print(np.min(v1kpc),np.max(v1kpc))
+    print(np.min(vmax),np.max(vmax))
 
 def test_get_subhalo_part_idx(dataset):
     idx = dataset.get_subhalo_part_idx()
@@ -218,11 +219,11 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_make_part_file(LCDM)
 #test_get_particles(LCDM)
 #test_calcVelocitiesAt1kpc(LCDM)
-#test_get_subhalos_V1kpc(LCDM)
+test_get_subhalos_V1kpc(LCDM)
 #test_get_subhalo_part_idx(LCDM)
 #test_group_name(LCDM)
 #test_gn_counts(LCDM)
-test_get_particle_masses(LCDM)
+#test_get_particle_masses(LCDM)
 #test_convert_to_cgs_part(LCDM)
 #test_file_of_halo(LCDM)
 #test_order_of_links(LCDM)

@@ -1,4 +1,5 @@
 import numpy as np
+import h5py
 
 import astropy.units as u
 from astropy.constants import G
@@ -21,8 +22,8 @@ def split_satellites(snap, attr, fnums=[]):
         the second.
     """
 
-    SGNs = snap.read_subhalo_attr('SubGroupNumber', fnums=fnums)
-    data = snap.read_subhalo_attr(attr, fnums=fnums)
+    SGNs = snap.get_subhalos('SubGroupNumber', fnums=fnums)
+    data = snap.get_subhalos(attr, fnums=fnums)
 
     # Divide into satellites and isolated galaxies:
     dataSat = data[SGNs != 0]
@@ -30,34 +31,39 @@ def split_satellites(snap, attr, fnums=[]):
 
     return (dataSat,dataIsol)
 
-def calculate_attr(dataset,attr):
+def calculate_attr(snapshot,attr):
     """ An interface to the functions of this module. Uses the correct
     function to construct the dataset corresponding to attr in dataset.
     """
 
     if attr == 'V1kpc':
-        return calculate_V1kpc(dataset)
+        return calculate_V1kpc(snapshot)
 
     return None
 
-def calculate_V1kpc_slow(dataset):
+def calculate_V1kpc(snapshot):
     """ For each subhalo, calculate the circular velocity at 1kpc. """
 
     # Get particle data:
     part = {}
-    part['gns'] = dataset.get_particles('GroupNumber')
-    part['sgns'] = dataset.get_particles('SubGroupNumber')
-    part['coords'] = dataset.get_particles('Coordinates')\
+    part['gns'] = snapshot.get_particles('GroupNumber')
+    part['sgns'] = snapshot.get_particles('SubGroupNumber')
+    part['coords'] = snapshot.get_particles('Coordinates')\
             * u.cm.to(u.kpc)
-    part['mass'] = dataset.get_particle_masses() * u.g.to(u.Msun)
+    part['mass'] = snapshot.get_particle_masses() * u.g.to(u.Msun)
 
     # Get subhalodata:
     halo = {}
-    halo['gns'] = dataset.get_subhalos('GroupNumber',divided=False)[0]
-    halo['sgns'] = \
-            dataset.get_subhalos('SubGroupNumber',divided=False)[0]
-    halo['COPs'] = dataset.get_subhalos(\
-            'CentreOfPotential',divided=False)[0] * u.cm.to(u.kpc)
+    halo['gns'] = snapshot.get_subhalos('GroupNumber')
+    halo['sgns'] = snapshot.get_subhalos('SubGroupNumber')
+    halo['COPs'] = snapshot.get_subhalos('CentreOfPotential') \
+            * u.cm.to(u.kpc)
+
+    # Get box size:
+    with h5py.File(snapshot.part_file,'r') as partf:
+        h = partf['link1/Header'].attrs.get('HubbleParam')
+        boxs = partf['link1/Header'].attrs.get('BoxSize') * 1000/h 
+                                                            # Mpc/h -> kpc
 
     massWithin1kpc = np.zeros((halo['gns'].size))
 
@@ -71,8 +77,9 @@ def calculate_V1kpc_slow(dataset):
         coords = part['coords'][halo_mask]
         mass = part['mass'][halo_mask]
 
-        # Calculate distances to COP:
-        r = np.linalg.norm(coords - cop, axis=1)
+        # Calculate distances to cop:
+        d = np.mod(coords-cop+0.5*boxs, boxs) - 0.5*boxs
+        r = np.linalg.norm(d, axis=1)
 
         # Get coordinates within 1kpc from COP:
         r1kpc_mask = np.logical_and(r > 0, r < 1)
@@ -84,20 +91,20 @@ def calculate_V1kpc_slow(dataset):
 
     return v1kpc
 
-def calculate_V1kpc(dataset):
+def calculate_V1kpc_inProgress(snapshot):
     """ For each subhalo, calculate the circular velocity at 1kpc. 
     Assume that there are no jumps in the SubGroupNumber values in any
     of the groups."""
 
     # Get particle data:
-    coords = dataset.get_particles('Coordinates') \
+    coords = snapshot.get_particles('Coordinates') \
             * u.cm.to(u.kpc)
-    mass = dataset.get_particle_masses() * u.g.to(u.Msun)
+    mass = snapshot.get_particle_masses() * u.g.to(u.Msun)
 
     # Get halo data:
-    COPs = dataset.get_subhalos('CentreOfPotential',\
+    COPs = snapshot.get_subhalos('CentreOfPotential',\
             divided=False)[0] * u.cm.to(u.kpc)
-    part_idx = get_subhalo_part_idx(dataset)
+    part_idx = get_subhalo_part_idx(snapshot)
 
     massWithin1kpc = np.zeros((COPs[:,0].size))
 
@@ -120,18 +127,18 @@ def calculate_V1kpc(dataset):
 
     return v1kpc
     
-def get_subhalo_part_idx(dataset):
+def get_subhalo_part_idx(snapshot):
     """ Finds indices of the particles in each halo. """
 
     # Get subhalos:
-    halo_gns = dataset.get_subhalos('GroupNumber',\
+    halo_gns = snapshot.get_subhalos('GroupNumber',\
             divided=False)[0].astype(int)
-    halo_sgns = dataset.get_subhalos('SubGroupNumber',\
+    halo_sgns = snapshot.get_subhalos('SubGroupNumber',\
             divided=False)[0].astype(int)
 
     # Get particles:
-    part_gns = dataset.get_particles('GroupNumber')
-    part_sgns = dataset.get_particles('SubGroupNumber')
+    part_gns = snapshot.get_particles('GroupNumber')
+    part_sgns = snapshot.get_particles('SubGroupNumber')
 
     # Get halo indices:
     sorting = np.lexsort((halo_sgns,halo_gns))

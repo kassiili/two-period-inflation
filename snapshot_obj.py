@@ -147,15 +147,12 @@ class Snapshot:
 
     def get_subhalos(self, attr, fnums=[]):
         """ Retrieves the given attribute values for subhaloes in the
-        dataset.
+        snapshot.
         
         Parameters
         ----------
         attr : str
             attribute to be retrieved
-        divided : bool, optional
-            if True (default), output is divided into satellites and 
-            isolated galaxies
         fnums : list of ints, optional
             Specifies files, which are to be read
 
@@ -165,16 +162,31 @@ class Snapshot:
             Dataset of requested attribute values for subhalos.
         """
 
-        return self.read_subhalo_attr(attr, fnums=fnums)
+        # Output array.
+        out = np.empty((0))
 
-    def read_subhalo_attr(self, attr, fnums=[]):
-        """ Reads the data files for the attribute "attr" of each subhalo.
-        
-        Parameters
+        is_extension = False
+        with h5py.File(self.grp_file,'r') as grpf:
+            if attr not in grpf['link1/Subhalo']:
+                is_extension = True
+
+        if is_extension:
+            out = self.read_subhalo_extended_attr(attr)
+
+        else:
+            out = self.read_subhalo_catalogued_attr(attr,fnums)
+            
+        return out
+
+    def read_subhalo_catalogued_attr(self,attr,fnums):
+        """ Retrieves dataset corresponding to attr from the subhalo
+        catalogues.
+
+        Paramaters
         ----------
-        attr : str
+        datatype : attr
             attribute to be retrieved
-        fnums : list of ints, optional
+        fnums : list of ints
             Specifies files, which are to be read
 
         Returns
@@ -183,94 +195,29 @@ class Snapshot:
             dataset of the values of attribute "attr" for each subhalo
         """
 
-        # Output array.
         out = []
-
-        is_extension = False
+        link_names, link_sort = self.link_select(fnums)
+    
         with h5py.File(self.grp_file,'r') as grpf:
-            if attr not in grpf['link1/Subhalo']:
-                is_extension = True
 
-        if is_extension:
+            links = [f for (name,f) in grpf.items() \
+                    if name in link_names]
+            for f in links:
+                tmp = f['Subhalo/{}'.format(attr)][...]
+                out.append(tmp)
 
-           out = self.read_subhalo_extended_attr(attr)
-
+        # Sort by link number:
+        out = [out[i] for i in link_sort]
+        
+        # Combine to a single array.
+        if len(out[0].shape) > 1:
+            out = np.vstack(out)
         else:
+            out = np.concatenate(out)
 
-            link_names, link_sort = self.link_select(fnums)
-    
-            with h5py.File(self.grp_file,'r') as grpf:
+        out = self.convert_to_cgs_group(out,attr)
 
-                links = [f for (name,f) in grpf.items() \
-                        if name in link_names]
-                for f in links:
-                    tmp = f['Subhalo/{}'.format(attr)][...]
-                    out.append(tmp)
-
-            # Sort by link number:
-            out = [out[i] for i in link_sort]
-        
-            # Combine to a single array.
-            if len(out[0].shape) > 1:
-                out = np.vstack(out)
-            else:
-                out = np.concatenate(out)
-
-            out = self.convert_to_cgs_group(out,attr)
-            
         return out
-
-    def convert_to_cgs_group(self,data,attr):
-        """ Read conversion factors and convert dataset into cgs units.
-        """
-
-        converted = data
-
-        with h5py.File(self.grp_file,'r') as grpf:
-
-            # Get conversion factors.
-            cgs     = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                    .get('CGSConversionFactor')
-            aexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                    .get('aexp-scale-exponent')
-            hexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                    .get('h-scale-exponent')
-        
-            # Get expansion factor and Hubble parameter from the 
-            # header.
-            a       = grpf['link1/Header'].attrs.get('Time')
-            h       = grpf['link1/Header'].attrs.get('HubbleParam')
-    
-            # Convert to physical and return in cgs units.
-            if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
-                        dtype='f8')
-
-        return converted
-
-
-    def link_select(self, fnums):
-        """ Selects links from file keys and constructs an index list
-        for sorting. """
-
-        with h5py.File(self.grp_file,'r') as grpf:
-
-            # Set to ndarray:
-            keys = np.array(list(grpf.keys()))
-
-            mask = [False for k in keys]
-            for (idx,key) in enumerate(keys):
-                if 'link' in key:
-                    if len(fnums) == 0:
-                        mask[idx] = True
-                    elif int(key.replace('link','')) in fnums:
-                        mask[idx] = True
-
-        keys = keys[mask]
-        linknums = [int(key.replace('link','')) for key in keys]
-        sorting = np.argsort(linknums)
-
-        return keys[sorting],sorting
 
     def read_subhalo_extended_attr(self,attr):
         """ Retrieves dataset corresponding to attr from file if it is
@@ -312,7 +259,70 @@ class Snapshot:
 
         return out
 
+    def convert_to_cgs_group(self,data,attr):
+        """ Read conversion factors and convert dataset into cgs units.
+        """
+
+        converted = data
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Get conversion factors.
+            cgs     = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('CGSConversionFactor')
+            aexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('aexp-scale-exponent')
+            hexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
+                    .get('h-scale-exponent')
+        
+            # Get expansion factor and Hubble parameter from the 
+            # header.
+            a       = grpf['link1/Header'].attrs.get('Time')
+            h       = grpf['link1/Header'].attrs.get('HubbleParam')
+    
+            # Convert to physical and return in cgs units.
+            if data.dtype != np.int32 and data.dtype != np.int64:
+                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
+                        dtype='f8')
+
+        return converted
+
+    def link_select(self, fnums):
+        """ Selects links from file keys and constructs an index list
+        for sorting. """
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Set to ndarray:
+            keys = np.array(list(grpf.keys()))
+
+            mask = [False for k in keys]
+            for (idx,key) in enumerate(keys):
+                if 'link' in key:
+                    if len(fnums) == 0:
+                        mask[idx] = True
+                    elif int(key.replace('link','')) in fnums:
+                        mask[idx] = True
+
+        keys = keys[mask]
+        linknums = [int(key.replace('link','')) for key in keys]
+        sorting = np.argsort(linknums)
+
+        return keys[sorting],sorting
+
     def get_subhalos_IDs(self, fnums=[]):
+        """ Read IDs of bound particles for each halo.
+        
+        Paramaters
+        ----------
+        fnums : list of ints, optional
+            Specifies files, which are to be read
+
+        Returns
+        -------
+        IDs : HDF5 dataset 
+            Dataset of lists of bound particles
+        """
 
         IDs = []
 

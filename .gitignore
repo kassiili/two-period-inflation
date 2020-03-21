@@ -4,3 +4,4 @@ Figures/
 snapshots/
 *.hdf5
 Dump/
+.ipynb_checkpoints/

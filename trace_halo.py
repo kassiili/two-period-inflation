@@ -17,6 +17,8 @@ def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
         Group number of the traced halo in the initial snapshot.
     sgn : int
         Subgroup number of the traced halo in the initial snapshot.
+    direction : str, optional
+        Direction in which halo is traced.
     stop : int, optional
         Earliest snapshot to be explored
 
@@ -28,20 +30,19 @@ def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
         the first element of the tuples.
     """
 
+    with h5py.File(snap_init.grp_file,'r') as grpf:
+        z_init = grpf['link0/Header'].attrs.get('Redshift')
+
+    # Initialize tracer:
+    tracer = deque([(z_init,gn,sgn)])
+    snap = snap_init
+
     if direction == 'forward':
         condition = lambda ID : ID < 127
         add = 1
     else:
         condition = lambda ID : ID > stop
         add = -1
-
-    with h5py.File(snap_init.grp_file,'r') as grpf:
-        z_init = grpf['link0/Header'].attrs.get('Redshift')
-
-    # Initialize tracer:
-    tracer = deque([(z_init,gn,sgn)])
-
-    snap = snap_init
 
     while condition(snap.snapID):
         snap_next = Snapshot(snap.simID,snap.snapID+add)
