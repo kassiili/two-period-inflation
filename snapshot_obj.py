@@ -365,7 +365,7 @@ class Snapshot:
 
         return IDs
 
-    def get_particles(self, attr, part_type=[0,1,4,5]):
+    def get_particles(self, attr, part_type=[0,1,2,3,4,5]):
         """ Reads the data files for the attribute "attr" of each particle.
         
         Parameters
@@ -387,12 +387,12 @@ class Snapshot:
 
         # Get particle file:
         with h5py.File(self.part_file,'r') as partf:
+
+            # Loop over particle types:
+            for pt in part_type:
     
-            # Loop over each file and extract the data.
-            for f in partf.values():
-                
-                # Loop over particle types:
-                for pt in part_type:
+                # Loop over each file and extract the data.
+                for f in partf.values():
                     if attr in f['PartType{}'.format(pt)].keys():
                         tmp = f['PartType{}/{}'.format(pt,attr)][...]
                         out.append(tmp)
@@ -432,7 +432,7 @@ class Snapshot:
 
         return converted
 
-    def get_particle_masses(self,part_type=[0,1,4,5]):
+    def get_particle_masses(self,part_type=[0,1,2,3,4,5]):
         """ Reads particle masses, ignoring types 2,3!!
         
         Returns
