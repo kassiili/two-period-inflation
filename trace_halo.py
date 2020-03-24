@@ -34,7 +34,7 @@ def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
         z_init = grpf['link0/Header'].attrs.get('Redshift')
 
     # Initialize tracer:
-    tracer = deque([(z_init,gn,sgn)])
+    tracer = {snap_init.snapID : (z_init,gn,sgn)}
     snap = snap_init
 
     if direction == 'forward':
@@ -52,9 +52,11 @@ def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
         if gn == -1: break
 
         with h5py.File(snap_next.grp_file,'r') as grpf:
-            z_prev = grpf['link0/Header'].attrs.get('Redshift')
+            z_next = grpf['link0/Header'].attrs.get('Redshift')
 
-        tracer.append((z_prev,gn,sgn))
+        # Add match to tracer:
+        tracer[snap_next.snapID] = (z_next,gn,sgn)
+
         snap = snap_next
 
     return tracer
