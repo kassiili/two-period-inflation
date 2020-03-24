@@ -208,6 +208,10 @@ def test_get_subhalos_order(snap):
     for gn,sgn in zip(gns,sgns):
         print(gn,sgn)
 
+def test_peculiar_files():
+    snap = Snapshot("CDM_V1_LR",115)
+    snap.get_particles('Coordinates', part_type=[5])
+
 LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #LCDM_x = Snapshot("CDM_V1_LR", 101, "LCDM")
 #test_get_data_path(LCDM_x)
@@ -219,7 +223,7 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_make_part_file(LCDM)
 #test_get_particles(LCDM)
 #test_calcVelocitiesAt1kpc(LCDM)
-test_get_subhalos_V1kpc(LCDM)
+#test_get_subhalos_V1kpc(LCDM)
 #test_get_subhalo_part_idx(LCDM)
 #test_group_name(LCDM)
 #test_gn_counts(LCDM)
@@ -233,6 +237,7 @@ test_get_subhalos_V1kpc(LCDM)
 #test_get_subhalos_IDs_DMO(LCDM)
 #test_link_select(LCDM)
 #test_get_subhalos_order(LCDM)
+test_peculiar_files()
 
 #sgns = LCDM.get_subhalos('SubGroupNumber',False)[0]
 #print(sgns.size)

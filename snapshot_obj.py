@@ -406,7 +406,7 @@ class Snapshot:
             for pt in part_type:
     
                 for f in partf.values():
-                    if dataset in f['PartType{}'.format(pt)].keys():
+                    if 'PartType{}/{}'.format(pt,dataset) in f.keys():
                         tmp = f['PartType{}/{}'.format(pt,dataset)][...]
                         out.append(tmp)
 
