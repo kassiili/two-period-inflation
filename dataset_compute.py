@@ -31,17 +31,17 @@ def split_satellites(snap, attr, fnums=[]):
 
     return (dataSat,dataIsol)
 
-def calculate_attr(snapshot,attr):
+def generate_dataset(snapshot,dataset):
     """ An interface to the functions of this module. Uses the correct
-    function to construct the dataset corresponding to attr in dataset.
+    function to construct the dataset.
     """
 
-    if attr == 'V1kpc':
-        return calculate_V1kpc(snapshot)
+    if dataset == 'V1kpc':
+        return compute_V1kpc(snapshot)
 
     return None
 
-def calculate_V1kpc(snapshot):
+def compute_V1kpc(snapshot):
     """ For each subhalo, calculate the circular velocity at 1kpc. """
 
     # Get particle data:
@@ -90,6 +90,71 @@ def calculate_V1kpc(snapshot):
     v1kpc = np.sqrt(massWithin1kpc * myG)
 
     return v1kpc
+
+def compute_rotation_curve(snapshot, gn, sgn, part_type=[0,1,4,5], jump=10):
+    """ Compute circular velocity by radius for a given halo. 
+    
+    Parameters
+    ----------
+    jump : int, optional
+        Reduce noise by only computing circular velocity at the location
+        of every nth particle, where n = jump
+    Returns
+    -------
+    (r,v_circ) : tuple
+        Circular velocities, v_circ, at distances r to halo centre in
+        cgs units.
+    """
+
+    # Get centre of potential:
+    SGNs = snapshot.get_subhalos("SubGroupNumber")
+    GNs = snapshot.get_subhalos("GroupNumber")
+    COPs = snapshot.get_subhalos("CentreOfPotential")
+
+    halo_mask = np.logical_and(SGNs == sgn,GNs == gn)
+    cop = COPs[halo_mask]
+
+    # Get coordinates and masses of the halo:
+    SGNs = snapshot.get_particles("SubGroupNumber",part_type=part_type)
+    GNs = snapshot.get_particles("GroupNumber",part_type=part_type)
+    coords = snapshot.get_particles("Coordinates",part_type=part_type)
+    mass = snapshot.get_particle_masses(part_type=part_type)
+    
+    halo_mask = np.logical_and(SGNs == sgn,GNs == gn)
+    coords = periodic_wrap(snapshot,cop,coords[halo_mask])
+    mass = mass[halo_mask]
+    
+    # Calculate distance to centre and cumulative mass:
+    r = np.linalg.norm(coords - cop, axis=1)
+    sorting = np.argsort(r)
+    r = r[sorting]
+    cmass = np.cumsum(mass[sorting])
+   
+    # Clean up:
+    mask = r>0; r=r[mask]; cumass=cmass[mask]
+    r = r[jump::jump]
+    cumass = cumass[jump::jump]
+    
+    # Compute velocity.
+    myG = G.to(u.cm**3 * u.g**-1 * u.s**-2).value
+    v_circ = np.sqrt((myG * cumass) / r)
+
+    return r,v_circ
+
+def periodic_wrap(snapshot,cop,coords):
+    """ Account for the periodic boundary conditions by moving particles 
+    to the periodic location, which is closest to the cop of their host
+    halo. """
+
+    # Periodic wrap coordinates around centre.
+    with h5py.File(snapshot.part_file,'r') as partf:
+        h = partf['link1/Header'].attrs.get('HubbleParam')
+        boxs = partf['link1/Header'].attrs.get('BoxSize')  
+        boxs = snapshot.convert_to_cgs_group(np.array([boxs]),\
+                'CentreOfPotential') / h
+    wrapped = np.mod(coords-cop+0.5*boxs, boxs) + cop-0.5*boxs
+
+    return wrapped
 
 def calculate_V1kpc_inProgress(snapshot):
     """ For each subhalo, calculate the circular velocity at 1kpc. 

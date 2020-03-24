@@ -24,17 +24,17 @@ class Snapshot:
             and snapID.
         """
 
-        # Define class attributes:
         self.simID = simID
         self.snapID = snapID
+        # If not given, construct name from IDs:
         if not name:
             self.name = str(simID) + "_" + str(snapID)
         else:
             self.name = name
-        self.grp_file = '.groups_{}_{}.hdf5'.format(simID,snapID)
-        self.part_file = '.particles_{}_{}.hdf5'.format(simID,snapID)
 
         # Initialize HDF5 files:
+        self.grp_file = '.groups_{}_{}.hdf5'.format(simID,snapID)
+        self.part_file = '.particles_{}_{}.hdf5'.format(simID,snapID)
         self.make_group_file()
         self.make_part_file()
 
@@ -79,6 +79,36 @@ class Snapshot:
                     partf['link{}'.format(i)] = \
                             h5py.ExternalLink(filename,'/')
 
+    def get_data_path(self, datatype):
+        """ Constructs the path to data directory. 
+        
+        Paramaters
+        ----------
+        datatype : str
+            recognized values are: 'part' and 'group'
+
+        Returns
+        -------
+        path : str
+            path to data directory
+        """
+
+        home = os.path.dirname(os.path.realpath(__file__))
+        path = os.path.join(home,"snapshots",self.simID)
+
+        prefix = ""
+        if datatype == "part":
+            prefix = "snapshot_"
+        else:
+            prefix += "groups_"
+
+        # Find the snapshot directory and add to path:
+        for dirname in os.listdir(path):
+            if prefix + str(self.snapID) in dirname:
+                path = os.path.join(path,dirname) 
+
+        return path
+
     def file_of_halo(self, gn, sgn):
         """ Returns the file number of the file, which contains the halo
         identified by gn and sgn.
@@ -113,53 +143,20 @@ class Snapshot:
 
         return fileNum
 
-    def get_data_path(self, datatype):
-        """ Constructs the path to data directory. 
-        
-        Paramaters
-        ----------
-        datatype : str
-            recognized values are: part and group
-
-        Returns
-        -------
-        path : str
-            path to data directory
-        """
-
-        home = os.path.dirname(os.path.realpath(__file__))
-        path = os.path.join(home,"snapshots",self.simID)
-
-        prefix = ""
-        if datatype == "part":
-            prefix = "snapshot_"
-        elif datatype == "group":
-            prefix += "groups_"
-        else:
-            return None
-
-        # Find the snapshot directory and add to path:
-        for dirname in os.listdir(path):
-            if prefix + str(self.snapID) in dirname:
-                path = os.path.join(path,dirname) 
-
-        return path
-
-    def get_subhalos(self, attr, fnums=[]):
-        """ Retrieves the given attribute values for subhaloes in the
-        snapshot.
+    def get_subhalos(self, dataset, fnums=[]):
+        """ Retrieves a dataset for subhaloes in the snapshot.
         
         Parameters
         ----------
-        attr : str
-            attribute to be retrieved
+        dataset : str
+            Name of dataset to be retrieved.
         fnums : list of ints, optional
-            Specifies files, which are to be read
+            Specifies files, which are to be read.
 
         Returns
         -------
-        data : HDF5 datasets
-            Dataset of requested attribute values for subhalos.
+        out : HDF5 datasets
+            The requested dataset.
         """
 
         # Output array.
@@ -167,32 +164,31 @@ class Snapshot:
 
         is_extension = False
         with h5py.File(self.grp_file,'r') as grpf:
-            if attr not in grpf['link1/Subhalo']:
+            if dataset not in grpf['link1/Subhalo']:
                 is_extension = True
 
         if is_extension:
-            out = self.read_subhalo_extended_attr(attr)
+            out = self.get_subhalo_extended(dataset)
 
         else:
-            out = self.read_subhalo_catalogued_attr(attr,fnums)
+            out = self.get_subhalo_catalogue(dataset,fnums)
             
         return out
 
-    def read_subhalo_catalogued_attr(self,attr,fnums):
-        """ Retrieves dataset corresponding to attr from the subhalo
-        catalogues.
+    def get_subhalo_catalogue(self,dataset,fnums):
+        """ Retrieves a dataset from the subhalo catalogues.
 
         Paramaters
         ----------
-        datatype : attr
-            attribute to be retrieved
-        fnums : list of ints
-            Specifies files, which are to be read
+        dataset : str
+            Name of dataset to be retrieved.
+        fnums : list of ints, optional
+            Specifies files, which are to be read.
 
         Returns
         -------
         out : HDF5 dataset
-            dataset of the values of attribute "attr" for each subhalo
+            Requested dataset in cgs units.
         """
 
         out = []
@@ -203,7 +199,7 @@ class Snapshot:
             links = [f for (name,f) in grpf.items() \
                     if name in link_names]
             for f in links:
-                tmp = f['Subhalo/{}'.format(attr)][...]
+                tmp = f['Subhalo/{}'.format(dataset)][...]
                 out.append(tmp)
 
         # Sort by link number:
@@ -215,77 +211,44 @@ class Snapshot:
         else:
             out = np.concatenate(out)
 
-        out = self.convert_to_cgs_group(out,attr)
+        out = self.convert_to_cgs_group(out,dataset)
 
         return out
 
-    def read_subhalo_extended_attr(self,attr):
-        """ Retrieves dataset corresponding to attr from file if it is
-        already calculated. If not, calculates it and then returns it.
+    def get_subhalo_extended(self,dataset):
+        """ Retrieves dataset from file if it is already calculated. 
+        If not, calculates it and then returns it.
 
         Paramaters
         ----------
-        datatype : attr
-            (extended) attribute to be retrieved
+        dataset : str
+            Name of (extended) dataset to be retrieved.
 
         Returns
         -------
         out : HDF5 dataset
-            dataset of the values of attribute "attr" for each subhalo
+            Requested dataset in cgs units.
         """
 
         out = []
 
-        # Check if velocities at 1kpc are already stored in grpf:
-        attr_in_grpf = False
+        # Check if the dataset is already stored in grpf:
+        in_grpf = False
         with h5py.File(self.grp_file,'r') as grpf:
-            if 'extended/{}'.format(attr) in grpf:
-                out = grpf['extended/{}'.format(attr)][...]
-                attr_in_grpf = True
+            if 'extended/{}'.format(dataset) in grpf:
+                out = grpf['extended/{}'.format(dataset)][...]
+                in_grpf = True
 
-        if not attr_in_grpf:
+        if not in_grpf:
 
-            out = dataset_compute.calculate_attr(self,attr)
+            out = dataset_compute.generate_dataset(self,dataset)
 
             # Create dataset in grpf:
             with h5py.File(self.grp_file,'r+') as grpf:
-                if '/extended' not in grpf:
-                    ext = grpf.create_group('extended')
-                    attr_dataset = \
-                            ext.create_dataset(attr, data=out)
-                else:
-                    attr_dataset = grpf.create_dataset(\
-                            '/extended/{}'.format(attr), data=out)
+                grpf.create_dataset('/extended/{}'.format(dataset),\
+                        data=out)
 
         return out
-
-    def convert_to_cgs_group(self,data,attr):
-        """ Read conversion factors and convert dataset into cgs units.
-        """
-
-        converted = data
-
-        with h5py.File(self.grp_file,'r') as grpf:
-
-            # Get conversion factors.
-            cgs     = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                    .get('CGSConversionFactor')
-            aexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                    .get('aexp-scale-exponent')
-            hexp    = grpf['link1/Subhalo/{}'.format(attr)].attrs\
-                    .get('h-scale-exponent')
-        
-            # Get expansion factor and Hubble parameter from the 
-            # header.
-            a       = grpf['link1/Header'].attrs.get('Time')
-            h       = grpf['link1/Header'].attrs.get('HubbleParam')
-    
-            # Convert to physical and return in cgs units.
-            if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
-                        dtype='f8')
-
-        return converted
 
     def link_select(self, fnums):
         """ Selects links from file keys and constructs an index list
@@ -309,6 +272,47 @@ class Snapshot:
         sorting = np.argsort(linknums)
 
         return keys[sorting],sorting
+
+    def convert_to_cgs_group(self,data,dataset):
+        """ Read conversion factors for a halo dataset and convert it 
+        into cgs units.
+
+        Paramaters
+        ----------
+        data : HDF5 dataset
+            Dataset to be converted.
+        dataset : str
+            Name of dataset.
+
+        Returns
+        -------
+        converted : HDF5 dataset
+            Dataset in cgs units.
+        """
+
+        converted = data
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Get conversion factors.
+            cgs     = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
+                    .get('CGSConversionFactor')
+            aexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
+                    .get('aexp-scale-exponent')
+            hexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
+                    .get('h-scale-exponent')
+        
+            # Get expansion factor and Hubble parameter from the 
+            # header.
+            a       = grpf['link1/Header'].attrs.get('Time')
+            h       = grpf['link1/Header'].attrs.get('HubbleParam')
+    
+            # Convert to physical and return in cgs units.
+            if data.dtype != np.int32 and data.dtype != np.int64:
+                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
+                        dtype='f8')
+
+        return converted
 
     def get_subhalos_IDs(self, fnums=[]):
         """ Read IDs of bound particles for each halo.
@@ -365,21 +369,21 @@ class Snapshot:
 
         return IDs
 
-    def get_particles(self, attr, part_type=[0,1,2,3,4,5]):
-        """ Reads the data files for the attribute "attr" of each particle.
+    def get_particles(self, dataset, part_type=[0,1,4,5]):
+        """ Reads the dataset from particle catalogues.
         
         Parameters
         ----------
-        attr : str
-            attribute to be retrieved
+        dataset : str
+            Dataset to be retrieved.
         part_type : list of int, optional
-            types of particles, whose attribute values are retrieved (the
-            default is all of them)
+            Types of particles, whose attribute values are retrieved (the
+            default is set for high-res part types)
 
         Returns
         -------
         out : HDF5 dataset
-            dataset of the values of attribute "attr" for each particle 
+            Requested dataset in cgs units.
         """
 
         # Output array.
@@ -388,13 +392,13 @@ class Snapshot:
         # Get particle file:
         with h5py.File(self.part_file,'r') as partf:
 
-            # Loop over particle types:
+            # For each particle type, loop over files, s.t. elements in
+            # out are primarily ordered by particle type:
             for pt in part_type:
     
-                # Loop over each file and extract the data.
                 for f in partf.values():
-                    if attr in f['PartType{}'.format(pt)].keys():
-                        tmp = f['PartType{}/{}'.format(pt,attr)][...]
+                    if dataset in f['PartType{}'.format(pt)].keys():
+                        tmp = f['PartType{}/{}'.format(pt,dataset)][...]
                         out.append(tmp)
 
         # Combine to a single array.
@@ -403,42 +407,17 @@ class Snapshot:
         else:
             out = np.concatenate(out)
             
-        out = self.convert_to_cgs_part(out,attr)
+        out = self.convert_to_cgs_part(out,dataset)
             
         return out
 
-    def convert_to_cgs_part(self,data,attr):
-
-        converted = data
-
-        with h5py.File(self.part_file,'r') as partf:
-
-            # Get conversion factors (same for all types):
-            cgs     = partf['link1/PartType0/{}'.format(attr)]\
-                    .attrs.get('CGSConversionFactor')
-            aexp    = partf['link1/PartType0/{}'.format(attr)]\
-                    .attrs.get('aexp-scale-exponent')
-            hexp    = partf['link1/PartType0/{}'.format(attr)]\
-                    .attrs.get('h-scale-exponent')
-            
-            # Get expansion factor and Hubble parameter from the header:
-            a       = partf['link1/Header'].attrs.get('Time')
-            h       = partf['link1/Header'].attrs.get('HubbleParam')
-        
-            # Convert to physical and return in cgs units.
-            if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
-                        dtype='f8')
-
-        return converted
-
-    def get_particle_masses(self,part_type=[0,1,2,3,4,5]):
-        """ Reads particle masses, ignoring types 2,3!!
+    def get_particle_masses(self,part_type=[0,1,4,5]):
+        """ Reads particle masses in grams.
         
         Returns
         -------
         mass : HDF5 dataset
-            masses of each particle
+            Masses of each particle in cgs.
         """
 
         mass = []
@@ -460,4 +439,45 @@ class Snapshot:
         mass = np.concatenate(mass)
 
         return mass
+
+    def convert_to_cgs_part(self,data,dataset):
+        """ Read conversion factors for a dataset of particles and 
+        convert it into cgs units.
+
+        Paramaters
+        ----------
+        data : HDF5 dataset
+            Dataset to be converted.
+        dataset : str
+            Name of dataset.
+
+        Returns
+        -------
+        converted : HDF5 dataset
+            Dataset in cgs units.
+        """
+
+
+        converted = data
+
+        with h5py.File(self.part_file,'r') as partf:
+
+            # Get conversion factors (same for all types):
+            cgs     = partf['link1/PartType0/{}'.format(dataset)]\
+                    .attrs.get('CGSConversionFactor')
+            aexp    = partf['link1/PartType0/{}'.format(dataset)]\
+                    .attrs.get('aexp-scale-exponent')
+            hexp    = partf['link1/PartType0/{}'.format(dataset)]\
+                    .attrs.get('h-scale-exponent')
+            
+            # Get expansion factor and Hubble parameter from the header:
+            a       = partf['link1/Header'].attrs.get('Time')
+            h       = partf['link1/Header'].attrs.get('HubbleParam')
+        
+            # Convert to physical and return in cgs units.
+            if data.dtype != np.int32 and data.dtype != np.int64:
+                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
+                        dtype='f8')
+
+        return converted
 
