@@ -66,14 +66,23 @@ class Snapshot:
         """ Create a combined particle data file and add links to all 
         the actual data files """
 
+        path = self.get_data_path('part')
+
+        # Get files containing group data:
+        files = \
+                np.array(glob.glob(os.path.join(path,'snap_*.hdf5')))
+
+        # Sort in ascending order:
+        fnum = [int(fname.split(".")[-2]) for fname in files]
+        sorting = np.argsort(fnum)
+        files = files[sorting]
+
         # Create the file object with links to all the files:
         with h5py.File(self.part_file,'a') as partf:
-            path = self.get_data_path('part')
     
             # Iterate through data files (and dismiss irrelevant files in the
             # directory):
-            for i,filename in \
-            enumerate(glob.glob(os.path.join(path,'snap_*.hdf5'))):
+            for i,filename in enumerate(files):
                 # Make an external link:
                 if not 'link{}'.format(i) in partf:
                     partf['link{}'.format(i)] = \
