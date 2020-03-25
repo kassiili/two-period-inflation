@@ -29,6 +29,21 @@ def match_all(snap,snap_ref):
 
     return matches
 
+def initialize_pq(GNs1,GNs2):
+    """ Initializes a priority queue with pairs of indeces of (gn,sgn)
+    pairs, which can be found in both input arrays. """
+
+    pq = []
+    gn_cnt1 = np.bincount(GNs1.astype(int))
+    gn_cnt2 = np.bincount(GNs2.astype(int))
+    for gn in range(1,min(gn_cnt1.size,gn_cnt2.size)):
+        for sgn in range(min(gn_cnt1[gn],gn_cnt2[gn])):
+            idx1 = np.sum(gn_cnt1[:gn]) + sgn
+            idx2 = np.sum(gn_cnt2[:gn]) + sgn
+            heapq.heappush(pq, (0,(idx1,idx2)))
+
+    return pq
+
 def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
     """ Traces a halo as far back in time as possible, starting from
     the given snapshot.

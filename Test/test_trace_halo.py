@@ -107,10 +107,30 @@ def test_neighborhood(snap):
         print(gs.size)
     print(np.argwhere(np.logical_and((gns==gn),(sgns==sgn))))
 
+def test_initialize_pq():
+    snap1 = Snapshot("CDM_V1_LR", 127)
+    snap2 = Snapshot("CDM_V1_LR", 126)
+    GNs1 = snap1.get_subhalos('GroupNumber')
+    SGNs1 = snap1.get_subhalos('SubGroupNumber')
+    GNs2 = snap2.get_subhalos('GroupNumber')
+    SGNs2 = snap2.get_subhalos('SubGroupNumber')
+
+    gn_cnt1 = np.bincount(GNs1.astype(int))
+    gn_cnt2 = np.bincount(GNs2.astype(int))
+    print('cnt1 : ',gn_cnt1)
+    print('cnt2 : ',gn_cnt2)
+    pq = trace_halo.initialize_pq(GNs1,GNs2)
+    for item in pq[:150]:
+        idx_pair = item[1]
+        gn1 = GNs1[idx_pair[0]]; sgn1 = SGNs1[idx_pair[0]]
+        gn2 = GNs2[idx_pair[1]]; sgn2 = SGNs2[idx_pair[1]]
+        print('({},{}) : ({},{})'.format(gn1,sgn1,gn2,sgn2))
+
 LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
-test_trace_halo(LCDM)
+#test_trace_halo(LCDM)
 #test_get_subhalo(LCDM,2,8)
 #test_get_subhalo_IDs(LCDM,2,8)
 #test_match_halo()
 #test_match_snapshots()
 #test_neighborhood(LCDM)
+test_initialize_pq()
