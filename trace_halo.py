@@ -11,23 +11,35 @@ def match_all(snap,snap_ref):
     explore['GNs'] = snap.get_subhalos('GroupNumber')
     explore['SGNs'] = snap.get_subhalos('SubGroupNumber')
     explore['IDs'] = snap.get_subhalos_IDs()
-    explore['mass'] = snap.get_subhalos('Mass')
+    explore['Mass'] = snap.get_subhalos('Mass')
 
     reference = {}
     reference['GNs'] = snap_ref.get_subhalos('GroupNumber')
     reference['SGNs'] = snap_ref.get_subhalos('SubGroupNumber')
     reference['IDs'] = snap_ref.get_subhalos_IDs()
-    reference['mass'] = snap_ref.get_subhalos('Mass')
+    reference['Mass'] = snap_ref.get_subhalos('Mass')
 
-    matches = []
-    matches_ref = []
-
-    # Set maximum distance (by index) between matched halos:
-    term = 30
+    matches_exp = np.ones([(-1,-1)]*explore['GNs'].size)
+    matches_ref = np.ones([(-1,-1)]*reference['GNs'].size)
 
     pq = initialize_pq(explore['GNs'],reference['GNs'])
+    while len(pq) > 0:
+        next_item = heapq.heappop(pq)
+        idx_exp = next_item[1][0]; idx_ref = next_item[1][1]
+        found_match = match_subhalos(explore['IDs'][idx_exp],\
+                explore['Mass'][idx_exp],\
+                reference['IDs'][idx_ref],\
+                reference['Mass'][idx_ref])
 
-    return matches
+        if found_match:
+            matches_exp[idx_exp] = (reference['GNs'][idx_ref],\
+                    reference['SGNs'][idx_ref])
+            matches_ref[idx_ref] = (explore['GNs'][idx_exp],\
+                    explore['SGNs'][idx_exp])
+        else:
+            heapq.heappush(pq, next_matching_pair(idx_ref,matches_exp))
+
+    return matches_ref
 
 def initialize_pq(GNs1,GNs2):
     """ Initializes a priority queue with pairs of indeces of (gn,sgn)
@@ -43,6 +55,34 @@ def initialize_pq(GNs1,GNs2):
             heapq.heappush(pq, (0,(idx1,idx2)))
 
     return pq
+
+def next_matching_pair(idx_ref,matches_exp):
+    """ Find the next index nearest to idx_ref for matching, which has 
+    not yet been matched.
+    
+    Returns
+    -------
+    pq_item : tuple
+        First entry is the distance between idx_ref and the next index,
+        which is used as the priority. Second entry is a tuple containing
+        the index pair.
+    """
+
+    # Set maximum number of iterations:
+    term = 100
+
+    idx_next = -1; d = -1
+    for step in range(1,term):
+
+        idx = iteration(idx_ref, step, np.size(matches_exp,axis=0))
+
+        # If next index has not yet been matched:
+        if matches_exp[idx,0] == -1:
+            idx_next = idx
+            d = abs(idx-idx_ref)
+            break
+    pq_item = (d,(idx_next,idx_ref))
+    return pq_item
 
 def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
     """ Traces a halo as far back in time as possible, starting from
