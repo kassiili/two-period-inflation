@@ -365,10 +365,13 @@ class Snapshot:
                 offset = link['Subhalo/SubOffset'][...]
                 partNums = link['Subhalo/SubLength'][...]
 
-                splitByStart = np.split(particleIDs,offset)[1:]
-                splitByEnd = np.split(particleIDs,offset+partNums)[:-1]
-                linkIDs = [np.intersect1d(bystart,byend) for (bystart,byend)\
-                        in zip(splitByStart,splitByEnd)]
+                linkIDs = [particleIDs[o:o+n] for o,n in \
+                        zip(offset,partNums)]
+
+#                splitByStart = np.split(particleIDs,offset)[1:]
+#                splitByEnd = np.split(particleIDs,offset+partNums)[:-1]
+#                linkIDs = [np.intersect1d(bystart,byend) for (bystart,byend)\
+#                        in zip(splitByStart,splitByEnd)]
     
                 IDs.append(linkIDs)
             

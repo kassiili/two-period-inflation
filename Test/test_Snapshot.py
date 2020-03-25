@@ -233,11 +233,11 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_order_of_links(LCDM)
 #test_get_subhalos_with_fnums(LCDM)
 #test_get_subhalos_IDs_single(LCDM)
-#test_get_subhalos_IDs(LCDM)
+test_get_subhalos_IDs(LCDM)
 #test_get_subhalos_IDs_DMO(LCDM)
 #test_link_select(LCDM)
 #test_get_subhalos_order(LCDM)
-test_peculiar_files()
+#test_peculiar_files()
 
 #sgns = LCDM.get_subhalos('SubGroupNumber',False)[0]
 #print(sgns.size)
