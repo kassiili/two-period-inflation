@@ -126,6 +126,21 @@ def test_initialize_pq():
         gn2 = GNs2[idx_pair[1]]; sgn2 = SGNs2[idx_pair[1]]
         print('({},{}) : ({},{})'.format(gn1,sgn1,gn2,sgn2))
 
+def test_next_matching_pair():
+    return None
+
+def test_iteration():
+    arr = np.arange(100)
+    ir = 94
+    for step in range(6,20):
+        print("start:{}, step:{}, finish:{}".format(ir,step,\
+                trace_halo.iteration(ir,step,arr.size)))
+    print('')
+    ir = 4
+    for step in range(6,20):
+        print("start:{}, step:{}, finish:{}".format(ir,step,\
+                trace_halo.iteration(ir,step,arr.size)))
+
 LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
 #test_trace_halo(LCDM)
 #test_get_subhalo(LCDM,2,8)
@@ -133,4 +148,5 @@ LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
 #test_match_halo()
 #test_match_snapshots()
 #test_neighborhood(LCDM)
-test_initialize_pq()
+#test_initialize_pq()
+test_iteration()

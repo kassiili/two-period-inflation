@@ -57,8 +57,8 @@ def initialize_pq(GNs1,GNs2):
     return pq
 
 def next_matching_pair(idx_ref,matches_exp):
-    """ Find the next index nearest to idx_ref for matching, which has 
-    not yet been matched.
+    """ Find the next index, which is nearest to idx_ref and has not yet
+    been matched, for matching.
     
     Returns
     -------
@@ -83,6 +83,21 @@ def next_matching_pair(idx_ref,matches_exp):
             break
     pq_item = (d,(idx_next,idx_ref))
     return pq_item
+
+def iteration(idx_ref, step, lim):
+
+    # Iterate outwards from idx_ref, alternating between lower and higher
+    # index:
+    idx = idx_ref + int(math.copysign(\
+            math.floor((step+1)/2), (step % 2) - 0.5))
+
+    # Check that index is not out of array bounds:
+    if abs(idx_ref-idx) > idx_ref:
+        idx = step
+    elif abs(idx_ref-idx) > lim-idx_ref:
+        idx = lim-step-1
+
+    return idx
 
 def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
     """ Traces a halo as far back in time as possible, starting from
