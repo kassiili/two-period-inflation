@@ -19,8 +19,10 @@ def match_all(snap,snap_ref):
     reference['IDs'] = snap_ref.get_subhalos_IDs()
     reference['Mass'] = snap_ref.get_subhalos('Mass')
 
-    matches_exp = np.ones([(-1,-1)]*explore['GNs'].size)
-    matches_ref = np.ones([(-1,-1)]*reference['GNs'].size)
+    matches_exp = -1*np.ones(2*explore['GNs'].size)\
+            .reshape((explore['GNs'].size,2))
+    matches_ref = -1*np.ones(2*reference['GNs'].size)\
+            .reshape((reference['GNs'].size,2))
 
     pq = initialize_pq(explore['GNs'],reference['GNs'])
     while len(pq) > 0:
@@ -36,54 +38,66 @@ def match_all(snap,snap_ref):
                     reference['SGNs'][idx_ref])
             matches_ref[idx_ref] = (explore['GNs'][idx_exp],\
                     explore['SGNs'][idx_exp])
+            print(matches_exp[idx_exp],matches_ref[idx_ref])
         else:
             heapq.heappush(pq, next_matching_pair(idx_ref,matches_exp))
 
     return matches_ref
 
-def initialize_pq(GNs1,GNs2):
-    """ Initializes a priority queue with pairs of indeces of (gn,sgn)
-    pairs, which can be found in both input arrays. """
+def identify_groupNumbers(GNs1,GNs2):
+    """ Identifies the indeces between datasets 1 and 2, where (gn,sgn) 
+    pairs align.
+    
+    If a certain pair in 1 does not exist in 2, it is identified with the
+    halo with the same gn, for which sgn is the largest. """
+    GNs1 = GNs1.astype(int)
+    GNs2 = GNs2.astype(int)
+    gn_cnt1 = np.bincount(GNs1)
+    gn_cnt2 = np.bincount(GNs2)
 
-    pq = []
-    gn_cnt1 = np.bincount(GNs1.astype(int))
-    gn_cnt2 = np.bincount(GNs2.astype(int))
-    for gn in range(1,min(gn_cnt1.size,gn_cnt2.size)):
-        for sgn in range(min(gn_cnt1[gn],gn_cnt2[gn])):
+    idxOf1In2 = [None]*GNs1.size
+    for gn in GNs1:
+        for sgn in range(gn_cnt1[gn]):
             idx1 = np.sum(gn_cnt1[:gn]) + sgn
-            idx2 = np.sum(gn_cnt2[:gn]) + sgn
-            heapq.heappush(pq, (0,(idx1,idx2)))
+            # If halo with gn and sgn exists dataset 2, then identify
+            # those halos. If not, set indeces equal and reduce priority:
+            if gn < gn_cnt2.size:
+                if sgn < gn_cnt2[gn]:
+                    idx2 = np.sum(gn_cnt2[:gn]) + sgn
+            else:
+                idx2 = idx1
+            idxOf1In2[idx1] = idx2
 
-    return pq
+    return idxOf1In2
 
-def next_matching_pair(idx_ref,matches):
+def next_matching_pair(idx_ref,step_start,matches):
     """ Find the next index, which is nearest to idx_ref and has not yet
     been matched, for matching.
     
     Returns
     -------
-    pq_item : tuple
-        First entry is the distance between idx_ref and the next index,
-        which is used as the priority. Second entry is a tuple containing
-        the index pair.
+    step : int 
+        The number of steps it takes to iterate from idx_ref to the next
+        index.
     """
 
     # Set maximum number of iterations:
     term = 60
 
     idx_next = -1; d = -1
-    for step in range(1,term):
+    step = step_start
+    while step < term:
 
-        idx = iteration(idx_ref, step, np.size(matches_exp,axis=0))
+        idx = iteration(idx_ref, step, np.size(matches,axis=0))
 
         # If next index has not yet been matched:
-        if matches_exp[idx,0] == -1:
+        if matches[idx,0] == -1:
             idx_next = idx
             d = abs(idx-idx_ref)
             break
+        step += 1
 
-    pq_item = (d,(idx_next,idx_ref))
-    return pq_item
+    return step
 
 def iteration(idx_ref, step, lim):
 

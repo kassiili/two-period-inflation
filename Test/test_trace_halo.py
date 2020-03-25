@@ -107,7 +107,7 @@ def test_neighborhood(snap):
         print(gs.size)
     print(np.argwhere(np.logical_and((gns==gn),(sgns==sgn))))
 
-def test_initialize_pq():
+def test_identify_groupNumbers():
     snap1 = Snapshot("CDM_V1_LR", 127)
     snap2 = Snapshot("CDM_V1_LR", 126)
     GNs1 = snap1.get_subhalos('GroupNumber')
@@ -119,11 +119,11 @@ def test_initialize_pq():
     gn_cnt2 = np.bincount(GNs2.astype(int))
     print('cnt1 : ',gn_cnt1)
     print('cnt2 : ',gn_cnt2)
-    pq = trace_halo.initialize_pq(GNs1,GNs2)
-    for item in pq[:150]:
-        idx_pair = item[1]
-        gn1 = GNs1[idx_pair[0]]; sgn1 = SGNs1[idx_pair[0]]
-        gn2 = GNs2[idx_pair[1]]; sgn2 = SGNs2[idx_pair[1]]
+    ident = trace_halo.identify_groupNumbers(GNs1,GNs2)
+    for idx1, idx2 in enumerate(ident[:150]):
+        print(idx1,idx2)
+        gn1 = GNs1[idx1]; sgn1 = SGNs1[idx1]
+        gn2 = GNs2[idx2]; sgn2 = SGNs2[idx2]
         print('({},{}) : ({},{})'.format(gn1,sgn1,gn2,sgn2))
 
 def test_next_matching_pair():
@@ -133,7 +133,8 @@ def test_next_matching_pair():
     print(idx_ref)
     for i,m in enumerate(matches):
         print(i,m)
-    print(trace_halo.next_matching_pair(idx_ref,matches))
+    print(trace_halo.next_matching_pair(idx_ref,0,matches))
+    print(trace_halo.next_matching_pair(idx_ref,4,matches))
 
 def test_iteration():
     arr = np.arange(100)
@@ -147,6 +148,12 @@ def test_iteration():
         print("start:{}, step:{}, finish:{}".format(ir,step,\
                 trace_halo.iteration(ir,step,arr.size)))
 
+def test_match_all():
+    snap1 = Snapshot("CDM_V1_LR", 127)
+    snap2 = Snapshot("CDM_V1_LR", 126)
+    trace_halo.match_all(snap2,snap1)
+
+
 LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
 #test_trace_halo(LCDM)
 #test_get_subhalo(LCDM,2,8)
@@ -155,6 +162,8 @@ LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
 #test_match_snapshots()
 #test_neighborhood(LCDM)
 #test_initialize_pq()
-test_next_matching_pair()
+test_identify_groupNumbers()
+#test_next_matching_pair()
 #test_iteration()
+#test_match_all()
 
