@@ -127,7 +127,13 @@ def test_initialize_pq():
         print('({},{}) : ({},{})'.format(gn1,sgn1,gn2,sgn2))
 
 def test_next_matching_pair():
-    return None
+    matches = np.array([[0,0],[0,1],[0,2],[0,4],[0,3],[0,7],[-1,-1],\
+            [0,6],[-1,-1],[-1,-1],[0,10],[-1,-1],[-1,-1]])
+    idx_ref = 4
+    print(idx_ref)
+    for i,m in enumerate(matches):
+        print(i,m)
+    print(trace_halo.next_matching_pair(idx_ref,matches))
 
 def test_iteration():
     arr = np.arange(100)
@@ -149,4 +155,6 @@ LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
 #test_match_snapshots()
 #test_neighborhood(LCDM)
 #test_initialize_pq()
-test_iteration()
+test_next_matching_pair()
+#test_iteration()
+

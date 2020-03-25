@@ -56,7 +56,7 @@ def initialize_pq(GNs1,GNs2):
 
     return pq
 
-def next_matching_pair(idx_ref,matches_exp):
+def next_matching_pair(idx_ref,matches):
     """ Find the next index, which is nearest to idx_ref and has not yet
     been matched, for matching.
     
@@ -69,7 +69,7 @@ def next_matching_pair(idx_ref,matches_exp):
     """
 
     # Set maximum number of iterations:
-    term = 100
+    term = 60
 
     idx_next = -1; d = -1
     for step in range(1,term):
@@ -81,6 +81,7 @@ def next_matching_pair(idx_ref,matches_exp):
             idx_next = idx
             d = abs(idx-idx_ref)
             break
+
     pq_item = (d,(idx_next,idx_ref))
     return pq_item
 
