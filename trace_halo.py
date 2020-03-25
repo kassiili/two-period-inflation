@@ -5,44 +5,78 @@ import heapq
 
 from snapshot_obj import Snapshot
 
-def match_all(snap,snap_ref):
+def match_all(snap_ref,snap_exp,gns=[]):
 
-    explore = {}
-    explore['GNs'] = snap.get_subhalos('GroupNumber')
-    explore['SGNs'] = snap.get_subhalos('SubGroupNumber')
-    explore['IDs'] = snap.get_subhalos_IDs()
-    explore['Mass'] = snap.get_subhalos('Mass')
+    reference,explore = get_data_for_matching(snap_ref,snap_exp,gns)
 
-    reference = {}
-    reference['GNs'] = snap_ref.get_subhalos('GroupNumber')
-    reference['SGNs'] = snap_ref.get_subhalos('SubGroupNumber')
-    reference['IDs'] = snap_ref.get_subhalos_IDs()
-    reference['Mass'] = snap_ref.get_subhalos('Mass')
-
+    # Initialize match arrays:
     matches_exp = -1*np.ones(2*explore['GNs'].size)\
             .reshape((explore['GNs'].size,2))
     matches_ref = -1*np.ones(2*reference['GNs'].size)\
             .reshape((reference['GNs'].size,2))
-
-    pq = initialize_pq(explore['GNs'],reference['GNs'])
+    
+    init_idents = identify_groupNumbers(reference['GNs'],explore['GNs'])
+    
+    # Initialize priority queue:
+    pq = []
+    for idx_ref,idx_exp in enumerate(init_idents):
+        heapq.heappush(pq, (0,(idx_ref,idx_exp)))
+    
     while len(pq) > 0:
+        
+        # Get next one for matching:
         next_item = heapq.heappop(pq)
-        idx_exp = next_item[1][0]; idx_ref = next_item[1][1]
+        step = next_item[0]
+        idx_ref = next_item[1][0]; idx_exp0 = next_item[1][1]
+
+        # Get index of the halo to be tried next. step tells how far to
+        # iterate from initial index:
+        idx_exp = iteration(idx_exp0,step,explore['GNs'].size)
+        
+        # Match:
         found_match = match_subhalos(explore['IDs'][idx_exp],\
                 explore['Mass'][idx_exp],\
                 reference['IDs'][idx_ref],\
                 reference['Mass'][idx_ref])
-
+    
         if found_match:
             matches_exp[idx_exp] = (reference['GNs'][idx_ref],\
                     reference['SGNs'][idx_ref])
             matches_ref[idx_ref] = (explore['GNs'][idx_exp],\
                     explore['SGNs'][idx_exp])
-            print(matches_exp[idx_exp],matches_ref[idx_ref])
         else:
-            heapq.heappush(pq, next_matching_pair(idx_ref,matches_exp))
+            new_step = next_matching_pair(idx_exp0,step,matches_exp)
+            # If new_step == step, then all potential matches for idx_ref
+            # have been explored:
+            if new_step != step: 
+                heapq.heappush(pq, (new_step,(idx_ref,idx_exp0)))
 
     return matches_ref
+
+def get_data_for_matching(snap_ref,snap_exp,gns):
+
+    GNs_ref = snap_ref.get_subhalos('GroupNumber')
+    GNs_exp = snap_exp.get_subhalos('GroupNumber')
+
+    mask_ref = [True]*GNs_ref.size
+    mask_exp = [True]*GNs_exp.size
+    if gns:
+        mask_ref = [gn in gns for gn in GNs_ref]
+        mask_exp = [gn in gns for gn in GNs_exp]
+    
+    reference = {}
+    reference['GNs'] = GNs_ref[mask_ref]
+    reference['SGNs'] = snap_ref.get_subhalos('SubGroupNumber')[mask_ref]
+    reference['IDs'] = snap_ref.get_subhalos_IDs()[mask_ref]
+    reference['Mass'] = snap_ref.get_subhalos('Mass')[mask_ref]
+    
+    explore = {}
+    explore['GNs'] = GNs_exp[mask_exp]
+    explore['SGNs'] = snap_exp.get_subhalos('SubGroupNumber')[mask_exp]
+    explore['IDs'] = snap_exp.get_subhalos_IDs()[mask_exp]
+    explore['Mass'] = snap_exp.get_subhalos('Mass')[mask_exp]
+
+    return reference,explore
 
 def identify_groupNumbers(GNs1,GNs2):
     """ Identifies the indeces between datasets 1 and 2, where (gn,sgn) 
@@ -88,8 +122,6 @@ def next_matching_pair(idx_ref,step_start,matches):
     while step < term:
 
         idx = iteration(idx_ref, step+1, np.size(matches,axis=0))
-
-        print(idx_ref,'->',idx)
 
         # If all values of array are consumed:
         if idx == idx_ref:
@@ -291,7 +323,7 @@ def match_subhalos(IDs1,mass1,IDs2,mass2):
         True iff halos match.
     """
 
-    frac_parts = 0.3    # Min fraction of shared particles in a match
+    frac_parts = 0.5    # Min fraction of shared particles in a match
     frac_mass = 3   # Limit for mass difference between matching halos
 
     found_match = False
