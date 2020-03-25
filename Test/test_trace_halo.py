@@ -137,14 +137,14 @@ def test_next_matching_pair():
     print(trace_halo.next_matching_pair(idx_ref,4,matches))
 
 def test_iteration():
-    arr = np.arange(100)
-    ir = 94
-    for step in range(6,20):
+    arr = np.arange(60)
+    ir = 54
+    for step in range(6,70):
         print("start:{}, step:{}, finish:{}".format(ir,step,\
                 trace_halo.iteration(ir,step,arr.size)))
     print('')
     ir = 4
-    for step in range(6,20):
+    for step in range(6,70):
         print("start:{}, step:{}, finish:{}".format(ir,step,\
                 trace_halo.iteration(ir,step,arr.size)))
 
@@ -162,8 +162,8 @@ LCDM = Snapshot("CDM_V1_LR",100,"LCDM")
 #test_match_snapshots()
 #test_neighborhood(LCDM)
 #test_initialize_pq()
-test_identify_groupNumbers()
+#test_identify_groupNumbers()
 #test_next_matching_pair()
-#test_iteration()
+test_iteration()
 #test_match_all()
 

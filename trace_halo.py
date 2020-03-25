@@ -65,7 +65,7 @@ def identify_groupNumbers(GNs1,GNs2):
                 if sgn < gn_cnt2[gn]:
                     idx2 = np.sum(gn_cnt2[:gn]) + sgn
             else:
-                idx2 = idx1
+                idx2 = min(GNs2.size-1,idx1)
             idxOf1In2[idx1] = idx2
 
     return idxOf1In2
@@ -84,17 +84,22 @@ def next_matching_pair(idx_ref,step_start,matches):
     # Set maximum number of iterations:
     term = 60
 
-    idx_next = -1; d = -1
     step = step_start
     while step < term:
 
-        idx = iteration(idx_ref, step, np.size(matches,axis=0))
+        idx = iteration(idx_ref, step+1, np.size(matches,axis=0))
+
+        print(idx_ref,'->',idx)
+
+        # If all values of array are consumed:
+        if idx == idx_ref:
+            break
 
         # If next index has not yet been matched:
         if matches[idx,0] == -1:
-            idx_next = idx
-            d = abs(idx-idx_ref)
+            step += 1
             break
+
         step += 1
 
     return step
@@ -109,8 +114,12 @@ def iteration(idx_ref, step, lim):
     # Check that index is not out of array bounds:
     if abs(idx_ref-idx) > idx_ref:
         idx = step
-    elif abs(idx_ref-idx) > lim-idx_ref:
-        idx = lim-step-1
+    elif abs(idx_ref-idx) > lim-1-idx_ref:
+        idx = lim-step
+
+    # If all values of array are consumed:
+    if idx < 0 or idx >= lim:
+        idx = idx_ref
 
     return idx
 
