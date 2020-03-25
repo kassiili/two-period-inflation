@@ -1,9 +1,33 @@
 import numpy as np
 import h5py
 import math
-from collections import deque
+import heapq
 
 from snapshot_obj import Snapshot
+
+def match_all(snap,snap_ref):
+
+    explore = {}
+    explore['GNs'] = snap.get_subhalos('GroupNumber')
+    explore['SGNs'] = snap.get_subhalos('SubGroupNumber')
+    explore['IDs'] = snap.get_subhalos_IDs()
+    explore['mass'] = snap.get_subhalos('Mass')
+
+    reference = {}
+    reference['GNs'] = snap_ref.get_subhalos('GroupNumber')
+    reference['SGNs'] = snap_ref.get_subhalos('SubGroupNumber')
+    reference['IDs'] = snap_ref.get_subhalos_IDs()
+    reference['mass'] = snap_ref.get_subhalos('Mass')
+
+    matches = []
+    matches_ref = []
+
+    # Set maximum distance (by index) between matched halos:
+    term = 30
+
+    pq = initialize_pq(explore['GNs'],reference['GNs'])
+
+    return matches
 
 def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
     """ Traces a halo as far back in time as possible, starting from
@@ -24,10 +48,11 @@ def trace_halo(snap_init,gn,sgn,direction='forward',stop=101):
 
     Returns
     -------
-    tracer : collections.deque object of tuples of type (float,int,int)
-        Doubly linked list tracing the gn and sgn values of the halo
-        through snapshots. The corresponding redshifts are included as 
-        the first element of the tuples.
+    tracer : dict of tuple
+        Dictionary tracing the gn and sgn values of the halo through 
+        snapshots. The keys are the snapshot IDs. The corresponding 
+        redshifts are included as the first element of the tuples (the
+        following elements being the gn and the sgn).
     """
 
     with h5py.File(snap_init.grp_file,'r') as grpf:
