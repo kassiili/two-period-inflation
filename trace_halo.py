@@ -6,6 +6,25 @@ import heapq
 from snapshot_obj import Snapshot
 
 def match_all(snap_ref,snap_exp,gns=[]):
+    """ Try matching all halos in snap_ref with given group numbers with
+    halos in snap_exp with the same set of group numbers. 
+    
+    Parameters
+    ----------
+    snap_ref : Snapshot object
+        Reference snapshot.
+    snap_exp : Snapshot object
+        Explored snapshot.
+    gns : list of int, optional
+        Group numbers that are to be matched. If empty, match all.
+
+    Returns
+    -------
+    matches_ref : ndarray of int of shape (# of halos,2)
+        Group numbers in the first column and subgroup numbers in the
+        second of matched halos in snap_exp. If no match was found for
+        the halo in index i, then matches_ref[i] = [-1,-1].
+    """
 
     reference,explore = get_data_for_matching(snap_ref,snap_exp,gns)
 
@@ -31,7 +50,7 @@ def match_all(snap_ref,snap_exp,gns=[]):
 
         # Get index of the halo to be tried next. step tells how far to
         # iterate from initial index:
-        idx_exp = iteration(idx_exp0,step,explore['GNs'].size)
+        idx_exp = get_index_at_step(idx_exp0,step,explore['GNs'].size)
         
         # Match:
         found_match = match_subhalos(explore['IDs'][idx_exp],\
@@ -45,7 +64,7 @@ def match_all(snap_ref,snap_exp,gns=[]):
             matches_ref[idx_ref] = (explore['GNs'][idx_exp],\
                     explore['SGNs'][idx_exp])
         else:
-            new_step = next_matching_pair(idx_exp0,step,matches_exp)
+            new_step = iterate_step(idx_exp0,step,matches_exp)
             # If new_step == step, then all potential matches for idx_ref
             # have been explored:
             if new_step != step: 
@@ -54,6 +73,22 @@ def match_all(snap_ref,snap_exp,gns=[]):
     return matches_ref
 
 def get_data_for_matching(snap_ref,snap_exp,gns):
+    """ Retrieve datasets for matching for the given set of groupnumbers.
+    
+    Parameters
+    ----------
+    snap_ref : Snapshot object
+        Reference snapshot.
+    snap_exp : Snapshot object
+        Explored snapshot.
+    gns : list of int
+        Group numbers that are to be matched. If empty, match all.
+
+    Returns
+    -------
+    (reference,explore) : tuple of dict
+        Matching data for both snapshots in dictionaries.
+    """
 
     GNs_ref = snap_ref.get_subhalos('GroupNumber')
     GNs_exp = snap_exp.get_subhalos('GroupNumber')
@@ -79,11 +114,27 @@ def get_data_for_matching(snap_ref,snap_exp,gns):
     return reference,explore
 
 def identify_groupNumbers(GNs1,GNs2):
-    """ Identifies the indeces between datasets 1 and 2, where (gn,sgn) 
-    pairs align.
+    """ Identifies the indeces, where (gn,sgn) pairs align, between 
+    datasets 1 and 2.
+
+    Parameters
+    ----------
+    GNs1 : ndarray of int
+        Group numbers of first dataset.
+    GNs2 : ndarray of int
+        Group numbers of second dataset.
+
+    Returns
+    -------
+    idxOf1In2 : list of int
+        Elements satisfy: GNs1[idx] == GNs2[idxOf1In2[idx]] (unless
+        GNs1[idx] not in GNs2)
     
+    Notes
+    -----
     If a certain pair in 1 does not exist in 2, it is identified with the
     halo with the same gn, for which sgn is the largest. """
+
     GNs1 = GNs1.astype(int)
     GNs2 = GNs2.astype(int)
     gn_cnt1 = np.bincount(GNs1)
@@ -94,7 +145,7 @@ def identify_groupNumbers(GNs1,GNs2):
         for sgn in range(gn_cnt1[gn]):
             idx1 = np.sum(gn_cnt1[:gn]) + sgn
             # If halo with gn and sgn exists dataset 2, then identify
-            # those halos. If not, set indeces equal and reduce priority:
+            # those halos. If not, set indeces equal:
             if gn < gn_cnt2.size:
                 if sgn < gn_cnt2[gn]:
                     idx2 = np.sum(gn_cnt2[:gn]) + sgn
@@ -104,15 +155,28 @@ def identify_groupNumbers(GNs1,GNs2):
 
     return idxOf1In2
 
-def next_matching_pair(idx_ref,step_start,matches):
+def iterate_step(idx_ref,step_start,matches,oneToOne=False):
     """ Find the next index, which is nearest to idx_ref and has not yet
     been matched, for matching.
+
+    Parameters
+    ----------
+    idx_ref : int
+        Starting point of iteration.
+    step_start : int
+        Current step at function call.
+    matches : ndarray 
+        Array of already found matches of subhalos in reference snapshot.
     
     Returns
     -------
     step : int 
-        The number of steps it takes to iterate from idx_ref to the next
-        index.
+        The new step.
+
+    Notes
+    -----
+        step is the number of steps it takes to iterate from idx_ref to 
+        the next index.
     """
 
     # Set maximum number of iterations:
@@ -121,7 +185,7 @@ def next_matching_pair(idx_ref,step_start,matches):
     step = step_start
     while step < term:
 
-        idx = iteration(idx_ref, step+1, np.size(matches,axis=0))
+        idx = get_index_at_step(idx_ref, step+1, np.size(matches,axis=0))
 
         # If all values of array are consumed:
         if idx == idx_ref:
@@ -136,16 +200,34 @@ def next_matching_pair(idx_ref,step_start,matches):
 
     return step
 
-def iteration(idx_ref, step, lim):
+def get_index_at_step(idx_ref, step, lim):
+    """ Get the index of the next subhalo after step iterations from
+    idx_ref. 
+    
+    Parameters
+    ----------
+    idx_ref : int
+        Starting point of iterations.
+    step : int
+        Number of iterations completed.
+    lim : int
+        Upper limit for index value.
+
+    Returns
+    -------
+    idx : int
+        Index of next subhalo after step iterations from idx_ref.
+    """
 
     # Iterate outwards from idx_ref, alternating between lower and higher
     # index:
     idx = idx_ref + int(math.copysign(\
             math.floor((step+1)/2), (step % 2) - 0.5))
 
-    # Check that index is not out of array bounds:
+    # Check that index is not negative:
     if abs(idx_ref-idx) > idx_ref:
         idx = step
+    # Check that index is not out of array bounds:
     elif abs(idx_ref-idx) > lim-1-idx_ref:
         idx = lim-step
 
