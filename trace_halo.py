@@ -192,7 +192,7 @@ def iterate_step(idx_ref,step_start,matches,oneToOne=False):
             break
 
         # If next index has not yet been matched:
-        if matches[idx,0] == -1:
+        if matches[idx,0] == -1 or not oneToOne:
             step += 1
             break
 
