@@ -149,43 +149,26 @@ def test_get_subhalos_IDs_single(dataset):
     for el in IDs:
         print(el.shape)
 
-def test_get_subhalos_IDs(dataset):
-    IDs = dataset.get_subhalos_IDs()
+def test_get_subhalos_IDs(snapshot):
+    IDs = snapshot.get_subhalos_IDs()
     print('s',IDs.shape)
     print(IDs[0].shape)
     print(IDs[-1].shape)
     print(IDs[1].shape)
-    IDs = dataset.get_subhalos_IDs(list(range(65,67)))
+    IDs = snapshot.get_subhalos_IDs(list(range(65,67)))
     print(len(IDs))
     print(IDs[0].shape)
     print(IDs[-1].shape)
     print(IDs[1].shape)
-    #print(IDs)
 
-def test_get_subhalos_IDs_DMO(snap):
-    fnum=0
-    IDs = snap.get_subhalos_IDs_DMO([fnum])
-    subLengthType = snap.get_subhalos('SubLengthType',fnums=[fnum])
-    print(subLengthType[:20].astype(int))
-
-    matching_lengths = [len(ids) == typelen[1] for (ids,typelen) in\
-        zip(IDs,subLengthType)]
-
-    if sum(matching_lengths) == len(IDs):
-        print("lengths match")
-    else:
-        print("lengths no match")
-
-    from_part_file =\
-            snap.get_particles('ParticleIDs',part_type=[1,2,4,5]).astype(int)
-    print(IDs[0])
-    print(from_part_file.size)
+    IDs = snapshot.get_subhalos_IDs(part_type=[0,1])
+    offs = snapshot.get_subhalos('SubOffset')
+    subLT = snapshot.get_subhalos('SubLengthType')
     print(IDs.shape)
-    for ids in IDs:
-        print(len(ids))
-        shared = np.intersect1d(ids,from_part_file)
-        print(len(shared))
-        print(len(ids)==len(shared))
+    for i,x in enumerate(zip(IDs[:50],subLT[:50])):
+        ids = x[0]; slt = x[1]
+        print(i,len(ids))
+        print(slt)
 
 def contained(arr1,arr2):
     arr2 = set(arr2)
@@ -234,7 +217,6 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_get_subhalos_with_fnums(LCDM)
 #test_get_subhalos_IDs_single(LCDM)
 test_get_subhalos_IDs(LCDM)
-#test_get_subhalos_IDs_DMO(LCDM)
 #test_link_select(LCDM)
 #test_get_subhalos_order(LCDM)
 #test_peculiar_files()

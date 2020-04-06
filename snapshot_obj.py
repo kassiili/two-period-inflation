@@ -323,13 +323,16 @@ class Snapshot:
 
         return converted
 
-    def get_subhalos_IDs(self, fnums=[]):
+    def get_subhalos_IDs(self, fnums=[], part_type=[]):
         """ Read IDs of bound particles for each halo.
         
         Paramaters
         ----------
         fnums : list of ints, optional
             Specifies files, which are to be read
+        part_type : list of int, optional
+            Types of particles, whose attribute values are retrieved (the
+            default is set for high-res part types)
 
         Returns
         -------
@@ -365,13 +368,30 @@ class Snapshot:
                 offset = link['Subhalo/SubOffset'][...]
                 partNums = link['Subhalo/SubLength'][...]
 
-                linkIDs = [particleIDs[o:o+n] for o,n in \
-                        zip(offset,partNums)]
+                linkIDs = []
+                # Select particles of given type:
+                if part_type:
+                    partNumsByType = link['Subhalo/SubLengthType'][...]
 
-#                splitByStart = np.split(particleIDs,offset)[1:]
-#                splitByEnd = np.split(particleIDs,offset+partNums)[:-1]
-#                linkIDs = [np.intersect1d(bystart,byend) for (bystart,byend)\
-#                        in zip(splitByStart,splitByEnd)]
+                    # Construct 2D array of offsets by part type for each
+                    # subhalo:
+                    pts = np.size(partNumsByType, axis=1)
+                    cumsum = np.zeros((offset.size,pts+1)).astype(int)
+                    cumsum[:,1:] = np.cumsum(partNumsByType,axis=1)
+                    offsetByType = offset[:,np.newaxis] + cumsum
+
+                    # For each subhalo, construct a list of indeces of the
+                    # wanted particles:
+                    construct_idx = lambda offs : \
+                            [idx for i in part_type \
+                            for idx in range(offs[i],offs[i+1])]
+
+                    linkIDs = [particleIDs[construct_idx(o)] for o in \
+                            offsetByType]
+
+                else:
+                    linkIDs = [particleIDs[o:o+n] for o,n in \
+                            zip(offset,partNums)]
     
                 IDs.append(linkIDs)
             
