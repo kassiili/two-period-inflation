@@ -395,8 +395,29 @@ class Snapshot:
                             [idx for i in part_type \
                             for idx in range(offs[i],offs[i+1])]
 
-                    linkIDs = [particleIDs[construct_idx(o)] for o in \
+#                    for i in range(len(offset)):
+#                        print(offsetByType[i])
+#                        print(offset[i],partNumsByType[i])
+#                        l = construct_idx(offsetByType[i])
+#                        for j in part_type:
+#                            print("{} - {}".format(offsetByType[i,j],\
+#                                    offsetByType[i,j+1]))
+
+                    linkIDs = [list(particleIDs[construct_idx(o)]) for o in \
                             offsetByType]
+
+                else:
+                    linkIDs = [list(particleIDs[o:o+n]) for o,n in \
+                            zip(offset,partNums)]
+    
+                IDs.append(linkIDs)
+            
+            # Sort by link number:
+            IDs = [IDs[i] for i in link_sort_sel]
+            IDs = [ids for link in IDs for ids in link]
+
+        return np.array(IDs)
+
     def get_all_bound_IDs(self):
         """ Reads IDs of all bound particles in one array
 
@@ -409,16 +430,6 @@ class Snapshot:
         link_names_all, link_sort_all = self.link_select('group',[])
 
         with h5py.File(self.grp_file,'r') as grpf:
-
-                else:
-                    linkIDs = [particleIDs[o:o+n] for o,n in \
-                            zip(offset,partNums)]
-    
-                IDs.append(linkIDs)
-            
-            # Sort by link number:
-            IDs = [IDs[i] for i in link_sort_sel]
-            IDs = np.concatenate(IDs)
 
             # Get particle IDs from all files:
             particleIDs = []
@@ -435,6 +446,7 @@ class Snapshot:
 
         return particleIDs
 
+    def get_particles(self, dataset, part_type=[0,1,4,5], fnums=[]):
         """ Reads the dataset from particle catalogues.
         
         Parameters
@@ -463,10 +475,16 @@ class Snapshot:
             # out are primarily ordered by particle type:
             for pt in part_type:
     
-                for f in partf.values():
+                pt_out = []
+                links = [f for (name,f) in partf.items() \
+                        if name in link_names]
+                for f in links:
                     if 'PartType{}/{}'.format(pt,dataset) in f.keys():
                         tmp = f['PartType{}/{}'.format(pt,dataset)][...]
-                        out.append(tmp)
+                        pt_out.append(tmp)
+
+                # Sort by link number and add to main list:
+                out += [pt_out[i] for i in link_sort]
 
         # Combine to a single array.
         if len(out[0].shape) > 1:
