@@ -6,6 +6,7 @@ import numpy as np
 import h5py
 
 import dataset_compute
+import data_file_manipulation
 
 class Snapshot:
     """ Object that represents the data of a single snapshot. 
@@ -49,125 +50,19 @@ class Snapshot:
         else:
             self.name = name
 
-        # Initialize HDF5 files:
+        # Generate combined data files:
         self.grp_file = '.groups_{}_{}.hdf5'.format(simID,snapID)
         self.part_file = '.particles_{}_{}.hdf5'.format(simID,snapID)
-        self.make_group_file()
-        self.make_part_file()
 
-    def make_group_file(self):
-        """ Create a combined group data file and add links to all the
-        actual data files """
+        path = data_file_manipulation.get_data_path('group',simID,snapID)
+        data_file_manipulation.combine_data_files(\
+            np.array(glob.glob(os.path.join(path,'eagle_subfind_tab*'))),\
+            self.grp_file)
 
-        path = self.get_data_path('group')
-
-        # Get files containing group data:
-        files = \
-                np.array(glob.glob(os.path.join(path,'eagle_subfind_tab*')))
-
-        # Sort in ascending order:
-        fnum = [int(fname.split(".")[-2]) for fname in files]
-        sorting = np.argsort(fnum)
-        files = files[sorting]
-
-        # Create the file object with links to all the files:
-        with h5py.File(self.grp_file,'a') as grpf:
-
-            # Iterate through group files:
-            for i,filename in enumerate(files):
-                # Make an external link:
-                if not 'link{}'.format(i) in grpf:
-                    grpf['link{}'.format(i)] = h5py.ExternalLink(filename,'/')
-        
-    def make_part_file(self):
-        """ Create a combined particle data file and add links to all 
-        the actual data files """
-
-        path = self.get_data_path('part')
-
-        # Get files containing group data:
-        files = \
-                np.array(glob.glob(os.path.join(path,'snap_*.hdf5')))
-
-        # Sort in ascending order:
-        fnum = [int(fname.split(".")[-2]) for fname in files]
-        sorting = np.argsort(fnum)
-        files = files[sorting]
-
-        # Create the file object with links to all the files:
-        with h5py.File(self.part_file,'a') as partf:
-    
-            # Iterate through data files (and dismiss irrelevant files in the
-            # directory):
-            for i,filename in enumerate(files):
-                # Make an external link:
-                if not 'link{}'.format(i) in partf:
-                    partf['link{}'.format(i)] = \
-                            h5py.ExternalLink(filename,'/')
-
-    def get_data_path(self, datatype):
-        """ Constructs the path to data directory. 
-        
-        Paramaters
-        ----------
-        datatype : str
-            recognized values are: 'part' and 'group'
-
-        Returns
-        -------
-        path : str
-            path to data directory
-        """
-
-        home = os.path.dirname(os.path.realpath(__file__))
-        path = os.path.join(home,"snapshots",self.simID)
-
-        prefix = ""
-        if datatype == "part":
-            prefix = "snapshot_"
-        else:
-            prefix += "groups_"
-
-        # Find the snapshot directory and add to path:
-        for dirname in os.listdir(path):
-            if prefix + str(self.snapID) in dirname:
-                path = os.path.join(path,dirname) 
-
-        return path
-
-    def file_of_halo(self, gn, sgn):
-        """ Returns the file number of the file, which contains the halo
-        identified by gn and sgn.
-
-        Parameters
-        ----------
-        gn : int
-            Halo group number
-        sgn : int
-            Halo subgroup number
-
-        Returns
-        -------
-        fileNum : int
-            File number
-        """
-
-        fileNum = -1
-
-        with h5py.File(self.grp_file,'r') as grpf:
-
-            links = [item for item in grpf.items() \
-                    if ('link' in item[0])]
-
-            for (name,link) in links:
-                GNs = link['Subhalo/GroupNumber'][...]
-                SGNs = link['Subhalo/SubGroupNumber'][...]
-
-                if np.logical_and((GNs==gn),(SGNs==sgn)).sum() > 0:
-                    fileNum = int(name.replace('link',''))
-                    break
-
-        return fileNum
+        path = data_file_manipulation.get_data_path('part',simID,snapID)
+        data_file_manipulation.combine_data_files(\
+            np.array(glob.glob(os.path.join(path,'snap*'))),\
+            self.part_file)
 
     def get_subhalos(self, dataset, fnums=[]):
         """ Retrieves a dataset for subhaloes in the snapshot.
@@ -276,76 +171,7 @@ class Snapshot:
 
         return out
 
-    def link_select(self, datatype, fnums):
-        """ Selects links from file keys and constructs an index list
-        for sorting. """
-
-        filename = ''
-        if datatype == 'group':
-            filename = self.grp_file
-        else:
-            filename = self.part_file
-
-        with h5py.File(filename,'r') as f:
-
-            # Set to ndarray:
-            keys = np.array(list(f.keys()))
-
-            mask = [False for k in keys]
-            for (idx,key) in enumerate(keys):
-                if 'link' in key:
-                    if len(fnums) == 0:
-                        mask[idx] = True
-                    elif int(key.replace('link','')) in fnums:
-                        mask[idx] = True
-
-        keys = keys[mask]
-        linknums = [int(key.replace('link','')) for key in keys]
-        sorting = np.argsort(linknums)
-
-        return keys[sorting],sorting
-
-    def convert_to_cgs_group(self,data,dataset):
-        """ Read conversion factors for a halo dataset and convert it 
-        into cgs units.
-
-        Paramaters
-        ----------
-        data : HDF5 dataset
-            Dataset to be converted.
-        dataset : str
-            Name of dataset.
-
-        Returns
-        -------
-        converted : HDF5 dataset
-            Dataset in cgs units.
-        """
-
-        converted = data
-
-        with h5py.File(self.grp_file,'r') as grpf:
-
-            # Get conversion factors.
-            cgs     = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
-                    .get('CGSConversionFactor')
-            aexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
-                    .get('aexp-scale-exponent')
-            hexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
-                    .get('h-scale-exponent')
-        
-            # Get expansion factor and Hubble parameter from the 
-            # header.
-            a       = grpf['link1/Header'].attrs.get('Time')
-            h       = grpf['link1/Header'].attrs.get('HubbleParam')
-    
-            # Convert to physical and return in cgs units.
-            if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
-                        dtype='f8')
-
-        return converted
-
+    # BUG: PARTICLE TYPES ARE MISMATCHED!!!
     def get_subhalos_IDs(self, fnums=[], part_type=[]):
         """ Read IDs of bound particles for each halo.
         
@@ -525,6 +351,76 @@ class Snapshot:
 
         return mass
 
+    def link_select(self, data_category, fnums):
+        """ Selects links from file keys and constructs an index list
+        for sorting. """
+
+        filename = ''
+        if data_category == 'group':
+            filename = self.grp_file
+        else:
+            filename = self.part_file
+
+        with h5py.File(filename,'r') as f:
+
+            # Set to ndarray:
+            keys = np.array(list(f.keys()))
+
+            mask = [False for k in keys]
+            for (idx,key) in enumerate(keys):
+                if 'link' in key:
+                    if len(fnums) == 0:
+                        mask[idx] = True
+                    elif int(key.replace('link','')) in fnums:
+                        mask[idx] = True
+
+        keys = keys[mask]
+        linknums = [int(key.replace('link','')) for key in keys]
+        sorting = np.argsort(linknums)
+
+        return keys[sorting],sorting
+
+    def convert_to_cgs_group(self,data,dataset):
+        """ Read conversion factors for a halo dataset and convert it 
+        into cgs units.
+
+        Paramaters
+        ----------
+        data : HDF5 dataset
+            Dataset to be converted.
+        dataset : str
+            Name of dataset.
+
+        Returns
+        -------
+        converted : HDF5 dataset
+            Dataset in cgs units.
+        """
+
+        converted = data
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Get conversion factors.
+            cgs     = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
+                    .get('CGSConversionFactor')
+            aexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
+                    .get('aexp-scale-exponent')
+            hexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
+                    .get('h-scale-exponent')
+        
+            # Get expansion factor and Hubble parameter from the 
+            # header.
+            a       = grpf['link1/Header'].attrs.get('Time')
+            h       = grpf['link1/Header'].attrs.get('HubbleParam')
+    
+            # Convert to physical and return in cgs units.
+            if data.dtype != np.int32 and data.dtype != np.int64:
+                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
+                        dtype='f8')
+
+        return converted
+
     def convert_to_cgs_part(self,data,dataset):
         """ Read conversion factors for a dataset of particles and 
         convert it into cgs units.
@@ -565,4 +461,38 @@ class Snapshot:
                         dtype='f8')
 
         return converted
+
+    def file_of_halo(self, gn, sgn):
+        """ Returns the file number of the file, which contains the halo
+        identified by gn and sgn.
+
+        Parameters
+        ----------
+        gn : int
+            Halo group number
+        sgn : int
+            Halo subgroup number
+
+        Returns
+        -------
+        fileNum : int
+            File number
+        """
+
+        fileNum = -1
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            links = [item for item in grpf.items() \
+                    if ('link' in item[0])]
+
+            for (name,link) in links:
+                GNs = link['Subhalo/GroupNumber'][...]
+                SGNs = link['Subhalo/SubGroupNumber'][...]
+
+                if np.logical_and((GNs==gn),(SGNs==sgn)).sum() > 0:
+                    fileNum = int(name.replace('link',''))
+                    break
+
+        return fileNum
 
