@@ -8,6 +8,23 @@ import h5py
 import dataset_compute
 
 class Snapshot:
+    """ Object that represents the data of a single snapshot. 
+
+    Attributes
+    ----------
+    simID : str
+        Identifier of the simulation data equivalent to the directory name
+        of the directory containing all the data of the simulation.
+    snapID : int
+        The number identifying the snapshot.
+    name : str, optional
+        Label of the data set.
+    grp_file : str
+        Filename of the combined group data file.
+    part_file : hdf5 file
+        Filename of the combined particle data file.
+
+    """
 
     def __init__(self, simID, snapID, name=""):
         """
