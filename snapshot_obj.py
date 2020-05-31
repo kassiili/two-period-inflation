@@ -218,7 +218,7 @@ class Snapshot:
         """
 
         out = []
-        link_names, link_sort = self.link_select(fnums)
+        link_names, link_sort = self.link_select('group',fnums)
     
         with h5py.File(self.grp_file,'r') as grpf:
 
@@ -276,14 +276,20 @@ class Snapshot:
 
         return out
 
-    def link_select(self, fnums):
+    def link_select(self, datatype, fnums):
         """ Selects links from file keys and constructs an index list
         for sorting. """
 
-        with h5py.File(self.grp_file,'r') as grpf:
+        filename = ''
+        if datatype == 'group':
+            filename = self.grp_file
+        else:
+            filename = self.part_file
+
+        with h5py.File(filename,'r') as f:
 
             # Set to ndarray:
-            keys = np.array(list(grpf.keys()))
+            keys = np.array(list(f.keys()))
 
             mask = [False for k in keys]
             for (idx,key) in enumerate(keys):
@@ -359,9 +365,8 @@ class Snapshot:
 
         IDs = []
 
-        link_names_all, link_sort_all = self.link_select([])
-        link_names_sel, link_sort_sel = self.link_select(fnums)
-            
+        IDs = []
+        link_names_sel, link_sort_sel = self.link_select('group',fnums)
         with h5py.File(self.grp_file,'r') as grpf:
 
             # Get particle IDs from all files:
@@ -378,7 +383,6 @@ class Snapshot:
             particleIDs = np.concatenate(particleIDs)
 
             # Get IDs by halo from selected files:
-            IDs = []
             links = [f for (name,f) in grpf.items() \
                     if name in link_names_sel]
             for i,link in enumerate(links):
@@ -437,6 +441,8 @@ class Snapshot:
 
         # Output array.
         out = []
+
+        link_names, link_sort = self.link_select('part',fnums)
 
         # Get particle file:
         with h5py.File(self.part_file,'r') as partf:
