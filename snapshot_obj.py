@@ -363,24 +363,12 @@ class Snapshot:
             Dataset of lists of bound particles
         """
 
-        IDs = []
+        # Get particle IDs from all files:
+        particleIDs = self.get_all_bound_IDs()
 
         IDs = []
         link_names_sel, link_sort_sel = self.link_select('group',fnums)
         with h5py.File(self.grp_file,'r') as grpf:
-
-            # Get particle IDs from all files:
-            particleIDs = []
-            links = [f for (name,f) in grpf.items() \
-                    if name in link_names_all]
-
-            for link in links:
-                particleIDs.append(link['IDs/ParticleID'][...])
-
-            # Sort by link number:
-            particleIDs = [particleIDs[i] for i in link_sort_all]
-
-            particleIDs = np.concatenate(particleIDs)
 
             # Get IDs by halo from selected files:
             links = [f for (name,f) in grpf.items() \
@@ -409,6 +397,18 @@ class Snapshot:
 
                     linkIDs = [particleIDs[construct_idx(o)] for o in \
                             offsetByType]
+    def get_all_bound_IDs(self):
+        """ Reads IDs of all bound particles in one array
+
+        Returns
+        -------
+        particleIDs : ndarray of ints
+        """
+
+        particleIDs = []
+        link_names_all, link_sort_all = self.link_select('group',[])
+
+        with h5py.File(self.grp_file,'r') as grpf:
 
                 else:
                     linkIDs = [particleIDs[o:o+n] for o,n in \
@@ -420,9 +420,21 @@ class Snapshot:
             IDs = [IDs[i] for i in link_sort_sel]
             IDs = np.concatenate(IDs)
 
-        return IDs
+            # Get particle IDs from all files:
+            particleIDs = []
+            links = [f for (name,f) in grpf.items() \
+                    if name in link_names_all]
 
-    def get_particles(self, dataset, part_type=[0,1,4,5]):
+            for link in links:
+                particleIDs.append(link['IDs/ParticleID'][...])
+
+        # Sort by link number:
+        particleIDs = [particleIDs[i] for i in link_sort_all]
+
+        particleIDs = np.concatenate(particleIDs)
+
+        return particleIDs
+
         """ Reads the dataset from particle catalogues.
         
         Parameters
