@@ -1,6 +1,8 @@
 import sys,os 
 import numpy as np
 import h5py
+from collections import Counter
+import matplotlib.pyplot as plt
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from snapshot_obj import Snapshot
@@ -149,26 +151,170 @@ def test_get_subhalos_IDs_single(dataset):
     for el in IDs:
         print(el.shape)
 
-def test_get_subhalos_IDs(snapshot):
-    IDs = snapshot.get_subhalos_IDs()
-    print('s',IDs.shape)
-    print(IDs[0].shape)
-    print(IDs[-1].shape)
-    print(IDs[1].shape)
-    IDs = snapshot.get_subhalos_IDs(list(range(65,67)))
-    print(len(IDs))
-    print(IDs[0].shape)
-    print(IDs[-1].shape)
-    print(IDs[1].shape)
+def test_get_subhalos_IDs_type(snapshot):
 
-    IDs = snapshot.get_subhalos_IDs(part_type=[0,1])
-    offs = snapshot.get_subhalos('SubOffset')
-    subLT = snapshot.get_subhalos('SubLengthType')
-    print(IDs.shape)
-    for i,x in enumerate(zip(IDs[:50],subLT[:50])):
-        ids = x[0]; slt = x[1]
-        print(i,len(ids))
-        print(slt)
+    # Output should be an ndarray of lists of np.uint64:
+    for pt in [[0],[1],[0,1],[4],[5],[0,1,4,5],[]]:
+        print("part_type = {}".format(pt))
+        IDs = snapshot.get_subhalos_IDs(part_type=pt)
+        print(type(IDs))
+        print(IDs.shape)
+        print(type(IDs[0]))
+        for el in (IDs[0] + IDs[140] + IDs[-23]):
+            if type(el) != np.uint64:
+                print('problem')
+        print('')
+
+def test_get_subhalos_IDs_ptSelection(snapshot):
+
+    gas = snapshot.get_subhalos_IDs(part_type=[0])
+    dm = snapshot.get_subhalos_IDs(part_type=[1])
+    combined = snapshot.get_subhalos_IDs(part_type=[0,1])
+
+    print('len(gas[0])=',len(gas[0]))
+    print('len(dm[0])=',len(dm[0]))
+    print('len(combined[0])=',len(combined[0]))
+    intersection = list(set(dm[0]) & set(combined[0]))
+    print('len(intersection)=',len(intersection))
+
+    n = 20
+    sel = np.random.choice(np.arange(dm.size),n)
+    for i in sel:
+        intersection = list(set(dm[i]) & set(combined[i]))
+        if (len(intersection) != len(dm[i])):
+            print('problem: len(dm[{}]) = {}, len(intersection) = {}'\
+                    .format(i,len(dm[i]),len(intersection)))
+
+def test_get_subhalos_IDs_pt(snapshot):
+    mask = (snapshot.get_subhalos('GroupNumber') == 1)
+    pt = [0]
+    SGNs = snapshot.get_subhalos('SubGroupNumber')[mask]
+    IDs = snapshot.get_subhalos_IDs(part_type=pt)[mask]
+    IDs_from_sd = snapshot.get_all_bound_IDs()
+    IDs_from_pd = snapshot.get_particles("ParticleIDs",part_type=pt)
+    IDs_from_pd_all = snapshot.get_particles("ParticleIDs")
+    n = 20
+    sel = np.random.choice(np.arange(IDs.size),n)
+    sel = np.where(SGNs == 0)[0]
+    for i in sel:
+        intersection = np.intersect1d(\
+                np.array(IDs[i]),IDs_from_pd,assume_unique=True)
+        if (len(intersection) != len(IDs[i])):
+            print('problem: len(IDs[{}]) = {}, len(from_pd) = {},'\
+                    .format(i,len(IDs[i]),len(IDs_from_pd)),\
+                    'len(intersection) = {}'.format(len(intersection)))
+            for p in [e for e in range(6) if e not in pt]:
+                compare = snapshot.get_particles("ParticleIDs",\
+                        part_type=[p])
+                intersection = np.intersect1d(\
+                        np.array(IDs[i]),compare,assume_unique=True)
+                print('intersection with pt={}: {},'\
+                            .format(p,len(intersection)))
+
+#            inters,j,idxs = np.intersect1d(np.array(IDs[i]),\
+#                    IDs_from_pd_all,assume_unique=True,\
+#                    return_indices=True)
+#            inters2,j,idxs2 = np.intersect1d(np.array(IDs[i]),\
+#                    IDs_from_sd, assume_unique=True,\
+#                    return_indices=True)
+#
+#            idxs2 = np.sort(idxs2)
+#            print(idxs2[0],idxs2[-1],len(idxs2))
+#            for i in range(len(idxs2)-1):
+#                if idxs2[i+1]-idxs2[i] != 1:
+#                    print(idxs2[i],idxs2[i+1])
+
+
+#            mass_form_pd = snapshot.get_particle_masses(part_type=pt)
+#            mass_form_pd_all = snapshot.get_particle_masses()
+#            print(np.min(mass_form_pd),np.max(mass_form_pd))
+#            print(len(inters))
+#            print(np.min(mass_form_pd_all[idxs]),\
+#                    np.max(mass_form_pd_all[idxs]))
+#            cnts = Counter(mass_form_pd_all[idxs])
+#            for item in cnts.items():
+#                print(item)
+#
+#            # most frequent is almost without exception the pt=1 mass:
+#            most_freq = cnts.most_common(1)[0][0]
+#            odd_ones = np.argwhere([m != most_freq for m in \
+#                    mass_form_pd_all[idxs]])
+#            print('idxs of odd ones:', odd_ones)
+##            print("min and max idx of odds:",\
+##                    np.min(odd_ones),np.max(odd_ones))
+#            print('-----------------\n')
+
+def test_IDs_dist(snapshot):
+    GNs = snapshot.get_subhalos('GroupNumber')
+    mask = (GNs == 1)
+    SGNs = snapshot.get_subhalos('SubGroupNumber')[mask]
+    pt = [0]
+
+    IDs = snapshot.get_subhalos_IDs(part_type=pt)[mask]
+    COPs = snapshot.get_subhalos("CentreOfPotential")[mask]
+
+    # Get box size:
+    with h5py.File(snapshot.part_file,'r') as partf:
+        h = partf['link1/Header'].attrs.get('HubbleParam')
+        boxs = partf['link1/Header'].attrs.get('BoxSize') * 1000/h 
+                                                            # Mpc/h -> kpc
+
+    IDs_from_pd_all = snapshot.get_particles("ParticleIDs")
+    coords_all = snapshot.get_particles("Coordinates")
+    n = 10
+    #sel = np.random.choice(np.arange(IDs.size),n)
+    sel = np.where(SGNs == 0)[0]
+    print(sel)
+    for i in sel:
+        cop = COPs[i]
+        inters,j,idxs = np.intersect1d(np.array(IDs[i]),\
+                IDs_from_pd_all,assume_unique=True,\
+                return_indices=True)
+        coords_sel = coords_all[idxs]
+
+        # Calculate distances to cop:
+        d = np.mod(coords_sel-cop+0.5*boxs, boxs) - 0.5*boxs
+        r = np.linalg.norm(d, axis=1)
+        fig,ax = plt.subplots()
+        ax.hist(np.log(r))
+        plt.show()
+
+
+def test_get_all_bound_IDs(snapshot):
+    IDs = snapshot.get_particles('ParticleIDs')
+    GNs = snapshot.get_particles('GroupNumber')
+    IDs_bound = IDs[GNs < 10**10]
+    test_bound = snapshot.get_all_bound_IDs()
+    print(test_bound.size)
+    print(test_bound[0])
+    intersection = np.intersect1d(test_bound,IDs_bound)
+    if intersection.size == test_bound.size:
+        print('success')
+    else:
+        print('failure')
+
+def test_get_subhalos_IDs(snapshot):
+    IDs = snapshot.get_subhalos_IDs(part_type=[0,4])
+#    print('s',IDs.shape)
+#    print(IDs[0].shape)
+#    print(IDs[-1].shape)
+#    print(IDs[1].shape)
+#    IDs = snapshot.get_subhalos_IDs(list(range(65,67)))
+#    print(len(IDs))
+#    print(IDs[0].shape)
+#    print(IDs[-1].shape)
+#    print(IDs[1].shape)
+
+#    print('----------------')
+#    IDs = snapshot.get_subhalos_IDs(part_type=[0,1])
+#    print('----------------')
+#    offs = snapshot.get_subhalos('SubOffset')
+#    subLT = snapshot.get_subhalos('SubLengthType')
+#    print(IDs.shape)
+#    for i,x in enumerate(zip(IDs[:50],subLT[:50])):
+#        ids = x[0]; slt = x[1]
+#        print(i,len(ids))
+#        print(slt)
 
 def contained(arr1,arr2):
     arr2 = set(arr2)
@@ -181,7 +327,13 @@ def contained(arr1,arr2):
 def test_link_select(snap):
     selections = [[],list(range(45))]
     for fnums in selections:
-        keys,sorting = snap.link_select(fnums)
+        keys,sorting = snap.link_select('group',fnums)
+        print(keys)
+        print(sorting)
+
+    selections = [[],list(range(10))]
+    for fnums in selections:
+        keys,sorting = snap.link_select('particle',fnums)
         print(keys)
         print(sorting)
 
@@ -216,7 +368,11 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_order_of_links(LCDM)
 #test_get_subhalos_with_fnums(LCDM)
 #test_get_subhalos_IDs_single(LCDM)
-test_get_subhalos_IDs(LCDM)
+#test_get_subhalos_IDs(LCDM)
+#test_get_subhalos_IDs_ptSelection(LCDM)
+#test_get_subhalos_IDs_pt(LCDM)
+test_get_all_bound_IDs(LCDM)
+#test_IDs_dist(LCDM)
 #test_link_select(LCDM)
 #test_get_subhalos_order(LCDM)
 #test_peculiar_files()

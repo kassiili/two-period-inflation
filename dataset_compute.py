@@ -123,6 +123,7 @@ def compute_rotation_curve(snapshot, gn, sgn, part_type=[0,1,4,5], jump=10):
     halo_mask = np.logical_and(SGNs == sgn,GNs == gn)
     coords = periodic_wrap(snapshot,cop,coords[halo_mask])
     mass = mass[halo_mask]
+    print(part_type,np.sum(halo_mask))
     
     # Calculate distance to centre and cumulative mass:
     r = np.linalg.norm(coords - cop, axis=1)

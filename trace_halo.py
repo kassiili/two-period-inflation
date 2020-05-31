@@ -5,6 +5,61 @@ import heapq
 
 from snapshot_obj import Snapshot
 
+def trace_all(snapshot,gns=[],stop=101):
+    """ Traces all subhalos of given galaxies as far back in time as 
+    possible, starting from the given snapshot.
+
+    Parameters
+    ----------
+    snapshot : Dataset object
+        Starting point for the tracing.
+    gns : int, optional
+        Group numbers of the traced halos in the initial snapshot.
+    direction : str, optional
+        Direction in which halo is traced.
+    stop : int, optional
+        Earliest snapshot to be explored
+
+    Returns
+    -------
+    tracer : dict of tuple
+        Dictionary tracing the gn and sgn values of the halo through 
+        snapshots. The keys are the snapshot IDs. The corresponding 
+        redshifts are included as the first element of the tuples (the
+        following elements being the gn and the sgn).
+    """
+
+    with h5py.File(snap_init.grp_file,'r') as grpf:
+        z_init = grpf['link0/Header'].attrs.get('Redshift')
+
+    # Initialize tracer:
+    tracer = {snap_init.snapID : (z_init,gn,sgn)}
+    snap = snap_init
+
+    if direction == 'forward':
+        condition = lambda ID : ID < 127
+        add = 1
+    else:
+        condition = lambda ID : ID > stop
+        add = -1
+
+    while condition(snap.snapID):
+        snap_next = Snapshot(snap.simID,snap.snapID+add)
+        gn, sgn = match_snapshots(snap_next, snap, gn, sgn)
+
+        # No matching halo found:
+        if gn == -1: break
+
+        with h5py.File(snap_next.grp_file,'r') as grpf:
+            z_next = grpf['link0/Header'].attrs.get('Redshift')
+
+        # Add match to tracer:
+        tracer[snap_next.snapID] = (z_next,gn,sgn)
+
+        snap = snap_next
+
+    return tracer
+
 def match_all(snap_ref,snap_exp,gns=[]):
     """ Try matching all halos in snap_ref with given group numbers with
     halos in snap_exp with the same set of group numbers. 
@@ -384,7 +439,51 @@ def neighborhood(snap,gn,sgn,min_halos):
 
     return fnums
 
-def match_subhalos(IDs1,mass1,IDs2,mass2):
+def match_subhalos(IDs_ref,mass_ref,IDs_exp,mass_exp,restrict_exp=False):
+    """ Check if two halos in different snapshots correspond to the same
+    halo. 
+
+    Parameters
+    ----------
+    IDs_ref : ndarray of int
+        Particle IDs of the reference halo in ascending order by binding
+        energy (most bound first).
+    IDs_exp : ndarray of int
+        Particle IDs of the explored halo in ascending order by binding
+        energy (most bound first).
+
+    Returns
+    -------
+    found_match : bool
+        True iff halos match.
+
+    Notes
+    -----
+    The reference subhalo can only be matched with one subhalo in the
+    explored dataset. Explicitly, this is because of the following: if at
+    least half of the N_link most bound particles in the reference subhalo
+    are found in a given halo S, then there can be no other subhalo
+    satisfying the same condition (no duplicates of any ID in dataset).
+    """
+
+    N_link = 20 # number of most bound in reference for matching
+    f_exp = 1/5 # number of most bound in explored for matching
+
+    mostBound_ref = IDs_ref[:20]
+    if restrict_exp:
+        mostBound_exp = IDs_exp[:int(IDs_exp.size*f_exp)]
+    else:
+        mostBound_exp = IDs_exp
+
+    shared_parts = np.intersect1d(mostBound_ref, mostBound_exp,\
+            assume_unique=True)
+    found_match = False
+    if len(shared_parts) > N_link/2:
+        found_match = True
+
+    return found_match
+
+def match_subhalos_old(IDs1,mass1,IDs2,mass2):
     """ Check if two halos in different snapshots correspond to the same
     halo. 
 
@@ -409,7 +508,7 @@ def match_subhalos(IDs1,mass1,IDs2,mass2):
     frac_mass = 3   # Limit for mass difference between matching halos
 
     found_match = False
-    shared_parts = np.intersect1d(IDs1,IDs2)
+    shared_parts = np.intersect1d(IDs1,IDs2,assume_unique=True)
     if (len(shared_parts)/len(IDs1) > frac_parts) and \
             (mass1/mass2 < frac_mass) and \
             (mass1/mass2 > 1/frac_mass):
