@@ -157,13 +157,13 @@ def get_data_for_matching(snap_ref,snap_exp,gns):
     reference = {}
     reference['GNs'] = GNs_ref[mask_ref]
     reference['SGNs'] = snap_ref.get_subhalos('SubGroupNumber')[mask_ref]
-    reference['IDs'] = snap_ref.get_subhalos_IDs()[mask_ref]
+    reference['IDs'] = snap_ref.get_subhalos_IDs_single(part_type=1)[mask_ref]
     reference['Mass'] = snap_ref.get_subhalos('Mass')[mask_ref]
     
     explore = {}
     explore['GNs'] = GNs_exp[mask_exp]
     explore['SGNs'] = snap_exp.get_subhalos('SubGroupNumber')[mask_exp]
-    explore['IDs'] = snap_exp.get_subhalos_IDs()[mask_exp]
+    explore['IDs'] = snap_exp.get_subhalos_IDs_single(part_type=1)[mask_exp]
     explore['Mass'] = snap_exp.get_subhalos('Mass')[mask_exp]
 
     return reference,explore

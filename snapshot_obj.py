@@ -171,6 +171,52 @@ class Snapshot:
 
         return out
 
+    def get_subhalos_IDs_single(self, part_type, fnums=[]):
+        """ Read IDs of bound particles for each halo.
+        
+        Paramaters
+        ----------
+        fnums : list of ints, optional
+            Specifies files, which are to be read
+        part_type : list of int, optional
+            Types of particles, whose attribute values are retrieved (the
+            default is set for high-res part types)
+
+        Returns
+        -------
+        IDs : HDF5 dataset 
+            Dataset of lists of bound particles
+        """
+
+        # Get particle IDs from all files:
+        particleIDs = self.get_all_bound_IDs()
+
+        IDs = []
+        link_names_sel, link_sort_sel = self.link_select('group',fnums)
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Get IDs by halo from selected files:
+            links = [f for (name,f) in grpf.items() \
+                    if name in link_names_sel]
+            for i,link in enumerate(links):
+                linkIDs = []
+
+                offset = link['Subhalo/SubOffset'][...]
+                nByType = link['Subhalo/SubLengthType'][...]
+                nBefore = np.sum(nByType[:,:part_type],axis=1)
+                nums = nByType[:,part_type]
+
+                linkIDs = [list(particleIDs[o+b:o+b+n]) for o,b,n in \
+                        zip(offset,nBefore,nums)]
+    
+                IDs.append(linkIDs)
+            
+            # Sort by link number:
+            IDs = [IDs[i] for i in link_sort_sel]
+            IDs = [ids for link in IDs for ids in link]
+
+        return np.array(IDs)
+
     # BUG: PARTICLE TYPES ARE MISMATCHED!!!
     def get_subhalos_IDs(self, fnums=[], part_type=[]):
         """ Read IDs of bound particles for each halo.
