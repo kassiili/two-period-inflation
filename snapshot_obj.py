@@ -64,7 +64,7 @@ class Snapshot:
             np.array(glob.glob(os.path.join(path,'snap*'))),\
             self.part_file)
 
-    def get_subhalos(self, dataset, fnums=[]):
+    def get_subhalos(self, dataset, fnums=[], units='cgs'):
         """ Retrieves a dataset for subhaloes in the snapshot.
         
         Parameters
@@ -92,11 +92,11 @@ class Snapshot:
             out = self.get_subhalo_extended(dataset)
 
         else:
-            out = self.get_subhalo_catalogue(dataset,fnums)
+            out = self.get_subhalo_catalogue(dataset,fnums,units)
             
         return out
 
-    def get_subhalo_catalogue(self,dataset,fnums):
+    def get_subhalo_catalogue(self,dataset,fnums,units):
         """ Retrieves a dataset from the subhalo catalogues.
 
         Paramaters
@@ -132,7 +132,8 @@ class Snapshot:
         else:
             out = np.concatenate(out)
 
-        out = self.convert_to_cgs_group(out,dataset)
+        if units=='cgs':
+            out = self.convert_to_cgs_group(out,dataset)
 
         return out
 
@@ -171,16 +172,16 @@ class Snapshot:
 
         return out
 
-    def get_subhalos_IDs_single(self, part_type, fnums=[]):
-        """ Read IDs of bound particles for each halo.
+    def get_subhalos_IDs(self, part_type, fnums=[]):
+        """ Read IDs of bound particles of given type for each halo.
         
         Paramaters
         ----------
-        fnums : list of ints, optional
-            Specifies files, which are to be read
-        part_type : list of int, optional
+        part_type : list of int
             Types of particles, whose attribute values are retrieved (the
             default is set for high-res part types)
+        fnums : list of ints, optional
+            Specifies files, which are to be read
 
         Returns
         -------
@@ -188,8 +189,11 @@ class Snapshot:
             Dataset of lists of bound particles
         """
 
-        # Get particle IDs from all files:
-        particleIDs = self.get_all_bound_IDs()
+        IDs_bound = self.get_bound_particles("ParticleID")
+
+        # Construct mask for selecting bound particles of type pt:
+        IDs_pt = self.get_particles("ParticleIDs", part_type=[part_type])
+        mask_pt = np.in1d(IDs_bound,IDs_pt) 
 
         IDs = []
         link_names_sel, link_sort_sel = self.link_select('group',fnums)
@@ -202,12 +206,13 @@ class Snapshot:
                 linkIDs = []
 
                 offset = link['Subhalo/SubOffset'][...]
-                nByType = link['Subhalo/SubLengthType'][...]
-                nBefore = np.sum(nByType[:,:part_type],axis=1)
-                nums = nByType[:,part_type]
+                pnum = link['Subhalo/SubLength'][...]
+                ptnum = link['Subhalo/SubLengthType'][...]
 
-                linkIDs = [list(particleIDs[o+b:o+b+n]) for o,b,n in \
-                        zip(offset,nBefore,nums)]
+                select_halo = lambda o,n : \
+                        IDs_bound[o:o+n][mask_pt[o:o+n]]
+                linkIDs = [list(select_halo(o,n)) for o,n in \
+                        zip(offset,pnum)]
     
                 IDs.append(linkIDs)
             
@@ -217,106 +222,40 @@ class Snapshot:
 
         return np.array(IDs)
 
-    # BUG: PARTICLE TYPES ARE MISMATCHED!!!
-    def get_subhalos_IDs(self, fnums=[], part_type=[]):
-        """ Read IDs of bound particles for each halo.
-        
-        Paramaters
+    def get_bound_particles(self, dataset):
+        """ Reads data entries for bound particles in the group catalogues 
+
+        Parameters
         ----------
-        fnums : list of ints, optional
-            Specifies files, which are to be read
-        part_type : list of int, optional
-            Types of particles, whose attribute values are retrieved (the
-            default is set for high-res part types)
+        dataset : str
+            Dataset to be retrieved.
 
         Returns
         -------
-        IDs : HDF5 dataset 
-            Dataset of lists of bound particles
+        out : HDF5 dataset
+            Requested dataset in cgs units.
         """
 
-        # Get particle IDs from all files:
-        particleIDs = self.get_all_bound_IDs()
-
-        IDs = []
-        link_names_sel, link_sort_sel = self.link_select('group',fnums)
-        with h5py.File(self.grp_file,'r') as grpf:
-
-            # Get IDs by halo from selected files:
-            links = [f for (name,f) in grpf.items() \
-                    if name in link_names_sel]
-            for i,link in enumerate(links):
-                offset = link['Subhalo/SubOffset'][...]
-                partNums = link['Subhalo/SubLength'][...]
-
-                linkIDs = []
-                # Select particles of given type:
-                if part_type:
-                    partNumsByType = link['Subhalo/SubLengthType'][...]
-
-                    # Construct 2D array of offsets by part type for each
-                    # subhalo:
-                    pts = np.size(partNumsByType, axis=1)
-                    cumsum = np.zeros((offset.size,pts+1)).astype(int)
-                    cumsum[:,1:] = np.cumsum(partNumsByType,axis=1)
-                    offsetByType = offset[:,np.newaxis] + cumsum
-
-                    # For each subhalo, construct a list of indeces of the
-                    # wanted particles:
-                    construct_idx = lambda offs : \
-                            [idx for i in part_type \
-                            for idx in range(offs[i],offs[i+1])]
-
-#                    for i in range(len(offset)):
-#                        print(offsetByType[i])
-#                        print(offset[i],partNumsByType[i])
-#                        l = construct_idx(offsetByType[i])
-#                        for j in part_type:
-#                            print("{} - {}".format(offsetByType[i,j],\
-#                                    offsetByType[i,j+1]))
-
-                    linkIDs = [list(particleIDs[construct_idx(o)]) for o in \
-                            offsetByType]
-
-                else:
-                    linkIDs = [list(particleIDs[o:o+n]) for o,n in \
-                            zip(offset,partNums)]
-    
-                IDs.append(linkIDs)
-            
-            # Sort by link number:
-            IDs = [IDs[i] for i in link_sort_sel]
-            IDs = [ids for link in IDs for ids in link]
-
-        return np.array(IDs)
-
-    def get_all_bound_IDs(self):
-        """ Reads IDs of all bound particles in one array
-
-        Returns
-        -------
-        particleIDs : ndarray of ints
-        """
-
-        particleIDs = []
+        out = []
         link_names_all, link_sort_all = self.link_select('group',[])
 
         with h5py.File(self.grp_file,'r') as grpf:
 
             # Get particle IDs from all files:
-            particleIDs = []
+            out = []
             links = [f for (name,f) in grpf.items() \
                     if name in link_names_all]
 
             for link in links:
-                particleIDs.append(link['IDs/ParticleID'][...])
+                out.append(link['IDs/{}'.format(dataset)][...])
 
         # Sort by link number:
-        particleIDs = [particleIDs[i] for i in link_sort_all]
+        out = [out[i] for i in link_sort_all]
+        out = np.concatenate(out)
 
-        particleIDs = np.concatenate(particleIDs)
+        out = self.convert_to_cgs_bound(out,dataset)
 
-        return particleIDs
+        return out
 
     def get_particles(self, dataset, part_type=[0,1,4,5], fnums=[]):
         """ Reads the dataset from particle catalogues.
@@ -500,6 +439,47 @@ class Snapshot:
             # Get expansion factor and Hubble parameter from the header:
             a       = partf['link1/Header'].attrs.get('Time')
             h       = partf['link1/Header'].attrs.get('HubbleParam')
+        
+            # Convert to physical and return in cgs units.
+            if data.dtype != np.int32 and data.dtype != np.int64:
+                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
+                        dtype='f8')
+
+        return converted
+
+    def convert_to_cgs_bound(self,data,dataset):
+        """ Read conversion factors for a dataset of bound particles and 
+        convert it into cgs units.
+
+        Paramaters
+        ----------
+        data : HDF5 dataset
+            Dataset to be converted.
+        dataset : str
+            Name of dataset.
+
+        Returns
+        -------
+        converted : HDF5 dataset
+            Dataset in cgs units.
+        """
+
+
+        converted = data
+
+        with h5py.File(self.grp_file,'r') as grpf:
+
+            # Get conversion factors (same for all types):
+            cgs     = grpf['link1/IDs/{}'.format(dataset)]\
+                    .attrs.get('CGSConversionFactor')
+            aexp    = grpf['link1/IDs/{}'.format(dataset)]\
+                    .attrs.get('aexp-scale-exponent')
+            hexp    = grpf['link1/IDs/{}'.format(dataset)]\
+                    .attrs.get('h-scale-exponent')
+            
+            # Get expansion factor and Hubble parameter from the header:
+            a       = grpf['link1/Header'].attrs.get('Time')
+            h       = grpf['link1/Header'].attrs.get('HubbleParam')
         
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
