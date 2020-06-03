@@ -2,6 +2,7 @@ OldVersions/
 __pycache__
 Figures/
 snapshots/
+snapshots
 *.hdf5
 Dump/
 .ipynb_checkpoints/

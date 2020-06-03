@@ -8,6 +8,7 @@ import h5py
 import dataset_compute
 import data_file_manipulation
 
+
 class Snapshot:
     """ Object that represents the data of a single snapshot. 
 
@@ -51,17 +52,17 @@ class Snapshot:
             self.name = name
 
         # Generate combined data files:
-        self.grp_file = '.groups_{}_{}.hdf5'.format(simID,snapID)
-        self.part_file = '.particles_{}_{}.hdf5'.format(simID,snapID)
+        self.grp_file = '.groups_{}_{}.hdf5'.format(simID, snapID)
+        self.part_file = '.particles_{}_{}.hdf5'.format(simID, snapID)
 
-        path = data_file_manipulation.get_data_path('group',simID,snapID)
-        data_file_manipulation.combine_data_files(\
-            np.array(glob.glob(os.path.join(path,'eagle_subfind_tab*'))),\
+        path = data_file_manipulation.get_data_path('group', simID, snapID)
+        data_file_manipulation.combine_data_files( \
+            np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))), \
             self.grp_file)
 
-        path = data_file_manipulation.get_data_path('part',simID,snapID)
-        data_file_manipulation.combine_data_files(\
-            np.array(glob.glob(os.path.join(path,'snap*'))),\
+        path = data_file_manipulation.get_data_path('part', simID, snapID)
+        data_file_manipulation.combine_data_files( \
+            np.array(glob.glob(os.path.join(path, 'snap*'))), \
             self.part_file)
 
     def get_subhalos(self, dataset, fnums=[], units='cgs'):
@@ -84,7 +85,7 @@ class Snapshot:
         out = np.empty((0))
 
         is_extension = False
-        with h5py.File(self.grp_file,'r') as grpf:
+        with h5py.File(self.grp_file, 'r') as grpf:
             if dataset not in grpf['link1/Subhalo']:
                 is_extension = True
 
@@ -92,11 +93,11 @@ class Snapshot:
             out = self.get_subhalo_extended(dataset)
 
         else:
-            out = self.get_subhalo_catalogue(dataset,fnums,units)
-            
+            out = self.get_subhalo_catalogue(dataset, fnums, units)
+
         return out
 
-    def get_subhalo_catalogue(self,dataset,fnums,units):
+    def get_subhalo_catalogue(self, dataset, fnums, units):
         """ Retrieves a dataset from the subhalo catalogues.
 
         Paramaters
@@ -113,31 +114,31 @@ class Snapshot:
         """
 
         out = []
-        link_names, link_sort = self.link_select('group',fnums)
-    
-        with h5py.File(self.grp_file,'r') as grpf:
+        link_names, link_sort = self.link_select('group', fnums)
 
-            links = [f for (name,f) in grpf.items() \
-                    if name in link_names]
+        with h5py.File(self.grp_file, 'r') as grpf:
+
+            links = [f for (name, f) in grpf.items() \
+                     if name in link_names]
             for f in links:
                 tmp = f['Subhalo/{}'.format(dataset)][...]
                 out.append(tmp)
 
         # Sort by link number:
         out = [out[i] for i in link_sort]
-        
+
         # Combine to a single array.
         if len(out[0].shape) > 1:
             out = np.vstack(out)
         else:
             out = np.concatenate(out)
 
-        if units=='cgs':
-            out = self.convert_to_cgs_group(out,dataset)
+        if units == 'cgs':
+            out = self.convert_to_cgs_group(out, dataset)
 
         return out
 
-    def get_subhalo_extended(self,dataset):
+    def get_subhalo_extended(self, dataset):
         """ Retrieves dataset from file if it is already calculated. 
         If not, calculates it and then returns it.
 
@@ -156,19 +157,18 @@ class Snapshot:
 
         # Check if the dataset is already stored in grpf:
         in_grpf = False
-        with h5py.File(self.grp_file,'r') as grpf:
+        with h5py.File(self.grp_file, 'r') as grpf:
             if 'extended/{}'.format(dataset) in grpf:
                 out = grpf['extended/{}'.format(dataset)][...]
                 in_grpf = True
 
         if not in_grpf:
-
-            out = dataset_compute.generate_dataset(self,dataset)
+            out = dataset_compute.generate_dataset(self, dataset)
 
             # Create dataset in grpf:
-            with h5py.File(self.grp_file,'r+') as grpf:
-                grpf.create_dataset('/extended/{}'.format(dataset),\
-                        data=out)
+            with h5py.File(self.grp_file, 'r+') as grpf:
+                grpf.create_dataset('/extended/{}'.format(dataset), \
+                                    data=out)
 
         return out
 
@@ -186,36 +186,34 @@ class Snapshot:
         Returns
         -------
         IDs : HDF5 dataset 
-            Dataset of lists of bound particles
+            Dataset of ndarrays of bound particles
         """
 
         IDs_bound = self.get_bound_particles("ParticleID")
 
         # Construct mask for selecting bound particles of type pt:
         IDs_pt = self.get_particles("ParticleIDs", part_type=[part_type])
-        mask_pt = np.in1d(IDs_bound,IDs_pt) 
+        mask_pt = np.in1d(IDs_bound, IDs_pt)
 
         IDs = []
-        link_names_sel, link_sort_sel = self.link_select('group',fnums)
-        with h5py.File(self.grp_file,'r') as grpf:
-
+        link_names_sel, link_sort_sel = self.link_select('group', fnums)
+        with h5py.File(self.grp_file, 'r') as grpf:
             # Get IDs by halo from selected files:
-            links = [f for (name,f) in grpf.items() \
-                    if name in link_names_sel]
-            for i,link in enumerate(links):
+            links = [f for (name, f) in grpf.items() \
+                     if name in link_names_sel]
+            for i, link in enumerate(links):
                 linkIDs = []
 
                 offset = link['Subhalo/SubOffset'][...]
                 pnum = link['Subhalo/SubLength'][...]
-                ptnum = link['Subhalo/SubLengthType'][...]
 
-                select_halo = lambda o,n : \
-                        IDs_bound[o:o+n][mask_pt[o:o+n]]
-                linkIDs = [list(select_halo(o,n)) for o,n in \
-                        zip(offset,pnum)]
-    
+                select_halo = lambda o, n: \
+                    IDs_bound[o:o + n][mask_pt[o:o + n]]
+                linkIDs = [select_halo(o, n) for o, n in \
+                           zip(offset, pnum)]
+
                 IDs.append(linkIDs)
-            
+
             # Sort by link number:
             IDs = [IDs[i] for i in link_sort_sel]
             IDs = [ids for link in IDs for ids in link]
@@ -237,14 +235,13 @@ class Snapshot:
         """
 
         out = []
-        link_names_all, link_sort_all = self.link_select('group',[])
+        link_names_all, link_sort_all = self.link_select('group', [])
 
-        with h5py.File(self.grp_file,'r') as grpf:
-
+        with h5py.File(self.grp_file, 'r') as grpf:
             # Get particle IDs from all files:
             out = []
-            links = [f for (name,f) in grpf.items() \
-                    if name in link_names_all]
+            links = [f for (name, f) in grpf.items() \
+                     if name in link_names_all]
 
             for link in links:
                 out.append(link['IDs/{}'.format(dataset)][...])
@@ -253,11 +250,11 @@ class Snapshot:
         out = [out[i] for i in link_sort_all]
         out = np.concatenate(out)
 
-        out = self.convert_to_cgs_bound(out,dataset)
+        out = self.convert_to_cgs_bound(out, dataset)
 
         return out
 
-    def get_particles(self, dataset, part_type=[0,1,4,5], fnums=[]):
+    def get_particles(self, dataset, part_type=[0, 1, 4, 5], fnums=[]):
         """ Reads the dataset from particle catalogues.
         
         Parameters
@@ -277,21 +274,21 @@ class Snapshot:
         # Output array.
         out = []
 
-        link_names, link_sort = self.link_select('part',fnums)
+        link_names, link_sort = self.link_select('part', fnums)
 
         # Get particle file:
-        with h5py.File(self.part_file,'r') as partf:
+        with h5py.File(self.part_file, 'r') as partf:
 
             # For each particle type, loop over files, s.t. elements in
             # out are primarily ordered by particle type:
             for pt in part_type:
-    
+
                 pt_out = []
-                links = [f for (name,f) in partf.items() \
-                        if name in link_names]
+                links = [f for (name, f) in partf.items() \
+                         if name in link_names]
                 for f in links:
-                    if 'PartType{}/{}'.format(pt,dataset) in f.keys():
-                        tmp = f['PartType{}/{}'.format(pt,dataset)][...]
+                    if 'PartType{}/{}'.format(pt, dataset) in f.keys():
+                        tmp = f['PartType{}/{}'.format(pt, dataset)][...]
                         pt_out.append(tmp)
 
                 # Sort by link number and add to main list:
@@ -302,12 +299,12 @@ class Snapshot:
             out = np.vstack(out)
         else:
             out = np.concatenate(out)
-            
-        out = self.convert_to_cgs_part(out,dataset)
-            
+
+        out = self.convert_to_cgs_part(out, dataset)
+
         return out
 
-    def get_particle_masses(self,part_type=[0,1,4,5]):
+    def get_particle_masses(self, part_type=[0, 1, 4, 5]):
         """ Reads particle masses in grams.
         
         Returns
@@ -319,18 +316,18 @@ class Snapshot:
         mass = []
 
         for pt in part_type:
-            if pt in [1,2,3]:
+            if pt in [1, 2, 3]:
                 # Get dm particle masses:
-                with h5py.File(self.part_file,'r') as partf:
-                    dm_mass = partf['link1/Header']\
-                            .attrs.get('MassTable')[pt]
-                    dm_mass = self.convert_to_cgs_part(\
-                            np.array([dm_mass]),'Masses')[0]
-                    dm_n = partf['link1/Header']\
-                            .attrs.get('NumPart_Total')[pt]
-                    mass.append(np.ones(dm_n, dtype='f8')*dm_mass)
+                with h5py.File(self.part_file, 'r') as partf:
+                    dm_mass = partf['link1/Header'] \
+                        .attrs.get('MassTable')[pt]
+                    dm_mass = self.convert_to_cgs_part( \
+                        np.array([dm_mass]), 'Masses')[0]
+                    dm_n = partf['link1/Header'] \
+                        .attrs.get('NumPart_Total')[pt]
+                    mass.append(np.ones(dm_n, dtype='f8') * dm_mass)
             else:
-                mass.append(self.get_particles('Masses',part_type=[pt]))
+                mass.append(self.get_particles('Masses', part_type=[pt]))
 
         mass = np.concatenate(mass)
 
@@ -346,26 +343,26 @@ class Snapshot:
         else:
             filename = self.part_file
 
-        with h5py.File(filename,'r') as f:
+        with h5py.File(filename, 'r') as f:
 
             # Set to ndarray:
             keys = np.array(list(f.keys()))
 
             mask = [False for k in keys]
-            for (idx,key) in enumerate(keys):
+            for (idx, key) in enumerate(keys):
                 if 'link' in key:
                     if len(fnums) == 0:
                         mask[idx] = True
-                    elif int(key.replace('link','')) in fnums:
+                    elif int(key.replace('link', '')) in fnums:
                         mask[idx] = True
 
         keys = keys[mask]
-        linknums = [int(key.replace('link','')) for key in keys]
+        linknums = [int(key.replace('link', '')) for key in keys]
         sorting = np.argsort(linknums)
 
-        return keys[sorting],sorting
+        return keys[sorting], sorting
 
-    def convert_to_cgs_group(self,data,dataset):
+    def convert_to_cgs_group(self, data, dataset):
         """ Read conversion factors for a halo dataset and convert it 
         into cgs units.
 
@@ -384,29 +381,28 @@ class Snapshot:
 
         converted = data
 
-        with h5py.File(self.grp_file,'r') as grpf:
-
+        with h5py.File(self.grp_file, 'r') as grpf:
             # Get conversion factors.
-            cgs     = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
-                    .get('CGSConversionFactor')
-            aexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
-                    .get('aexp-scale-exponent')
-            hexp    = grpf['link1/Subhalo/{}'.format(dataset)].attrs\
-                    .get('h-scale-exponent')
-        
+            cgs = grpf['link1/Subhalo/{}'.format(dataset)].attrs \
+                .get('CGSConversionFactor')
+            aexp = grpf['link1/Subhalo/{}'.format(dataset)].attrs \
+                .get('aexp-scale-exponent')
+            hexp = grpf['link1/Subhalo/{}'.format(dataset)].attrs \
+                .get('h-scale-exponent')
+
             # Get expansion factor and Hubble parameter from the 
             # header.
-            a       = grpf['link1/Header'].attrs.get('Time')
-            h       = grpf['link1/Header'].attrs.get('HubbleParam')
-    
+            a = grpf['link1/Header'].attrs.get('Time')
+            h = grpf['link1/Header'].attrs.get('HubbleParam')
+
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
-                        dtype='f8')
+                converted = np.multiply(data, cgs * a ** aexp * h ** hexp, \
+                                        dtype='f8')
 
         return converted
 
-    def convert_to_cgs_part(self,data,dataset):
+    def convert_to_cgs_part(self, data, dataset):
         """ Read conversion factors for a dataset of particles and 
         convert it into cgs units.
 
@@ -423,31 +419,29 @@ class Snapshot:
             Dataset in cgs units.
         """
 
-
         converted = data
 
-        with h5py.File(self.part_file,'r') as partf:
-
+        with h5py.File(self.part_file, 'r') as partf:
             # Get conversion factors (same for all types):
-            cgs     = partf['link1/PartType0/{}'.format(dataset)]\
-                    .attrs.get('CGSConversionFactor')
-            aexp    = partf['link1/PartType0/{}'.format(dataset)]\
-                    .attrs.get('aexp-scale-exponent')
-            hexp    = partf['link1/PartType0/{}'.format(dataset)]\
-                    .attrs.get('h-scale-exponent')
-            
+            cgs = partf['link1/PartType0/{}'.format(dataset)] \
+                .attrs.get('CGSConversionFactor')
+            aexp = partf['link1/PartType0/{}'.format(dataset)] \
+                .attrs.get('aexp-scale-exponent')
+            hexp = partf['link1/PartType0/{}'.format(dataset)] \
+                .attrs.get('h-scale-exponent')
+
             # Get expansion factor and Hubble parameter from the header:
-            a       = partf['link1/Header'].attrs.get('Time')
-            h       = partf['link1/Header'].attrs.get('HubbleParam')
-        
+            a = partf['link1/Header'].attrs.get('Time')
+            h = partf['link1/Header'].attrs.get('HubbleParam')
+
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
-                        dtype='f8')
+                converted = np.multiply(data, cgs * a ** aexp * h ** hexp, \
+                                        dtype='f8')
 
         return converted
 
-    def convert_to_cgs_bound(self,data,dataset):
+    def convert_to_cgs_bound(self, data, dataset):
         """ Read conversion factors for a dataset of bound particles and 
         convert it into cgs units.
 
@@ -464,27 +458,25 @@ class Snapshot:
             Dataset in cgs units.
         """
 
-
         converted = data
 
-        with h5py.File(self.grp_file,'r') as grpf:
-
+        with h5py.File(self.grp_file, 'r') as grpf:
             # Get conversion factors (same for all types):
-            cgs     = grpf['link1/IDs/{}'.format(dataset)]\
-                    .attrs.get('CGSConversionFactor')
-            aexp    = grpf['link1/IDs/{}'.format(dataset)]\
-                    .attrs.get('aexp-scale-exponent')
-            hexp    = grpf['link1/IDs/{}'.format(dataset)]\
-                    .attrs.get('h-scale-exponent')
-            
+            cgs = grpf['link1/IDs/{}'.format(dataset)] \
+                .attrs.get('CGSConversionFactor')
+            aexp = grpf['link1/IDs/{}'.format(dataset)] \
+                .attrs.get('aexp-scale-exponent')
+            hexp = grpf['link1/IDs/{}'.format(dataset)] \
+                .attrs.get('h-scale-exponent')
+
             # Get expansion factor and Hubble parameter from the header:
-            a       = grpf['link1/Header'].attrs.get('Time')
-            h       = grpf['link1/Header'].attrs.get('HubbleParam')
-        
+            a = grpf['link1/Header'].attrs.get('Time')
+            h = grpf['link1/Header'].attrs.get('HubbleParam')
+
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a**aexp * h**hexp,\
-                        dtype='f8')
+                converted = np.multiply(data, cgs * a ** aexp * h ** hexp, \
+                                        dtype='f8')
 
         return converted
 
@@ -507,18 +499,17 @@ class Snapshot:
 
         fileNum = -1
 
-        with h5py.File(self.grp_file,'r') as grpf:
+        with h5py.File(self.grp_file, 'r') as grpf:
 
             links = [item for item in grpf.items() \
-                    if ('link' in item[0])]
+                     if ('link' in item[0])]
 
-            for (name,link) in links:
+            for (name, link) in links:
                 GNs = link['Subhalo/GroupNumber'][...]
                 SGNs = link['Subhalo/SubGroupNumber'][...]
 
-                if np.logical_and((GNs==gn),(SGNs==sgn)).sum() > 0:
-                    fileNum = int(name.replace('link',''))
+                if np.logical_and((GNs == gn), (SGNs == sgn)).sum() > 0:
+                    fileNum = int(name.replace('link', ''))
                     break
 
         return fileNum
-
