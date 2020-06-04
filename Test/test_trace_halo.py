@@ -62,11 +62,11 @@ def test_match_halo():
     IDs6,_ = trace_halo.get_subhalo_IDs(snap6,gn6,sgn6)
     mass6 = trace_halo.get_subhalo(snap6,'Mass',gn6,sgn6)[0]
 
-    print(trace_halo.match_subhalos(IDs1,mass1,IDs2,mass2))
-    print(trace_halo.match_subhalos(IDs1,mass1,IDs3,mass3))
-    print(trace_halo.match_subhalos(IDs1,mass1,IDs4,mass4))
-    print(trace_halo.match_subhalos(IDs1,mass1,IDs5,mass5))
-    print(trace_halo.match_subhalos(IDs1,mass1,IDs6,mass6))
+    print(trace_halo.is_a_match(IDs1, mass1, IDs2, mass2))
+    print(trace_halo.is_a_match(IDs1, mass1, IDs3, mass3))
+    print(trace_halo.is_a_match(IDs1, mass1, IDs4, mass4))
+    print(trace_halo.is_a_match(IDs1, mass1, IDs5, mass5))
+    print(trace_halo.is_a_match(IDs1, mass1, IDs6, mass6))
 
 def test_match_snapshots():
 
@@ -84,14 +84,14 @@ def test_match_snapshots():
     print(np.bincount(sgns.astype(int))[:15])
 
     gn = 4; sgn = 4
-    gn_m, sgn_m = trace_halo.match_snapshots(snap, snap_ref, gn, sgn)
+    gn_m, sgn_m = trace_halo.find_match(snap, snap_ref, gn, sgn)
     print(gn_m,sgn_m)
     ids,_ = trace_halo.get_subhalo_IDs(snap_ref, gn, sgn)
     ids_m,_ = trace_halo.get_subhalo_IDs(snap, gn_m, sgn_m)
     m,_ = trace_halo.get_subhalo(snap_ref, 'Mass', gn, sgn)
     m_m,_ = trace_halo.get_subhalo(snap, 'Mass', gn_m, sgn_m)
 
-    print(trace_halo.match_subhalos(ids,m,ids_m,m_m))
+    print(trace_halo.is_a_match(ids, m, ids_m, m_m))
     print(trace_halo.get_subhalo(snap_ref,'Stars/Mass',gn,sgn))
     print(trace_halo.get_subhalo(snap,'Stars/Mass',gn_m,sgn_m))
 

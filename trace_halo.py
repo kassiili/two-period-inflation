@@ -6,18 +6,16 @@ import heapq
 from snapshot_obj import Snapshot
 
 
-def trace_all(snapshot, gns=[], stop=101):
+def trace_all(snap_init, gns=[], stop=101):
     """ Traces all subhalos of given galaxies as far back in time as 
     possible, starting from the given snapshot.
 
     Parameters
     ----------
-    snapshot : Dataset object
+    snap_init : Dataset object
         Starting point for the tracing.
     gns : int, optional
         Group numbers of the traced halos in the initial snapshot.
-    direction : str, optional
-        Direction in which halo is traced.
     stop : int, optional
         Earliest snapshot to be explored
 
@@ -34,7 +32,7 @@ def trace_all(snapshot, gns=[], stop=101):
         z_init = grpf['link0/Header'].attrs.get('Redshift')
 
     # Initialize tracer:
-    tracer = {snap_init.snapID: (z_init, gn, sgn)}
+    tracer = {snap_init.snap_id: (z_init, gn, sgn)}
     snap = snap_init
 
     if direction == 'forward':
@@ -44,9 +42,9 @@ def trace_all(snapshot, gns=[], stop=101):
         condition = lambda ID: ID > stop
         add = -1
 
-    while condition(snap.snapID):
-        snap_next = Snapshot(snap.simID, snap.snapID + add)
-        gn, sgn = match_snapshots(snap_next, snap, gn, sgn)
+    while condition(snap.snap_id):
+        snap_next = Snapshot(snap.sim_id, snap.snap_id + add)
+        gn, sgn = find_match(snap_next, snap, gn, sgn)
 
         # No matching halo found:
         if gn == -1: break
@@ -55,7 +53,7 @@ def trace_all(snapshot, gns=[], stop=101):
             z_next = grpf['link0/Header'].attrs.get('Redshift')
 
         # Add match to tracer:
-        tracer[snap_next.snapID] = (z_next, gn, sgn)
+        tracer[snap_next.snap_id] = (z_next, gn, sgn)
 
         snap = snap_next
 
@@ -111,10 +109,10 @@ def match_all(snap_ref, snap_exp, gns=[]):
         idx_exp = get_index_at_step(idx_exp0, step, explore['GNs'].size)
 
         # Match:
-        found_match = match_subhalos(explore['IDs'][idx_exp],
-                                        explore['Mass'][idx_exp],
-                                        reference['IDs'][idx_ref],
-                                        reference['Mass'][idx_ref])
+        found_match = is_a_match(explore['IDs'][idx_exp],
+                                 explore['Mass'][idx_exp],
+                                 reference['IDs'][idx_ref],
+                                 reference['Mass'][idx_ref])
 
         if found_match:
             matches_exp[idx_exp] = (reference['GNs'][idx_ref],
@@ -301,121 +299,63 @@ def get_index_at_step(idx_ref, step, lim):
     return idx
 
 
-def trace_halo(snap_init, gn, sgn, direction='forward', stop=101):
-    """ Traces a halo as far back in time as possible, starting from
-    the given snapshot.
+def find_match(subhalo, snap_id, snap_exp):
+    """ Attempts to match a given subhalo with another subhalo in a given
+    snapshot.
 
     Parameters
     ----------
-    snapshot : Dataset object
-        Starting point for the tracing.
-    gn : int
-        Group number of the traced halo in the initial snapshot.
-    sgn : int
-        Subgroup number of the traced halo in the initial snapshot.
-    direction : str, optional
-        Direction in which halo is traced.
-    stop : int, optional
-        Earliest snapshot to be explored
-
-    Returns
-    -------
-    tracer : dict of tuple
-        Dictionary tracing the gn and sgn values of the halo through 
-        snapshots. The keys are the snapshot IDs. The corresponding 
-        redshifts are included as the first element of the tuples (the
-        following elements being the gn and the sgn).
-    """
-
-    with h5py.File(snap_init.grp_file, 'r') as grpf:
-        z_init = grpf['link0/Header'].attrs.get('Redshift')
-
-    # Initialize tracer:
-    tracer = {snap_init.snapID: (z_init, gn, sgn)}
-    snap = snap_init
-
-    if direction == 'forward':
-        condition = lambda ID: ID < 127
-        add = 1
-    else:
-        condition = lambda ID: ID > stop
-        add = -1
-
-    while condition(snap.snapID):
-        snap_next = Snapshot(snap.simID, snap.snapID + add)
-        gn, sgn = match_snapshots(snap_next, snap, gn, sgn)
-
-        # No matching halo found:
-        if gn == -1: break
-
-        with h5py.File(snap_next.grp_file, 'r') as grpf:
-            z_next = grpf['link0/Header'].attrs.get('Redshift')
-
-        # Add match to tracer:
-        tracer[snap_next.snapID] = (z_next, gn, sgn)
-
-        snap = snap_next
-
-    return tracer
-
-
-def match_snapshots(snap, snap_ref, gn, sgn):
-    """ Looks for a matching halo in snap for a given halo in snap_ref.
-
-    Parameters
-    ----------
-    snap : Dataset object
+    subhalo : Subhalo object
+        Matched subhalo.
+    snap_id : int
+        ID of the snapshot, at which the match is searched.
+    snap_exp : Snapshot object
         Explored snapshot.
-    snap_ref : Dataset object
-        Reference snapshot.
-    gn : int
-        Group number of a halo in the reference snapshot.
-    sgn : int
-        Subgroup number of a halo in the reference snapshot.
 
     Returns
     -------
     match : tuple
-        (gn,sgn) of matching halo. match==(-1,-1) if no match is found.
+        (gn,sgn) of matching halo in snap. match==(-1,-1) if no match is
+        found.
     """
 
-    # Get particle IDs and halo mass of reference:
-    IDs_ref, _ = get_subhalo_IDs(snap_ref, gn, sgn)
-    mass_ref, _ = get_subhalo(snap_ref, 'Mass', gn, sgn)
+    ids = subhalo.get_ids(snap_id)
+    mass = subhalo.get_halo_data('Mass', snap_id)
+    gn, sgn = subhalo.tracer.get(snap_id)
 
     # Set maximum number of iterations:
     term = 100
 
     # Read subhalos with group numbers and subgroup numbers near gn and
     # sgn:
-    fnums = neighborhood(snap, gn, sgn, term / 2)
-    GNs = snap.get_subhalos('GroupNumber', fnums=fnums)
-    SGNs = snap.get_subhalos('SubGroupNumber', fnums=fnums)
-    IDs_in_file = snap.get_subhalos_IDs(fnums=fnums)
-    mass_in_file = snap.get_subhalos('Mass', fnums=fnums)
+    fnums = neighborhood(snap_exp, gn, sgn, term / 2)
+    gns = snap_exp.get_subhalos('GroupNumber', fnums=fnums)
+    sgns = snap_exp.get_subhalos('SubGroupNumber', fnums=fnums)
+    ids_in_file = snap_exp.get_subhalos_IDs(part_type=1, fnums=fnums)
+    mass_in_file = snap_exp.get_subhalos('Mass', fnums=fnums)
 
     # Get index of halo with same sgn and gn as ref:
-    idx0 = np.argwhere(np.logical_and((GNs == gn), (SGNs == sgn)))[0, 0]
-    print('find match for:', GNs[idx0], SGNs[idx0], ' in ', snap.snapID)
+    idx0 = np.argwhere(np.logical_and((gns == gn), (sgns == sgn)))[0, 0]
+#    print('find match for:', gns[idx0], sgns[idx0], ' in ',
+#          snap_exp.snap_id)
 
     # Initial value of match is returned if no match is found:
     match = (-1, -1)
 
     idx = idx0
     for step in range(1, term):
-        print('idx=', idx)
-        IDs = IDs_in_file[idx];
-        mass = mass_in_file[idx]
-        found_match = match_subhalos(IDs_ref, mass_ref, IDs, mass)
+#        print('idx=', idx)
+        ids_exp = ids_in_file[idx]
+        mass_exp = mass_in_file[idx]
+        found_match = is_a_match(ids, mass, ids_exp, mass_exp)
 
         if found_match:
-            match = (GNs[idx], SGNs[idx])
+            match = (gns[idx], sgns[idx])
             break
 
-        # Iterate outwards from idx0, alternating between lower and higher
-        # index:
-        idx = idx0 + int(math.copysign( \
-            math.floor((step + 1) / 2), (step % 2) - 0.5))
+        idx = get_index_at_step(idx0, step, gns.size)
+        if idx == idx0:
+            break
 
     return match
 
@@ -452,9 +392,9 @@ def neighborhood(snap, gn, sgn, min_halos):
     return fnums
 
 
-def match_subhalos(IDs_ref, mass_ref, IDs_exp, mass_exp,
-                   restrict_exp=True):
-    """ Check if two halos in different snapshots correspond to the same
+def is_a_match(IDs_ref, mass_ref, IDs_exp, mass_exp,
+               restrict_exp=True):
+    """ Check if two halos with given IDs and masses correspond to the same
     halo. 
 
     Parameters
@@ -504,34 +444,3 @@ def match_subhalos(IDs_ref, mass_ref, IDs_exp, mass_exp,
 
     return found_match
 
-
-def get_subhalo(snap, attr, gn, sgn):
-    """ Read snapshot for a halo and return given attribute and index.
-    """
-
-    fnum = snap.file_of_halo(gn, sgn)
-
-    # Get index of halo:
-    gns = snap.get_subhalos('GroupNumber', fnums=[fnum])
-    sgns = snap.get_subhalos('SubGroupNumber', fnums=[fnum])
-    idx = np.argwhere(np.logical_and((gns == gn), (sgns == sgn)))[0, 0]
-
-    data = snap.get_subhalos(attr, fnums=[fnum])
-
-    return (data[idx], idx)
-
-
-def get_subhalo_IDs(snap, gn, sgn):
-    """ Read snapshot for a halo and return IDs of its particles and index.
-    """
-
-    fnum = snap.file_of_halo(gn, sgn)
-
-    # Get index of halo:
-    gns = snap.get_subhalos('GroupNumber', fnums=[fnum])
-    sgns = snap.get_subhalos('SubGroupNumber', fnums=[fnum])
-    idx = np.argwhere(np.logical_and((gns == gn), (sgns == sgn)))[0, 0]
-
-    IDs = snap.get_subhalos_IDs(fnums=[fnum])
-
-    return IDs[idx], idx

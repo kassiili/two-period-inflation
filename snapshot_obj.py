@@ -14,10 +14,10 @@ class Snapshot:
 
     Attributes
     ----------
-    simID : str
+    sim_id : str
         Identifier of the simulation data equivalent to the directory name
         of the directory containing all the data of the simulation.
-    snapID : int
+    snap_id : int
         The number identifying the snapshot.
     name : str, optional
         Label of the data set.
@@ -28,39 +28,39 @@ class Snapshot:
 
     """
 
-    def __init__(self, simID, snapID, name=""):
+    def __init__(self, sim_id, snap_id, name=""):
         """
         Parameters
         ----------
-        simID : str
+        sim_id : str
             Identifier of the simulation data -- should be equivalent to
             the directory name of the directory containing all the data 
             of the simulation.
-        snapID : int
+        snap_id : int
             The number identifying the snapshot.
         name : str, optional
             Label of the data set. If not given, is generated from simID
             and snapID.
         """
 
-        self.simID = simID
-        self.snapID = snapID
+        self.sim_id = sim_id
+        self.snap_id = snap_id
         # If not given, construct name from IDs:
         if not name:
-            self.name = str(simID) + "_" + str(snapID)
+            self.name = str(sim_id) + "_" + str(snap_id)
         else:
             self.name = name
 
         # Generate combined data files:
-        self.grp_file = '.groups_{}_{}.hdf5'.format(simID, snapID)
-        self.part_file = '.particles_{}_{}.hdf5'.format(simID, snapID)
+        self.grp_file = '.groups_{}_{}.hdf5'.format(sim_id, snap_id)
+        self.part_file = '.particles_{}_{}.hdf5'.format(sim_id, snap_id)
 
-        path = data_file_manipulation.get_data_path('group', simID, snapID)
+        path = data_file_manipulation.get_data_path('group', sim_id, snap_id)
         data_file_manipulation.combine_data_files( \
             np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))), \
             self.grp_file)
 
-        path = data_file_manipulation.get_data_path('part', simID, snapID)
+        path = data_file_manipulation.get_data_path('part', sim_id, snap_id)
         data_file_manipulation.combine_data_files( \
             np.array(glob.glob(os.path.join(path, 'snap*'))), \
             self.part_file)
@@ -193,7 +193,7 @@ class Snapshot:
 
         # Construct mask for selecting bound particles of type pt:
         IDs_pt = self.get_particles("ParticleIDs", part_type=[part_type])
-        mask_pt = np.in1d(IDs_bound, IDs_pt)
+        mask_pt = np.isin(IDs_bound, IDs_pt)
 
         IDs = []
         link_names_sel, link_sort_sel = self.link_select('group', fnums)
@@ -332,6 +332,20 @@ class Snapshot:
         mass = np.concatenate(mass)
 
         return mass
+
+    def get_redshift(self):
+        """ Reads snapshot redshift from header.
+
+        Returns
+        -------
+        z : float
+            Redshift of snapshot.
+        """
+
+        with h5py.File(self.grp_file, 'r') as grpf:
+            z = grpf['link0/Header'].attrs.get('Redshift')
+
+        return z
 
     def link_select(self, data_category, fnums):
         """ Selects links from file keys and constructs an index list

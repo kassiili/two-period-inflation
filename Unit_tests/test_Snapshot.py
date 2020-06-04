@@ -103,6 +103,10 @@ class TestSnapshot(ut.TestCase):
             self.assertTrue(\
                     (np.diff(bindErg[sort_halo][invsort_halo])>=0).all())
 
+    def test_get_redshift(self):
+        z = self.snapshot.get_redshift()
+        self.assertTrue(isinstance(z, float))
+
 
 if __name__ == '__main__':
     ut.main()
