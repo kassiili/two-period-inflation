@@ -119,7 +119,7 @@ def test_identify_groupNumbers():
     gn_cnt2 = np.bincount(GNs2.astype(int))
     print('cnt1 : ',gn_cnt1)
     print('cnt2 : ',gn_cnt2)
-    ident = trace_halo.identify_groupNumbers(GNs1,GNs2)
+    ident = trace_halo.identify_group_numbers(GNs1, GNs2)
     for idx1, idx2 in enumerate(ident[:150]):
         print(idx1,idx2)
         gn1 = GNs1[idx1]; sgn1 = SGNs1[idx1]

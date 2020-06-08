@@ -5,13 +5,13 @@ import astropy.units as u
 from astropy.constants import G
 
 
-def split_satellites(snap, attr, fnums=[]):
+def split_satellites(snap, dataset, fnums=[]):
     """ Reads an attribute from snapshot and divides into satellites and
     isolated galaxies.
     
     Parameters
     ----------
-    attr : str
+    dataset : str
         attribute to be retrieved
     fnums : list of ints, optional
         Specifies files, which are to be read
@@ -23,14 +23,14 @@ def split_satellites(snap, attr, fnums=[]):
         the second.
     """
 
-    SGNs = snap.get_subhalos('SubGroupNumber', fnums=fnums)
-    data = snap.get_subhalos(attr, fnums=fnums)
+    sgns = snap.get_subhalos('SubGroupNumber', fnums=fnums)
+    data = snap.get_subhalos(dataset, fnums=fnums)
 
     # Divide into satellites and isolated galaxies:
-    dataSat = data[SGNs != 0]
-    dataIsol = data[SGNs == 0]
+    data_sat= data[sgns != 0]
+    data_isol = data[sgns == 0]
 
-    return (dataSat, dataIsol)
+    return (data_sat, data_isol)
 
 
 def generate_dataset(snapshot, dataset):

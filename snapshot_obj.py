@@ -254,6 +254,17 @@ class Snapshot:
 
         return out
 
+    def get_halo_number(self, which_gns):
+
+        n = 0
+        gns = self.get_subhalos("GroupNumber")
+        if not which_gns:
+            n = gns.size
+        else:
+            n = np.sum(np.isin(gns, which_gns))
+
+        return n
+
     def get_particles(self, dataset, part_type=[0, 1, 4, 5], fnums=[]):
         """ Reads the dataset from particle catalogues.
         

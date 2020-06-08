@@ -1,7 +1,6 @@
 import unittest as ut
 import numpy as np
 import h5py
-import sys, os
 
 from snapshot_obj import Snapshot
 import data_file_manipulation
@@ -107,6 +106,10 @@ class TestSnapshot(ut.TestCase):
         z = self.snapshot.get_redshift()
         self.assertTrue(isinstance(z, float))
 
+    def test_get_halo_number(self):
+        print(self.snapshot.get_halo_number([]))
+        print(self.snapshot.get_halo_number([1]))
+        self.assertTrue(True)
 
 if __name__ == '__main__':
     ut.main()
