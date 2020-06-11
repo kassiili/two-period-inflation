@@ -21,17 +21,18 @@ class IterateArray:
         self.sorting = np.argsort(-iterated_array)  # Note: descending
         self.idx_in_sorted = np.argsort(self.sorting)
 
+        self.lim = self.sorting.size
+
     def iterate(self, iter_idx):
         """ Return current index and update step. """
 
         # Get new index:
         start = self.iterators[iter_idx, 0]
         step = self.iterators[iter_idx, 1]
-        if step >= self.term:
+        idx = self.get_index_at_step(start, step)
+        if step >= self.term or idx is None:
             idx = None
         else:
-            idx = self.get_index_at_step(start, step)
-
             # Update step:
             self.iterators[iter_idx, 1] += 1
 
@@ -46,7 +47,10 @@ class IterateArray:
         idx_in_sorted = self.get_index_at_step_in_sorted(
             start_in_sorted, step)
 
-        idx = self.sorting[idx_in_sorted]
+        if idx_in_sorted is None:
+            idx = None
+        else:
+            idx = self.sorting[idx_in_sorted]
 
         return idx
 
@@ -67,8 +71,6 @@ class IterateArray:
             Index of the element at step in the sorted array.
         """
 
-        lim = self.sorting.size
-
         # Iterate outwards from start, alternating between lower and higher
         # index:
         idx = start + int(math.copysign(
@@ -77,11 +79,11 @@ class IterateArray:
         # Check that index is not out of array bounds:
         if abs(start - idx) > start:
             idx = step
-        elif abs(start - idx) > lim - 1 - start:
-            idx = lim - 1 - step
+        elif abs(start - idx) > self.lim - 1 - start:
+            idx = self.lim - 1 - step
 
         # If all values of array are consumed:
-        if idx < 0 or idx >= lim:
-            idx = start
+        if idx < 0 or idx >= self.lim:
+            idx = None
 
         return idx

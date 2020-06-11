@@ -78,29 +78,38 @@ def match_all(snap_ref, snap_exp, gns=[]):
 
     # Initialize iterator:
     mass = snap_exp.get_subhalos("MassType")[:, 1]
-    iterator = IterateArray(init_idents, mass, term=1000)
+    iterator = IterateArray(init_idents, mass, term=100)
 
     # Initialize priority queue:
     pq = []
-    for idx_ref in range(len(init_idents)):
+    for idx_ref in range(init_idents.size):
         heapq.heappush(pq, (0, idx_ref))
 
+    pmax = 0
     while len(pq) > 0:
         # Get next one for matching:
-        p, idx_ref = heapq.heappop(pq)#[1]
+        p, idx_ref = heapq.heappop(pq)  # [1]
+        if p > pmax:
+            pmax = p
 
         # Get index of the halo to be tried next:
         idx_exp = iterator.iterate(idx_ref)
-        #print(p, idx_ref, idx_exp)
+#        if idx_exp is None:
+#            print(idx_exp, p)
+#        elif reference['GNs'][idx_ref] == 1 and \
+#                explore['GNs'][idx_exp] == 1:
+#            print(p, idx_ref, idx_exp)
 
-        # If there are still untried candidates and the current
-        # candidate is not matched:
-        if idx_exp is not None and matches_exp[idx_exp] is None:
-            # Match:
-            found_match = is_a_match(explore['IDs'][idx_exp],
-                                     explore['Mass'][idx_exp],
-                                     reference['IDs'][idx_ref],
-                                     reference['Mass'][idx_ref])
+        # If there are still untried candidates:
+        if idx_exp is not None:
+            found_match = False
+            # If current halo is not matched:
+            if matches_exp[idx_exp] is None:
+                # Match:
+                found_match = is_a_match(explore['IDs'][idx_exp],
+                                         explore['Mass'][idx_exp],
+                                         reference['IDs'][idx_ref],
+                                         reference['Mass'][idx_ref])
 
             if found_match:
                 matches_ref[idx_ref] = idx_exp
@@ -111,6 +120,7 @@ def match_all(snap_ref, snap_exp, gns=[]):
                 priority = iterator.get_step(idx_ref)
                 heapq.heappush(pq, (priority, idx_ref))
 
+    print(pmax)
     return matches_ref
 
 
@@ -139,7 +149,7 @@ def get_data_for_matching(snap_ref, snap_exp, gns):
     mask_exp = [True] * gns_exp.size
     if gns:
         mask_ref = [gn in gns for gn in gns_ref]
-        mask_exp = [gn in gns for gn in gns_exp]
+        #mask_exp = [gn in gns for gn in gns_exp]
 
     reference = {'GNs': gns_ref[mask_ref],
                  'SGNs': snap_ref.get_subhalos('SubGroupNumber')[mask_ref],
