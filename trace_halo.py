@@ -4,6 +4,7 @@ import math
 import heapq
 
 from snapshot_obj import Snapshot
+from iteratearray import IterateArray
 
 
 def trace_all(snap_init, gns=[], stop=101):
@@ -75,45 +76,47 @@ def match_all(snap_ref, snap_exp, gns=[]):
 
     init_idents = identify_group_numbers(reference['GNs'], explore['GNs'])
 
+    # Initialize iterator:
+    mass = snap_exp.get_subhalos("MassType")[:, 1]
+    iterator = IterateArray(init_idents, mass, term=1000)
+
     # Initialize priority queue:
     pq = []
-    for idx_ref, idx_exp in enumerate(init_idents):
-        heapq.heappush(pq, (0, (idx_ref, idx_exp)))
+    for idx_ref in range(len(init_idents)):
+        heapq.heappush(pq, (0, idx_ref))
 
     while len(pq) > 0:
-
         # Get next one for matching:
-        next_item = heapq.heappop(pq)
-        step = next_item[0]
-        idx_ref = next_item[1][0]
-        idx_exp0 = next_item[1][1]
+        p, idx_ref = heapq.heappop(pq)#[1]
 
-        # Get index of the halo to be tried next. step tells how far to
-        # iterate from initial index:
-        idx_exp = get_index_at_step(idx_exp0, step, explore['GNs'].size)
+        # Get index of the halo to be tried next:
+        idx_exp = iterator.iterate(idx_ref)
+        #print(p, idx_ref, idx_exp)
 
-        # Match:
-        found_match = is_a_match(explore['IDs'][idx_exp],
-                                 explore['Mass'][idx_exp],
-                                 reference['IDs'][idx_ref],
-                                 reference['Mass'][idx_ref])
+        # If there are still untried candidates and the current
+        # candidate is not matched:
+        if idx_exp is not None and matches_exp[idx_exp] is None:
+            # Match:
+            found_match = is_a_match(explore['IDs'][idx_exp],
+                                     explore['Mass'][idx_exp],
+                                     reference['IDs'][idx_ref],
+                                     reference['Mass'][idx_ref])
 
-        if found_match:
-            matches_ref[idx_ref] = idx_exp
-            matches_exp[idx_exp] = idx_ref
-        else:
-            new_step = iterate_step(idx_exp0, step, matches_exp)
-            # If new_step == step, then all potential matches_ref for
-            # idx_ref have been explored:
-            if new_step != step:
-                heapq.heappush(pq, (new_step, (idx_ref, idx_exp0)))
+            if found_match:
+                matches_ref[idx_ref] = idx_exp
+                matches_exp[idx_exp] = idx_ref
+            else:
+                # Set priority equal to the number previous matching
+                # events:
+                priority = iterator.get_step(idx_ref)
+                heapq.heappush(pq, (priority, idx_ref))
 
     return matches_ref
 
 
 def get_data_for_matching(snap_ref, snap_exp, gns):
     """ Retrieve datasets for matching for the given set of group numbers.
-    
+
     Parameters
     ----------
     snap_ref : Snapshot object
@@ -153,7 +156,7 @@ def get_data_for_matching(snap_ref, snap_exp, gns):
 
 def identify_group_numbers(gns1, gns2):
     """ Identifies the indices, where (gn,sgn) pairs align, between
-    datasets 1 and 2.
+    snapshots 1 and 2.
 
     Parameters
     ----------
@@ -164,29 +167,36 @@ def identify_group_numbers(gns1, gns2):
 
     Returns
     -------
-    idx_of1_in2 : list of int
-        Elements satisfy: GNs1[idx] == GNs2[idx_of1_in2[idx]] (unless
-        GNs1[idx] not in GNs2)
-    
+    idx_of1_in2 : ndarray of int
+        Where a group number and subgroup number pair exists in bots
+        datasets, the indices are identified, i.e.:
+            gns1[idx] == gns2[idx_of1_in2[idx]]
+            (and the same for subgroup numbers)
+        If a certain pair in 1 does not exist in 2, it is identified with
+        the halo with the same gn, for which sgn is the largest.
+
     Notes
     -----
-    If a certain pair in 1 does not exist in 2, it is identified with the
-    halo with the same gn, for which sgn is the largest. """
+    There could be elemnts in gns2 that are not identified with any
+    element in gns1.
+    """
 
     gns1 = gns1.astype(int)
     gns2 = gns2.astype(int)
     gn_cnt1 = np.bincount(gns1)
     gn_cnt2 = np.bincount(gns2)
 
-    idx_of1_in2 = [None] * gns1.size
-    for gn in gns1:
-        for sgn in range(gn_cnt1[gn]):
-            idx1 = np.sum(gn_cnt1[:gn]) + sgn
-            # If halo with gn and sgn exists dataset 2, then identify
+    idx_of1_in2 = np.zeros(gns1.size)
+    for gn, cnt in enumerate(gn_cnt1):
+        prev1 = np.sum(gn_cnt1[:gn])
+        prev2 = np.sum(gn_cnt2[:gn])
+        for sgn in range(cnt):
+            idx1 = prev1 + sgn
+            # If halo with gn and sgn exists snapshot 2, then identify
             # those halos. If not, set indices equal:
             if gn < gn_cnt2.size:
                 if sgn < gn_cnt2[gn]:
-                    idx2 = np.sum(gn_cnt2[:gn]) + sgn
+                    idx2 = prev2 + sgn
             else:
                 idx2 = min(gns2.size - 1, idx1)
             idx_of1_in2[idx1] = idx2
@@ -204,19 +214,19 @@ def iterate_step(idx_ref, step_start, matches, one_to_one=False):
         Starting point of iteration.
     step_start : int
         Current step at function call.
-    matches : ndarray 
+    matches : ndarray
         Array of already found matches of subhalos in reference snapshot.
     one_to_one : bool, optional
         ???
 
     Returns
     -------
-    step : int 
+    step : int
         The new step.
 
     Notes
     -----
-        step is the number of steps it takes to iterate from idx_ref to 
+        step is the number of steps it takes to iterate from idx_ref to
         the next index.
     """
 
@@ -244,8 +254,8 @@ def iterate_step(idx_ref, step_start, matches, one_to_one=False):
 
 def get_index_at_step(idx_ref, step, lim):
     """ Get the index of the next subhalo after step iterations from
-    idx_ref. 
-    
+    idx_ref.
+
     Parameters
     ----------
     idx_ref : int

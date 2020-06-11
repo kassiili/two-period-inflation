@@ -55,12 +55,14 @@ class Snapshot:
         self.grp_file = '.groups_{}_{}.hdf5'.format(sim_id, snap_id)
         self.part_file = '.particles_{}_{}.hdf5'.format(sim_id, snap_id)
 
-        path = data_file_manipulation.get_data_path('group', sim_id, snap_id)
+        path = data_file_manipulation.get_data_path('group', sim_id,
+                                                    snap_id)
         data_file_manipulation.combine_data_files( \
             np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))), \
             self.grp_file)
 
-        path = data_file_manipulation.get_data_path('part', sim_id, snap_id)
+        path = data_file_manipulation.get_data_path('part', sim_id,
+                                                    snap_id)
         data_file_manipulation.combine_data_files( \
             np.array(glob.glob(os.path.join(path, 'snap*'))), \
             self.part_file)
@@ -202,17 +204,15 @@ class Snapshot:
             links = [f for (name, f) in grpf.items() \
                      if name in link_names_sel]
             for i, link in enumerate(links):
-                linkIDs = []
-
                 offset = link['Subhalo/SubOffset'][...]
                 pnum = link['Subhalo/SubLength'][...]
 
                 select_halo = lambda o, n: \
                     IDs_bound[o:o + n][mask_pt[o:o + n]]
-                linkIDs = [select_halo(o, n) for o, n in \
-                           zip(offset, pnum)]
+                link_ids = [select_halo(o, n) for o, n in
+                            zip(offset, pnum)]
 
-                IDs.append(linkIDs)
+                IDs.append(link_ids)
 
             # Sort by link number:
             IDs = [IDs[i] for i in link_sort_sel]
