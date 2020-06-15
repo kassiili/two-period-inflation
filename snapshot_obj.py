@@ -327,12 +327,12 @@ class Snapshot:
         mass = []
 
         for pt in part_type:
-            if pt in [1, 2, 3]:
+            if pt in [1]:
                 # Get dm particle masses:
                 with h5py.File(self.part_file, 'r') as partf:
                     dm_mass = partf['link1/Header'] \
                         .attrs.get('MassTable')[pt]
-                    dm_mass = self.convert_to_cgs_part( \
+                    dm_mass = self.convert_to_cgs_part(
                         np.array([dm_mass]), 'Masses')[0]
                     dm_n = partf['link1/Header'] \
                         .attrs.get('NumPart_Total')[pt]
