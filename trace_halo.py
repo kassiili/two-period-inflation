@@ -431,18 +431,27 @@ def is_a_match(ids_ref, mass_ref, ids_exp, mass_exp,
     f_exp = 1 / 5  # number of most bound in explored for matching
     frac_mass = 3  # Limit for mass difference between matching halos
 
-    most_bound_ref = ids_ref[:n_link]
-    if limit_ids_exp:
-        most_bound_exp = ids_exp[:int(ids_exp.size * f_exp)]
-    else:
-        most_bound_exp = ids_exp
-
-    shared_parts = np.intersect1d(most_bound_ref, most_bound_exp,
-                                  assume_unique=True)
     found_match = False
-    if (len(shared_parts) > n_link / 2) and \
-            (mass_ref / mass_exp < frac_mass) and \
-            (mass_ref / mass_exp > 1 / frac_mass):
-        found_match = True
+
+    # Ignore pure gas halos:
+    if mass_ref > 0 and mass_exp > 0:
+
+        # Check masses:
+        if (mass_ref / mass_exp < frac_mass) and \
+                (mass_ref / mass_exp > 1 / frac_mass):
+
+            # Get most bound particles:
+            most_bound_ref = ids_ref[:n_link]
+            if limit_ids_exp:
+                most_bound_exp = ids_exp[:int(ids_exp.size * f_exp)]
+            else:
+                most_bound_exp = ids_exp
+
+            # Check intersection:
+            shared_parts = np.intersect1d(most_bound_ref, most_bound_exp,
+                                          assume_unique=True)
+            if len(shared_parts) > n_link / 2:
+                found_match = True
 
     return found_match
+
