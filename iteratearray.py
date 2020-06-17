@@ -7,12 +7,24 @@ class IterateArray:
      starting points. """
 
     def __init__(self, starting_points, iterated_array, term=100):
+        """
+
+        Parameters
+        ----------
+        starting_points : iterable of int
+            An iterable object of the starting points in iterated_array
+            for the iterators.
+        iterated_array : ndarray
+            An array that can be sorted.
+        term : int
+            Maximum number of iteration for a single iterator.
+        """
         # Initialize iterators:
         # A single row represents a single "iterator", which consists of a
         # starting point and a step. Starting points are saved in column 0
         # and steps in column 1.
-        self.iterators = np.zeros((starting_points.size, 2)).astype(int)
-        self.iterators[:, 0] = starting_points.astype(int)
+        self.iterators = np.zeros((len(starting_points), 2))
+        self.iterators[:, 0] = starting_points
 
         # Set maximum step:
         self.term = term

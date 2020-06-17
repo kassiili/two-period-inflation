@@ -29,7 +29,7 @@ def trace_all(snap_init, gns=[], stop=101):
         snapshot.
     """
 
-    tracer = [[(snap_init.snap_id, i)] for i in
+    tracer = [[(snap_init.snap_id_ref, i)] for i in
               range(snap_init.get_halo_number(gns))]
     snap = snap_init
     while snap.snap_id > stop:
@@ -85,12 +85,9 @@ def match_all(snap_ref, snap_exp, gns=[]):
     for idx_ref in range(init_idents.size):
         heapq.heappush(pq, (0, idx_ref))
 
-    pmax = 0
     while len(pq) > 0:
         # Get next one for matching:
         p, idx_ref = heapq.heappop(pq)  # [1]
-        if p > pmax:
-            pmax = p
 
         # Get index of the halo to be tried next:
         idx_exp = iterator.iterate(idx_ref)
@@ -120,7 +117,6 @@ def match_all(snap_ref, snap_exp, gns=[]):
                 priority = iterator.get_step(idx_ref)
                 heapq.heappush(pq, (priority, idx_ref))
 
-    print(pmax)
     return matches_ref
 
 
@@ -177,7 +173,7 @@ def identify_group_numbers(gns1, gns2):
 
     Returns
     -------
-    idx_of1_in2 : ndarray of int
+    idx_of1_in2 : ndarray of np.int_
         Where a group number and subgroup number pair exists in bots
         datasets, the indices are identified, i.e.:
             gns1[idx] == gns2[idx_of1_in2[idx]]
@@ -187,7 +183,7 @@ def identify_group_numbers(gns1, gns2):
 
     Notes
     -----
-    There could be elemnts in gns2 that are not identified with any
+    There could be elements in gns2 that are not identified with any
     element in gns1.
     """
 
@@ -196,7 +192,7 @@ def identify_group_numbers(gns1, gns2):
     gn_cnt1 = np.bincount(gns1)
     gn_cnt2 = np.bincount(gns2)
 
-    idx_of1_in2 = np.zeros(gns1.size)
+    idx_of1_in2 = np.zeros(gns1.size, dtype=int)
     for gn, cnt in enumerate(gn_cnt1):
         prev1 = np.sum(gn_cnt1[:gn])
         prev2 = np.sum(gn_cnt2[:gn])
@@ -212,92 +208,6 @@ def identify_group_numbers(gns1, gns2):
             idx_of1_in2[idx1] = idx2
 
     return idx_of1_in2
-
-
-def iterate_step(idx_ref, step_start, matches, one_to_one=False):
-    """ Find the next index, which is nearest to idx_ref and has not yet
-    been matched, for matching.
-
-    Parameters
-    ----------
-    idx_ref : int
-        Starting point of iteration.
-    step_start : int
-        Current step at function call.
-    matches : ndarray
-        Array of already found matches of subhalos in reference snapshot.
-    one_to_one : bool, optional
-        ???
-
-    Returns
-    -------
-    step : int
-        The new step.
-
-    Notes
-    -----
-        step is the number of steps it takes to iterate from idx_ref to
-        the next index.
-    """
-
-    # Set maximum number of iterations:
-    term = 60
-
-    step = step_start
-    while step < term:
-
-        idx = get_index_at_step(idx_ref, step + 1, matches.size)
-
-        # If all values of array are consumed:
-        if idx == idx_ref:
-            break
-
-        # If next index has not yet been matched:
-        if matches[idx] is None or not one_to_one:
-            step += 1
-            break
-
-        step += 1
-
-    return step
-
-
-def get_index_at_step(idx_ref, step, lim):
-    """ Get the index of the next subhalo after step iterations from
-    idx_ref.
-
-    Parameters
-    ----------
-    idx_ref : int
-        Starting point of iterations.
-    step : int
-        Number of iterations completed.
-    lim : int
-        Upper limit for index value.
-
-    Returns
-    -------
-    idx : int
-        Index of next subhalo after step iterations from idx_ref.
-    """
-
-    # Iterate outwards from idx_ref, alternating between lower and higher
-    # index:
-    idx = idx_ref + int(math.copysign(
-        math.floor((step + 1) / 2), (step % 2) - 0.5))
-
-    # Check that index is not negative:
-    if abs(idx_ref - idx) > idx_ref:
-        idx = step
-    # Check that index is not out of array bounds:
-    elif abs(idx_ref - idx) > lim - 1 - idx_ref:
-        idx = lim - step
-
-    # If all values of array are consumed:
-    if idx < 0 or idx >= lim:
-        idx = idx_ref
-
-    return idx
 
 
 def find_match(subhalo, snap_id, snap_exp):
@@ -324,72 +234,33 @@ def find_match(subhalo, snap_id, snap_exp):
     mass = subhalo.get_halo_data('MassType', snap_id)[1]
     gn, sgn = subhalo.tracer.get(snap_id)
 
-    # Set maximum number of iterations:
-    term = 100
-
-    # Read subhalos with group numbers and subgroup numbers near gn and
-    # sgn:
-    fnums = neighborhood(snap_exp, gn, sgn, term / 2)
-    gns = snap_exp.get_subhalos('GroupNumber', fnums=fnums)
-    sgns = snap_exp.get_subhalos('SubGroupNumber', fnums=fnums)
-    ids_in_file = snap_exp.get_subhalos_IDs(part_type=1, fnums=fnums)
-    mass_in_file = snap_exp.get_subhalos('MassType', fnums=fnums)[:, 1]
+    gns = snap_exp.get_subhalos('GroupNumber')
+    sgns = snap_exp.get_subhalos('SubGroupNumber')
+    ids_exp = snap_exp.get_subhalos_IDs(part_type=1)
+    mass_exp = snap_exp.get_subhalos('MassType')[:, 1]
 
     # Get index of halo with same sgn and gn as ref:
     idx0 = np.argwhere(np.logical_and((gns == gn), (sgns == sgn)))[0, 0]
-    #    print('find match for:', gns[idx0], sgns[idx0], ' in ',
-    #          snap_exp.snap_id)
 
     # Initial value of match is returned if no match is found:
     match = (-1, -1)
 
+    iterator = IterateArray([int(idx0)], mass_exp)
+
     idx = idx0
-    for step in range(1, term):
-        ids_exp = ids_in_file[idx]
-        mass_exp = mass_in_file[idx]
-        found_match = is_a_match(ids, mass, ids_exp, mass_exp)
+    while idx is not None:
+        ids_trial = ids_exp[idx]
+        mass_trial = mass_exp[idx]
+        found_match = is_a_match(ids, mass, ids_trial, mass_trial)
 
         if found_match:
             match = (gns[idx], sgns[idx])
             break
 
-        idx = get_index_at_step(idx0, step, gns.size)
-        if idx == idx0:
-            break
+        # Get next one for trial:
+        idx = iterator.iterate(0)
 
     return match
-
-
-def neighborhood(snap, gn, sgn, min_halos):
-    """ Gets file numbers of files that contain a minimum amount of
-    halos above and below a certain halo. """
-
-    fnum = snap.file_of_halo(gn, sgn)
-    GNs = snap.get_subhalos('GroupNumber', fnums=[fnum])
-    SGNs = snap.get_subhalos('SubGroupNumber', fnums=[fnum])
-    idx = np.argwhere(np.logical_and((GNs == gn), (SGNs == sgn)))[0, 0]
-
-    fnums = [fnum]
-    halos_below = idx
-    for n in range(fnum - 1, -1, -1):
-        if halos_below < min_halos:
-            fnums.append(n)
-            halos_below += snap.get_subhalos('GroupNumber', fnums=[n]).size
-        else:
-            break
-
-    with h5py.File(snap.grp_file, 'r') as grpf:
-        n_files = grpf['link1/FOF'].attrs.get('NTask')
-
-    halos_above = GNs.size - 1 - idx
-    for n in range(fnum + 1, n_files):
-        if halos_above < min_halos:
-            fnums.append(n)
-            halos_above += snap.get_subhalos('GroupNumber', fnums=[n]).size
-        else:
-            break
-
-    return fnums
 
 
 def is_a_match(ids_ref, mass_ref, ids_exp, mass_exp,

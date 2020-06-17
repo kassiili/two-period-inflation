@@ -88,7 +88,7 @@ class Subhalo:
             if gn == -1: break
 
             # Add match to tracer:
-            self.tracer[snap_next.snap_id] = (gn, sgn)
+            self.tracer[snap_next.snap_id] = (int(gn), int(sgn))
 
             snap = snap_next
 
