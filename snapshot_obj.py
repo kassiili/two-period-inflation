@@ -100,7 +100,7 @@ class Snapshot:
     def get_subhalo_catalogue(self, dataset, fnums, units):
         """ Retrieves a dataset from the subhalo catalogues.
 
-        Paramaters
+        Parameters
         ----------
         dataset : str
             Name of dataset to be retrieved.
@@ -344,19 +344,28 @@ class Snapshot:
 
         return mass
 
-    def get_redshift(self):
-        """ Reads snapshot redshift from header.
+    def get_attribute(self, attr, entry, data_category='group'):
+        """ Reads an attribute of the given entry (either dataset or
+        group).
 
         Returns
         -------
-        z : float
-            Redshift of snapshot.
+        out : float
+            The value of the attribute.
         """
 
-        with h5py.File(self.grp_file, 'r') as grpf:
-            z = grpf['link0/Header'].attrs.get('Redshift')
+        filename = ''
+        if data_category == 'group':
+            filename = self.grp_file
+        else:
+            filename = self.part_file
 
-        return z
+        # All items in the snapshot file header are also included in the
+        # group file header:
+        with h5py.File(filename, 'r') as f:
+            out = f['link0/{}'.format(entry)].attrs.get(attr)
+
+        return out
 
     def link_select(self, data_category, fnums):
         """ Selects links from file keys and constructs an index list

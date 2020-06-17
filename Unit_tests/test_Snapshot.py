@@ -102,8 +102,8 @@ class TestSnapshot(ut.TestCase):
             self.assertTrue(\
                     (np.diff(bindErg[sort_halo][invsort_halo])>=0).all())
 
-    def test_get_redshift(self):
-        z = self.snapshot.get_redshift()
+    def test_get_attribute(self):
+        z = self.snapshot.get_attribute('Redshift', 'Header')
         self.assertTrue(isinstance(z, float))
 
     def test_get_halo_number(self):
