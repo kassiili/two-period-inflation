@@ -7,3 +7,4 @@ snapshots
 Dump/
 .ipynb_checkpoints/
 *.dat
+*.npy
