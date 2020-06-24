@@ -6,46 +6,7 @@ import heapq
 from snapshot_obj import Snapshot
 
 
-def trace_all(snap_init, gns=[], stop=101):
-    """ Traces all subhalos of given galaxies as far back in time as
-    possible, starting from the given snapshot.
-
-    Parameters
-    ----------
-    snap_init : Snapshot object
-        Starting point for the tracing.
-    gns : int, optional
-        Group numbers of the traced halos in the initial snapshot.
-    stop : int, optional
-        Earliest snapshot to be explored
-
-    Returns
-    -------
-    tracer : ndarray of lists
-        The lists trace the indices of the subhalos through snapshots.
-        Each list element is a tuple, where the first entry is the
-        snap_id and the second entry is the idx of the subhalo in that
-        snapshot.
-    """
-
-    tracer = [[(snap_init.snap_id, i)] for i in
-              range(snap_init.get_halo_number(gns))]
-    snap = snap_init
-    while snap.snap_id > stop:
-        snap_next = Snapshot(snap.sim_id, snap.snap_id - 1)
-        matches = match_all(snap, snap_next, gns)
-        for halo_tracer in tracer:
-            last_idx = halo_tracer[-1][1]
-            if not last_idx is None:
-                halo_tracer += [(snap_next.snap_id, matches[last_idx])]
-
-        snap = snap_next
-
-    tracer = np.array(tracer)
-    return tracer
-
-
-def match_all(snap_ref, snap_exp, gns=[]):
+def match_snapshots(snap_ref, snap_exp, no_match=2 ** 32):
     """ Try matching all halos in snap_ref with given group numbers with
     halos in snap_exp with the same set of group numbers. 
     
@@ -55,8 +16,8 @@ def match_all(snap_ref, snap_exp, gns=[]):
         Reference snapshot.
     snap_exp : Snapshot object
         Explored snapshot.
-    gns : list of int, optional
-        Group numbers that are to be matched. If empty, match all.
+    no_match : int
+        Value used to indicate that no match is found.
 
     Returns
     -------
@@ -66,12 +27,12 @@ def match_all(snap_ref, snap_exp, gns=[]):
         the halo in index i, then matches_ref[i] = [-1,-1].
     """
 
-    reference, explore = get_data_for_matching(snap_ref, snap_exp, gns)
+    reference, explore = get_data_for_matching(snap_ref, snap_exp)
 
     # Initialize matches:
-    matches_ref = np.array([None] * reference['GNs'].size)
-    matches_exp = np.array([None] * explore['GNs'].size)  # This is
-    # defined just make the code run a bit faster
+    matches_ref = no_match * np.ones(reference['GNs'].size, dtype=int)
+    matches_exp = no_match * np.ones(explore['GNs'].size, dtype=int)
+    # This is defined just make the code run a bit faster
 
     init_idents = identify_group_numbers(reference['GNs'], explore['GNs'])
 
@@ -80,7 +41,10 @@ def match_all(snap_ref, snap_exp, gns=[]):
     for idx_ref, idx_exp in enumerate(init_idents):
         heapq.heappush(pq, (0, (idx_ref, idx_exp)))
 
+    trials = 0
+    n_matched = 0
     while len(pq) > 0:
+        trials += 1
 
         # Get next one for matching:
         next_item = heapq.heappop(pq)
@@ -99,19 +63,23 @@ def match_all(snap_ref, snap_exp, gns=[]):
                                  reference['Mass'][idx_ref])
 
         if found_match:
+            n_matched += 1
             matches_ref[idx_ref] = idx_exp
             matches_exp[idx_exp] = idx_ref
         else:
-            new_step = iterate_step(idx_exp0, step, matches_exp)
+            new_step = iterate_step(idx_exp0, step, matches_exp, no_match)
             # If new_step == step, then all potential matches_ref for
             # idx_ref have been explored:
             if new_step != step:
                 heapq.heappush(pq, (new_step, (idx_ref, idx_exp0)))
 
+    print("{} -> {}: {} trials, {} matches".format(snap_ref.snap_id,
+                                                   snap_exp.snap_id,
+                                                   trials, n_matched))
     return matches_ref
 
 
-def get_data_for_matching(snap_ref, snap_exp, gns):
+def get_data_for_matching(snap_ref, snap_exp):
     """ Retrieve datasets for matching for the given set of group numbers.
     
     Parameters
@@ -120,8 +88,6 @@ def get_data_for_matching(snap_ref, snap_exp, gns):
         Reference snapshot.
     snap_exp : Snapshot object
         Explored snapshot.
-    gns : list of int
-        Group numbers that are to be matched. If empty, match all.
 
     Returns
     -------
@@ -129,24 +95,15 @@ def get_data_for_matching(snap_ref, snap_exp, gns):
         Matching data for both snapshots in dictionaries.
     """
 
-    gns_ref = snap_ref.get_subhalos('GroupNumber')
-    gns_exp = snap_exp.get_subhalos('GroupNumber')
+    reference = {'GNs': snap_ref.get_subhalos('GroupNumber'),
+                 'SGNs': snap_ref.get_subhalos('SubGroupNumber'),
+                 'IDs': snap_ref.get_subhalos_IDs(part_type=1),
+                 'Mass': snap_ref.get_subhalos('MassType')[:, 1]}
 
-    mask_ref = [True] * gns_ref.size
-    mask_exp = [True] * gns_exp.size
-    if gns:
-        mask_ref = [gn in gns for gn in gns_ref]
-        mask_exp = [gn in gns for gn in gns_exp]
-
-    reference = {'GNs': gns_ref[mask_ref],
-                 'SGNs': snap_ref.get_subhalos('SubGroupNumber')[mask_ref],
-                 'IDs': snap_ref.get_subhalos_IDs(part_type=1)[mask_ref],
-                 'Mass': snap_ref.get_subhalos('MassType')[:, 1][mask_ref]}
-
-    explore = {'GNs': gns_exp[mask_exp],
-               'SGNs': snap_exp.get_subhalos('SubGroupNumber')[mask_exp],
-               'IDs': snap_exp.get_subhalos_IDs(part_type=1)[mask_exp],
-               'Mass': snap_exp.get_subhalos('MassType')[:, 1][mask_exp]}
+    explore = {'GNs': snap_exp.get_subhalos('GroupNumber'),
+               'SGNs': snap_exp.get_subhalos('SubGroupNumber'),
+               'IDs': snap_exp.get_subhalos_IDs(part_type=1),
+               'Mass': snap_exp.get_subhalos('MassType')[:, 1]}
 
     return reference, explore
 
@@ -194,7 +151,7 @@ def identify_group_numbers(gns1, gns2):
     return idx_of1_in2
 
 
-def iterate_step(idx_ref, step_start, matches, one_to_one=False):
+def iterate_step(idx_ref, step_start, matches, no_match, one_to_one=False):
     """ Find the next index, which is nearest to idx_ref and has not yet
     been matched, for matching.
 
@@ -221,7 +178,7 @@ def iterate_step(idx_ref, step_start, matches, one_to_one=False):
     """
 
     # Set maximum number of iterations:
-    term = 60
+    term = 10000
 
     step = step_start
     while step < term:
@@ -233,7 +190,7 @@ def iterate_step(idx_ref, step_start, matches, one_to_one=False):
             break
 
         # If next index has not yet been matched:
-        if matches[idx] is None or not one_to_one:
+        if matches[idx] == no_match or not one_to_one:
             step += 1
             break
 
@@ -305,7 +262,7 @@ def find_match(subhalo, snap_id, snap_exp):
     gn, sgn = subhalo.tracer.get(snap_id)
 
     # Set maximum number of iterations:
-    term = 100
+    term = 10000
 
     # Read subhalos with group numbers and subgroup numbers near gn and
     # sgn:
@@ -411,18 +368,26 @@ def is_a_match(ids_ref, mass_ref, ids_exp, mass_exp,
     f_exp = 1 / 5  # number of most bound in explored for matching
     frac_mass = 3  # Limit for mass difference between matching halos
 
-    most_bound_ref = ids_ref[:n_link]
-    if limit_ids_exp:
-        most_bound_exp = ids_exp[:int(ids_exp.size * f_exp)]
-    else:
-        most_bound_exp = ids_exp
-
-    shared_parts = np.intersect1d(most_bound_ref, most_bound_exp,
-                                  assume_unique=True)
     found_match = False
-    if (len(shared_parts) > n_link / 2) and \
-            (mass_ref / mass_exp < frac_mass) and \
-            (mass_ref / mass_exp > 1 / frac_mass):
-        found_match = True
+
+    # Ignore pure gas halos:
+    if mass_ref > 0 and mass_exp > 0:
+
+        # Check masses:
+        if (mass_ref / mass_exp < frac_mass) and \
+                (mass_ref / mass_exp > 1 / frac_mass):
+
+            # Get most bound particles:
+            most_bound_ref = ids_ref[:n_link]
+            if limit_ids_exp:
+                most_bound_exp = ids_exp[:int(ids_exp.size * f_exp)]
+            else:
+                most_bound_exp = ids_exp
+
+            # Check intersection:
+            shared_parts = np.intersect1d(most_bound_ref, most_bound_exp,
+                                          assume_unique=True)
+            if len(shared_parts) > n_link / 2:
+                found_match = True
 
     return found_match

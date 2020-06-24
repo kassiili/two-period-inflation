@@ -6,15 +6,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from snapshot_obj import Snapshot
 from curve_fit import poly_fit
-import trace_halo
+import halo_matching
 
 def test_trace_halo(snap):
-    print(trace_halo.trace_halo(snap,12,0,direction='forward'))
+    print(halo_matching.trace_halo(snap, 12, 0, direction='forward'))
 
 def test_get_subhalo(snap,gn,sgn):
     attrs = ['GroupNumber','Vmax']
     for attr in attrs:
-        data,idx = trace_halo.get_subhalo(snap,attr,gn,sgn)
+        data,idx = halo_matching.get_subhalo(snap, attr, gn, sgn)
         print(idx,data)
         print("Correct:",gn,sgn)
         g = snap.get_subhalos('GroupNumber',False)[0][idx]
@@ -22,7 +22,7 @@ def test_get_subhalo(snap,gn,sgn):
         print("Returned:",g,s)
 
 def test_get_subhalo_IDs(snap,gn,sgn):
-    data, idx = trace_halo.get_subhalo_IDs(snap,gn,sgn)
+    data, idx = halo_matching.get_subhalo_IDs(snap, gn, sgn)
     print(data.shape)
     print(type(data))
 #    print(idx,data)
@@ -49,24 +49,24 @@ def test_match_halo():
     gn6 = 2; sgn6 = 8
     
     # Get particle IDs and halo mass:
-    IDs1,_ = trace_halo.get_subhalo_IDs(snap1,gn1,sgn1)
-    mass1 = trace_halo.get_subhalo(snap1,'Mass',gn1,sgn1)[0]
-    IDs2,_ = trace_halo.get_subhalo_IDs(snap2,gn2,sgn2)
-    mass2 = trace_halo.get_subhalo(snap2,'Mass',gn2,sgn2)[0]
-    IDs3,_ = trace_halo.get_subhalo_IDs(snap3,gn3,sgn3)
-    mass3 = trace_halo.get_subhalo(snap3,'Mass',gn3,sgn3)[0]
-    IDs4,_ = trace_halo.get_subhalo_IDs(snap4,gn4,sgn4)
-    mass4 = trace_halo.get_subhalo(snap4,'Mass',gn4,sgn4)[0]
-    IDs5,_ = trace_halo.get_subhalo_IDs(snap5,gn5,sgn5)
-    mass5 = trace_halo.get_subhalo(snap5,'Mass',gn5,sgn5)[0]
-    IDs6,_ = trace_halo.get_subhalo_IDs(snap6,gn6,sgn6)
-    mass6 = trace_halo.get_subhalo(snap6,'Mass',gn6,sgn6)[0]
+    IDs1,_ = halo_matching.get_subhalo_IDs(snap1, gn1, sgn1)
+    mass1 = halo_matching.get_subhalo(snap1, 'Mass', gn1, sgn1)[0]
+    IDs2,_ = halo_matching.get_subhalo_IDs(snap2, gn2, sgn2)
+    mass2 = halo_matching.get_subhalo(snap2, 'Mass', gn2, sgn2)[0]
+    IDs3,_ = halo_matching.get_subhalo_IDs(snap3, gn3, sgn3)
+    mass3 = halo_matching.get_subhalo(snap3, 'Mass', gn3, sgn3)[0]
+    IDs4,_ = halo_matching.get_subhalo_IDs(snap4, gn4, sgn4)
+    mass4 = halo_matching.get_subhalo(snap4, 'Mass', gn4, sgn4)[0]
+    IDs5,_ = halo_matching.get_subhalo_IDs(snap5, gn5, sgn5)
+    mass5 = halo_matching.get_subhalo(snap5, 'Mass', gn5, sgn5)[0]
+    IDs6,_ = halo_matching.get_subhalo_IDs(snap6, gn6, sgn6)
+    mass6 = halo_matching.get_subhalo(snap6, 'Mass', gn6, sgn6)[0]
 
-    print(trace_halo.is_a_match(IDs1, mass1, IDs2, mass2))
-    print(trace_halo.is_a_match(IDs1, mass1, IDs3, mass3))
-    print(trace_halo.is_a_match(IDs1, mass1, IDs4, mass4))
-    print(trace_halo.is_a_match(IDs1, mass1, IDs5, mass5))
-    print(trace_halo.is_a_match(IDs1, mass1, IDs6, mass6))
+    print(halo_matching.is_a_match(IDs1, mass1, IDs2, mass2))
+    print(halo_matching.is_a_match(IDs1, mass1, IDs3, mass3))
+    print(halo_matching.is_a_match(IDs1, mass1, IDs4, mass4))
+    print(halo_matching.is_a_match(IDs1, mass1, IDs5, mass5))
+    print(halo_matching.is_a_match(IDs1, mass1, IDs6, mass6))
 
 def test_match_snapshots():
 
@@ -84,20 +84,20 @@ def test_match_snapshots():
     print(np.bincount(sgns.astype(int))[:15])
 
     gn = 4; sgn = 4
-    gn_m, sgn_m = trace_halo.find_match(snap, snap_ref, gn, sgn)
+    gn_m, sgn_m = halo_matching.find_match(snap, snap_ref, gn, sgn)
     print(gn_m,sgn_m)
-    ids,_ = trace_halo.get_subhalo_IDs(snap_ref, gn, sgn)
-    ids_m,_ = trace_halo.get_subhalo_IDs(snap, gn_m, sgn_m)
-    m,_ = trace_halo.get_subhalo(snap_ref, 'Mass', gn, sgn)
-    m_m,_ = trace_halo.get_subhalo(snap, 'Mass', gn_m, sgn_m)
+    ids,_ = halo_matching.get_subhalo_IDs(snap_ref, gn, sgn)
+    ids_m,_ = halo_matching.get_subhalo_IDs(snap, gn_m, sgn_m)
+    m,_ = halo_matching.get_subhalo(snap_ref, 'Mass', gn, sgn)
+    m_m,_ = halo_matching.get_subhalo(snap, 'Mass', gn_m, sgn_m)
 
-    print(trace_halo.is_a_match(ids, m, ids_m, m_m))
-    print(trace_halo.get_subhalo(snap_ref,'Stars/Mass',gn,sgn))
-    print(trace_halo.get_subhalo(snap,'Stars/Mass',gn_m,sgn_m))
+    print(halo_matching.is_a_match(ids, m, ids_m, m_m))
+    print(halo_matching.get_subhalo(snap_ref, 'Stars/Mass', gn, sgn))
+    print(halo_matching.get_subhalo(snap, 'Stars/Mass', gn_m, sgn_m))
 
 def test_neighborhood(snap):
     gn=990; sgn=0
-    fnums = trace_halo.neighborhood(snap,gn,sgn,50)
+    fnums = halo_matching.neighborhood(snap, gn, sgn, 50)
     print(fnums)
     gns = snap.get_subhalos('GroupNumber',fnums=fnums)
     sgns = snap.get_subhalos('SubGroupNumber',fnums=fnums)
@@ -119,7 +119,7 @@ def test_identify_groupNumbers():
     gn_cnt2 = np.bincount(GNs2.astype(int))
     print('cnt1 : ',gn_cnt1)
     print('cnt2 : ',gn_cnt2)
-    ident = trace_halo.identify_group_numbers(GNs1, GNs2)
+    ident = halo_matching.identify_group_numbers(GNs1, GNs2)
     for idx1, idx2 in enumerate(ident[:150]):
         print(idx1,idx2)
         gn1 = GNs1[idx1]; sgn1 = SGNs1[idx1]
@@ -133,25 +133,25 @@ def test_next_matching_pair():
     print(idx_ref)
     for i,m in enumerate(matches):
         print(i,m)
-    print(trace_halo.next_matching_pair(idx_ref,0,matches))
-    print(trace_halo.next_matching_pair(idx_ref,4,matches))
+    print(halo_matching.next_matching_pair(idx_ref, 0, matches))
+    print(halo_matching.next_matching_pair(idx_ref, 4, matches))
 
 def test_iteration():
     arr = np.arange(60)
     ir = 54
     for step in range(6,70):
-        print("start:{}, step:{}, finish:{}".format(ir,step,\
-                trace_halo.iteration(ir,step,arr.size)))
+        print("start:{}, step:{}, finish:{}".format(ir, step, \
+                                                    halo_matching.iteration(ir, step, arr.size)))
     print('')
     ir = 4
     for step in range(6,70):
-        print("start:{}, step:{}, finish:{}".format(ir,step,\
-                trace_halo.iteration(ir,step,arr.size)))
+        print("start:{}, step:{}, finish:{}".format(ir, step, \
+                                                    halo_matching.iteration(ir, step, arr.size)))
 
 def test_match_all():
     snap1 = Snapshot("CDM_V1_LR", 127)
     snap2 = Snapshot("CDM_V1_LR", 126)
-    trace_halo.match_all(snap2,snap1)
+    halo_matching.match_snapshots(snap2, snap1)
 
 
 LCDM = Snapshot("CDM_V1_LR",100,"LCDM")

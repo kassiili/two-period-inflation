@@ -254,7 +254,7 @@ class Snapshot:
 
         return out
 
-    def get_halo_number(self, which_gns):
+    def get_halo_number(self, which_gns=[]):
 
         n = 0
         gns = self.get_subhalos("GroupNumber")
@@ -547,3 +547,12 @@ class Snapshot:
                     break
 
         return fileNum
+
+    def index_of_halo(self, gn, sgn):
+
+        gns = self.get_subhalos("GroupNumber")
+        sgns = self.get_subhalos("SubGroupNumber")
+        mask = np.logical_and(gns == gn, sgns == sgn)
+        idx = np.arange(gns.size)[mask][0]
+
+        return idx

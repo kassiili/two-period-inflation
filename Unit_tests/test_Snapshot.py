@@ -9,7 +9,7 @@ class TestSnapshot(ut.TestCase):
 
     def setUp(self):
         self.snapID = 127
-        self.simID = "CDM_V1_LR"
+        self.simID = "V1_LR_fix"
         self.snapshot = Snapshot(self.simID,self.snapID)
         self.grp_path = data_file_manipulation.get_data_path('group',\
                 self.simID, self.snapID)

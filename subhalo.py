@@ -2,29 +2,31 @@ import numpy as np
 
 import dataset_compute
 from snapshot_obj import Snapshot
-import trace_halo
+import halo_matching
 
 
 class Subhalo:
 
-    def __init__(self, sim_id, snap_id_ref, gn_ref, sgn_ref):
-        self.sim_id = sim_id
-        self.tracer = {snap_id_ref: (gn_ref, sgn_ref)}
+    def __init__(self, snap_z0, gn_z0, sgn_z0):
+        """
+
+        Parameters
+        ----------
+        snap_z0 : Snapshot
+        """
+        self.sim_id = snap_z0.sim_id
+        self.tracer = 2**32 * np.ones(snap_z0.snap_id+1, dtype=int)
+        self.tracer[snap_z0.snap_id] = snap_z0.index_of_halo(gn_z0, sgn_z0)
 
     def get_halo_data(self, data_name, snap_id):
         """ Retrieves a subhalo dataset in the given snapshot.
         """
 
-        gn, sgn = self.tracer[snap_id]
+        idx = self.tracer[snap_id]
         snap = Snapshot(self.sim_id, snap_id)
-        fnum = snap.file_of_halo(gn, sgn)
+        data = snap.get_subhalos(data_name)[idx]
 
-        gns = snap.get_subhalos('GroupNumber', fnums=[fnum])
-        sgns = snap.get_subhalos('SubGroupNumber', fnums=[fnum])
-        data = snap.get_subhalos(data_name, fnums=[fnum]) \
-            [np.logical_and((gns == gn), (sgns == sgn))]
-
-        return data[0]
+        return data
 
     def get_particles(self, dataset, snap_id):
         """ Retrieves a subhalo dataset in the given snapshot.
@@ -82,7 +84,7 @@ class Subhalo:
         snap = Snapshot(self.sim_id, snap_id)
         while snap.snap_id > stop:
             snap_next = Snapshot(snap.sim_id, snap.snap_id - 1)
-            gn, sgn = trace_halo.find_match(self, snap_id, snap_next)
+            gn, sgn = halo_matching.find_match(self, snap_id, snap_next)
 
             # No matching halo found:
             if gn == -1: break
@@ -94,16 +96,12 @@ class Subhalo:
 
         return self.tracer
 
-    def distance_to_central(self, snap_id):
+    def distance_to_central(self, snap_id, central):
         """ Compute distance to the central galaxy at the given snapshot.
         """
 
-        gn, sgn = self.tracer.get(snap_id)
-        if sgn == 0:
-            return 0
-
-        central = Subhalo(self.sim_id, snap_id, gn, 0)
-        galactic_centre = central.get_halo_data("CentreOfPotential", snap_id)
+        galactic_centre = central.get_halo_data("CentreOfPotential",
+                                                snap_id)
         halo_cop = self.get_halo_data("CentreOfPotential", snap_id)
         halo_cop = dataset_compute.periodic_wrap(Snapshot(
             self.sim_id, snap_id), galactic_centre, halo_cop)
