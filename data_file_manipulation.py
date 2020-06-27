@@ -2,6 +2,7 @@ import numpy as np
 import os
 import h5py
 
+
 def combine_data_files(files, filename):
     """ Create an HDF5 file object and add links to all given files
 
@@ -28,6 +29,7 @@ def combine_data_files(files, filename):
                 f['link{}'.format(i)] = \
                         h5py.ExternalLink(filename,'/')
 
+
 def get_data_path(data_category, simID, snapID):
     """ Constructs the path to data directory. 
     
@@ -43,7 +45,7 @@ def get_data_path(data_category, simID, snapID):
     """
 
     home = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.join(home,"snapshots",simID)
+    path = os.path.join(home, "snapshots", simID)
 
     prefix = ""
     if data_category == "part":
@@ -52,9 +54,9 @@ def get_data_path(data_category, simID, snapID):
         prefix += "groups_"
 
     # Find the snapshot directory and add to path:
-    for dirname in os.listdir(path):
-        if prefix + str(snapID) in dirname:
-            path = os.path.join(path,dirname) 
+    for dir_name in os.listdir(path):
+        if prefix + str(snapID) in dir_name:
+            path = os.path.join(path,dir_name)
 
     return path
 

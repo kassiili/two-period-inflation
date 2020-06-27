@@ -1,3 +1,4 @@
+import h5py
 import numpy as np
 import os.path
 
@@ -7,35 +8,41 @@ import halo_matching
 
 class SimulationTracer:
 
-    def __init__(self, snap_z0, stop):
+    def __init__(self, snap_z0, no_match=2 ** 32):
         """
 
         Parameters
         ----------
         snap_z0 : Snapshot
             Simulation snapshot at redshift z=0.
-        stop : int
-            The id of the snapshot beyond which the tracing is not
-            continued.
         """
-        self.snap_z0 = snap_z0
-        self.stop = stop
-        n_halos = snap_z0.get_halo_number()
+        self.sim_id = snap_z0.sim_id
+        self.n_halos = snap_z0.get_halo_number()
 
         # Name of file for saving the tracer:
-        self.tracer_file = ".tracer_{}_from{}to{}.npy".format(
-            snap_z0.sim_id, snap_z0.snap_id, self.stop)
+        self.tracer_file = ".tracer_{}.hdf5".format(snap_z0.sim_id)
 
-        # Set value indicating no match:
-        self.no_match = 2 ** 32
+        # If the tracer file does not yet exists, create it:
+        if not os.path.isfile(self.tracer_file):
+            print('creating file {}'.format(self.tracer_file))
+            # Initialize tracer:
+            tracer_arr = np.ones((self.n_halos, snap_z0.snap_id + 1),
+                                 dtype=int) * no_match
 
-        # Initialize tracer:
-        self.tracer = np.ones((n_halos, snap_z0.snap_id + 1),
-                              dtype=int) * self.no_match
-        # Identify halos in snap_ref with themselves:
-        self.tracer[:, snap_z0.snap_id] = np.arange(n_halos)
+            # Identify halos in snap_z0 with themselves:
+            tracer_arr[:, snap_z0.snap_id] = np.arange(self.n_halos)
 
-    def trace_all(self):
+            # Add tracer array to file:
+            with h5py.File(self.tracer_file, "w") as f:
+                tracer_dset = f.create_dataset("tracer", data=tracer_arr)
+                tracer_dset.attrs['earliest_snap'] = snap_z0.snap_id
+                tracer_dset.attrs['no_match'] = no_match
+
+                # For convenience, write snapshot ids as well:
+                f.create_dataset("snapshot_ids", data=np.arange(
+                    snap_z0.snap_id + 1))
+
+    def trace_all(self, stop):
         """ Traces all subhalos of given galaxies as far back in time as
         possible, starting from the given snapshot.
 
@@ -48,24 +55,31 @@ class SimulationTracer:
             snapshot.
         """
 
-        # Check if tracer file already exists:
-        if os.path.isfile(self.tracer_file):
-            self.tracer = np.load(self.tracer_file)
+        # Get the earliest traced snapshot and continue from there:
+        with h5py.File(self.tracer_file, "r") as f:
+            tracer = f['tracer']
+            no_match = tracer.attrs.get('no_match')
+            snap = Snapshot(self.sim_id, tracer.attrs.get('earliest_snap'))
+            tracer = tracer[...]
+            snap_ids = f['snapshot_ids'][...]
 
-        else:
-            snap = self.snap_z0
-            while snap.snap_id > self.stop:
-                snap_next = Snapshot(snap.sim_id, snap.snap_id - 1)
-                matches = halo_matching.match_snapshots(snap, snap_next,
-                                                    no_match=self.no_match)
-                for halo_tracer in self.tracer:
-                    last_idx = halo_tracer[snap.snap_id]
-                    if last_idx != self.no_match:
-                        halo_tracer[snap_next.snap_id] = matches[last_idx]
+        while snap.snap_id > stop:
+            snap_next = Snapshot(self.sim_id, snap.snap_id - 1)
+            matches = halo_matching.match_snapshots(snap, snap_next,
+                                                    no_match)
 
-                snap = snap_next
+            # Get those matches that connect to redshift zero:
+            for z0_idx, prev_idx in enumerate(tracer[:, snap.snap_id]):
+                if prev_idx != no_match:
+                    tracer[z0_idx, snap_next.snap_id] = matches[prev_idx]
 
-            # Save tracer:
-            np.save(self.tracer_file, self.tracer)
+            # Save new matches:
+            with h5py.File(self.tracer_file, "r+") as f:
+                f['tracer'][:, snap_next.snap_id] = tracer[:,
+                                                         snap_next.snap_id]
+                f['tracer'].attrs.modify('earliest_snap',
+                                         snap_next.snap_id)
 
-        return self.tracer
+            snap = snap_next
+
+        return tracer[:, stop:], snap_ids[stop:]

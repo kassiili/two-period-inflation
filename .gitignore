@@ -3,8 +3,11 @@ __pycache__
 Figures/
 snapshots/
 snapshots
-*.hdf5
 Dump/
+Gadgetviewer/
 .ipynb_checkpoints/
+*.hdf5
 *.dat
 *.npy
+
+npy_to_hdf5.py

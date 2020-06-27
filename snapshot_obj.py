@@ -86,7 +86,7 @@ class Snapshot:
 
         is_extension = False
         with h5py.File(self.grp_file, 'r') as grpf:
-            if dataset not in grpf['link1/Subhalo']:
+            if dataset not in grpf['link0/Subhalo']:
                 is_extension = True
 
         if is_extension:
@@ -330,11 +330,11 @@ class Snapshot:
             if pt in [1]:
                 # Get dm particle masses:
                 with h5py.File(self.part_file, 'r') as partf:
-                    dm_mass = partf['link1/Header'] \
+                    dm_mass = partf['link0/Header'] \
                         .attrs.get('MassTable')[pt]
                     dm_mass = self.convert_to_cgs_part(
                         np.array([dm_mass]), 'Masses')[0]
-                    dm_n = partf['link1/Header'] \
+                    dm_n = partf['link0/Header'] \
                         .attrs.get('NumPart_Total')[pt]
                     mass.append(np.ones(dm_n, dtype='f8') * dm_mass)
             else:
@@ -417,17 +417,17 @@ class Snapshot:
 
         with h5py.File(self.grp_file, 'r') as grpf:
             # Get conversion factors.
-            cgs = grpf['link1/Subhalo/{}'.format(dataset)].attrs \
+            cgs = grpf['link0/Subhalo/{}'.format(dataset)].attrs \
                 .get('CGSConversionFactor')
-            aexp = grpf['link1/Subhalo/{}'.format(dataset)].attrs \
+            aexp = grpf['link0/Subhalo/{}'.format(dataset)].attrs \
                 .get('aexp-scale-exponent')
-            hexp = grpf['link1/Subhalo/{}'.format(dataset)].attrs \
+            hexp = grpf['link0/Subhalo/{}'.format(dataset)].attrs \
                 .get('h-scale-exponent')
 
             # Get expansion factor and Hubble parameter from the 
             # header.
-            a = grpf['link1/Header'].attrs.get('Time')
-            h = grpf['link1/Header'].attrs.get('HubbleParam')
+            a = grpf['link0/Header'].attrs.get('Time')
+            h = grpf['link0/Header'].attrs.get('HubbleParam')
 
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
@@ -457,16 +457,16 @@ class Snapshot:
 
         with h5py.File(self.part_file, 'r') as partf:
             # Get conversion factors (same for all types):
-            cgs = partf['link1/PartType0/{}'.format(dataset)] \
+            cgs = partf['link0/PartType0/{}'.format(dataset)] \
                 .attrs.get('CGSConversionFactor')
-            aexp = partf['link1/PartType0/{}'.format(dataset)] \
+            aexp = partf['link0/PartType0/{}'.format(dataset)] \
                 .attrs.get('aexp-scale-exponent')
-            hexp = partf['link1/PartType0/{}'.format(dataset)] \
+            hexp = partf['link0/PartType0/{}'.format(dataset)] \
                 .attrs.get('h-scale-exponent')
 
             # Get expansion factor and Hubble parameter from the header:
-            a = partf['link1/Header'].attrs.get('Time')
-            h = partf['link1/Header'].attrs.get('HubbleParam')
+            a = partf['link0/Header'].attrs.get('Time')
+            h = partf['link0/Header'].attrs.get('HubbleParam')
 
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
@@ -496,16 +496,16 @@ class Snapshot:
 
         with h5py.File(self.grp_file, 'r') as grpf:
             # Get conversion factors (same for all types):
-            cgs = grpf['link1/IDs/{}'.format(dataset)] \
+            cgs = grpf['link0/IDs/{}'.format(dataset)] \
                 .attrs.get('CGSConversionFactor')
-            aexp = grpf['link1/IDs/{}'.format(dataset)] \
+            aexp = grpf['link0/IDs/{}'.format(dataset)] \
                 .attrs.get('aexp-scale-exponent')
-            hexp = grpf['link1/IDs/{}'.format(dataset)] \
+            hexp = grpf['link0/IDs/{}'.format(dataset)] \
                 .attrs.get('h-scale-exponent')
 
             # Get expansion factor and Hubble parameter from the header:
-            a = grpf['link1/Header'].attrs.get('Time')
-            h = grpf['link1/Header'].attrs.get('HubbleParam')
+            a = grpf['link0/Header'].attrs.get('Time')
+            h = grpf['link0/Header'].attrs.get('HubbleParam')
 
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
