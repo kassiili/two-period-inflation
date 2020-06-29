@@ -39,57 +39,46 @@ def generate_dataset(snapshot, dataset):
     """
 
     if dataset == 'V1kpc':
-        return compute_V1kpc(snapshot)
+        return compute_v1kpc(snapshot)
 
     return None
 
 
-def compute_V1kpc(snapshot):
+def compute_v1kpc(snapshot):
     """ For each subhalo, calculate the circular velocity at 1kpc. """
 
     # Get particle data:
-    part = {}
-    part['gns'] = snapshot.get_particles('GroupNumber')
-    part['sgns'] = snapshot.get_particles('SubGroupNumber')
-    part['coords'] = snapshot.get_particles('Coordinates') \
-                     * u.cm.to(u.kpc)
-    part['mass'] = snapshot.get_particle_masses() * u.g.to(u.Msun)
+    part = {'gns': snapshot.get_particles('GroupNumber'),
+            'sgns': snapshot.get_particles('SubGroupNumber'),
+            'coords': snapshot.get_particles('Coordinates'),
+            'mass': snapshot.get_particle_masses()}
 
     # Get subhalodata:
-    halo = {}
-    halo['gns'] = snapshot.get_subhalos('GroupNumber')
-    halo['sgns'] = snapshot.get_subhalos('SubGroupNumber')
-    halo['COPs'] = snapshot.get_subhalos('CentreOfPotential') \
-                   * u.cm.to(u.kpc)
+    halo = {'gns': snapshot.get_subhalos('GroupNumber'),
+            'sgns': snapshot.get_subhalos('SubGroupNumber'),
+            'COPs': snapshot.get_subhalos('CentreOfPotential')}
 
-    # Get box size:
-    with h5py.File(snapshot.part_file, 'r') as partf:
-        h = partf['link1/Header'].attrs.get('HubbleParam')
-        boxs = partf['link1/Header'].attrs.get('BoxSize') * 1000 / h
-        # Mpc/h -> kpc
-
-    massWithin1kpc = np.zeros((halo['gns'].size))
+    mass_within1kpc = np.zeros(halo['gns'].size)
 
     # Loop through subhalos:
     for idx, (gn, sgn, cop) in \
             enumerate(zip(halo['gns'], halo['sgns'], halo['COPs'])):
         # Get coordinates and masses of the particles in the halo:
-        halo_mask = np.logical_and(part['gns'] == gn, \
+        halo_mask = np.logical_and(part['gns'] == gn,
                                    part['sgns'] == sgn)
         coords = part['coords'][halo_mask]
         mass = part['mass'][halo_mask]
 
         # Calculate distances to cop:
-        d = np.mod(coords - cop + 0.5 * boxs, boxs) - 0.5 * boxs
-        r = np.linalg.norm(d, axis=1)
+        wrapped_coords = periodic_wrap(snapshot, cop, coords)
+        r = np.linalg.norm(wrapped_coords - cop, axis=1)
 
         # Get coordinates within 1kpc from COP:
-        r1kpc_mask = np.logical_and(r > 0, r < 1)
+        r1kpc_mask = np.logical_and(r > 0, r < u.kpc.to(u.cm))
+        mass_within1kpc[idx] = mass[r1kpc_mask].sum()
 
-        massWithin1kpc[idx] = mass[r1kpc_mask].sum()
-
-    myG = G.to(u.km ** 2 * u.kpc * u.Msun ** -1 * u.s ** -2).value
-    v1kpc = np.sqrt(massWithin1kpc * myG)
+    myG = G.to(u.cm ** 3 * u.g ** -1 * u.s ** -2).value
+    v1kpc = np.sqrt(mass_within1kpc * myG / u.kpc.to(u.cm))
 
     return v1kpc
 
@@ -111,23 +100,22 @@ def compute_rotation_curve(snapshot, gn, sgn, part_type=[0, 1, 4, 5],
     """
 
     # Get centre of potential:
-    SGNs = snapshot.get_subhalos("SubGroupNumber")
-    GNs = snapshot.get_subhalos("GroupNumber")
-    COPs = snapshot.get_subhalos("CentreOfPotential")
+    sgns = snapshot.get_subhalos("SubGroupNumber")
+    gns = snapshot.get_subhalos("GroupNumber")
+    cops = snapshot.get_subhalos("CentreOfPotential")
 
-    halo_mask = np.logical_and(SGNs == sgn, GNs == gn)
-    cop = COPs[halo_mask]
+    halo_mask = np.logical_and(sgns == sgn, gns == gn)
+    cop = cops[halo_mask]
 
     # Get coordinates and masses of the halo:
-    SGNs = snapshot.get_particles("SubGroupNumber", part_type=part_type)
-    GNs = snapshot.get_particles("GroupNumber", part_type=part_type)
+    sgns = snapshot.get_particles("SubGroupNumber", part_type=part_type)
+    gns = snapshot.get_particles("GroupNumber", part_type=part_type)
     coords = snapshot.get_particles("Coordinates", part_type=part_type)
     mass = snapshot.get_particle_masses(part_type=part_type)
 
-    halo_mask = np.logical_and(SGNs == sgn, GNs == gn)
+    halo_mask = np.logical_and(sgns == sgn, gns == gn)
     coords = periodic_wrap(snapshot, cop, coords[halo_mask])
     mass = mass[halo_mask]
-    print(part_type, np.sum(halo_mask))
 
     # Calculate distance to centre and cumulative mass:
     r = np.linalg.norm(coords - cop, axis=1)
@@ -156,9 +144,9 @@ def periodic_wrap(snapshot, cop, coords):
 
     # Periodic wrap coordinates around centre.
     with h5py.File(snapshot.part_file, 'r') as partf:
-        h = partf['link1/Header'].attrs.get('HubbleParam')
-        boxs = partf['link1/Header'].attrs.get('BoxSize')
-        boxs = snapshot.convert_to_cgs_group(np.array([boxs]), \
+        h = partf['link0/Header'].attrs.get('HubbleParam')
+        boxs = partf['link0/Header'].attrs.get('BoxSize')
+        boxs = snapshot.convert_to_cgs_group(np.array([boxs]),
                                              'CentreOfPotential') / h
     wrapped = np.mod(coords - cop + 0.5 * boxs, boxs) + cop - 0.5 * boxs
 

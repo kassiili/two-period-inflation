@@ -431,7 +431,7 @@ class Snapshot:
 
             # Convert to physical and return in cgs units.
             if data.dtype != np.int32 and data.dtype != np.int64:
-                converted = np.multiply(data, cgs * a ** aexp * h ** hexp, \
+                converted = np.multiply(data, cgs * a ** aexp * h ** hexp,
                                         dtype='f8')
 
         return converted
