@@ -18,6 +18,8 @@ class SimulationTracer:
         """
         self.sim_id = snap_z0.sim_id
         self.n_halos = snap_z0.get_halo_number()
+        self.earliest_snap = snap_z0.snap_id
+        self.no_match = no_match
 
         # Name of file for saving the tracer:
         self.tracer_file = ".tracer_{}.hdf5".format(snap_z0.sim_id)
@@ -41,6 +43,10 @@ class SimulationTracer:
                 # For convenience, write snapshot ids as well:
                 f.create_dataset("snapshot_ids", data=np.arange(
                     snap_z0.snap_id + 1))
+        else:
+            with h5py.File(self.tracer_file, 'r') as f:
+                self.earliest_snap = f['tracer'].attrs.get(
+                    'earliest_snap')
 
     def trace_all(self, stop):
         """ Traces all subhalos of given galaxies as far back in time as
@@ -79,7 +85,22 @@ class SimulationTracer:
                                                          snap_next.snap_id]
                 f['tracer'].attrs.modify('earliest_snap',
                                          snap_next.snap_id)
+            self.earliest_snap = snap.snap_id
 
             snap = snap_next
 
         return tracer[:, stop:], snap_ids[stop:]
+
+    def get_tracer(self):
+
+        with h5py.File(self.tracer_file, 'r') as f:
+            out = f['tracer'][:, self.earliest_snap:]
+
+        return out
+
+    def get_snapshot_ids(self):
+
+        with h5py.File(self.tracer_file, 'r') as f:
+            out = f['snapshot_ids'][self.earliest_snap:]
+
+        return out
