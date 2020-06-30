@@ -39,8 +39,13 @@ def generate_dataset(snapshot, dataset):
     """
 
     if dataset == 'V1kpc':
-        return compute_v1kpc(snapshot)
+        return compute_vcirc(snapshot, u.kpc.to(u.cm))
+
     elif dataset == 'MassAccum':
+        # Combine all particles from all subhalos into one long array.
+        # Particles are ordered first by halo, then by particle
+        # type, and lastly by distance to host halo.
+
         ma, r = compute_mass_accumulation(snapshot, part_type=[0])
         for pt in [1, 4, 5]:
             ma_add, r_add = compute_mass_accumulation(snapshot,
@@ -51,11 +56,64 @@ def generate_dataset(snapshot, dataset):
         ma = np.concatenate(ma)
         r = np.concatenate(r)
 
-        combined = np.column_stack((r, ma))
+        combined = np.column_stack((ma, r))
 
         return combined
 
+    elif dataset == 'Max_Vcirc':
+        vmax, rmax = compute_vmax(snapshot)
+        combined = np.column_stack((vmax, rmax))
+        return combined
+
     return None
+
+
+def compute_vcirc(snapshot, r):
+    cmass, radii = compute_mass_accumulation(snapshot)
+
+    n_parts_inside_r = [np.sum(np.array(radii_halo) < r) for radii_halo in
+                        radii]
+
+    # Exclude spurious cases:
+    def condition(n, n_sub):
+        return (n_sub < n) and (n_sub > 0)
+
+    a = 2  # number of values averaged around r
+    mass_inside_r = [np.mean(cm[n - int(a / 2):n - 1 + int(a / 2)])
+                     if condition(len(cm), n) else 0
+                     for cm, n in zip(cmass, n_parts_inside_r)]
+
+    myG = G.to(u.cm ** 3 * u.g ** -1 * u.s ** -2).value
+    v_circ_at_r = np.array([np.sqrt(m * myG / r) for m in mass_inside_r])
+
+    return v_circ_at_r
+
+
+def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
+    cmass, radii = compute_mass_accumulation(snapshot, part_type=part_type)
+
+    # Compute running average:
+    radii = [np.array(r[n_soft::n_soft]) for r in radii]
+    cmass = [np.array(cm[n_soft::n_soft]) for cm in cmass]
+
+    myG = G.to(u.cm ** 3 * u.g ** -1 * u.s ** -2).value
+    v_circ = [np.sqrt(cm * myG / r) for cm, r in zip(cmass, radii)]
+
+    # Add zero:
+    radii = np.array([np.concatenate((np.array([0]), r)) for r in radii])
+    v_circ = np.array([np.concatenate((np.array([0]), v)) for v in v_circ])
+
+    return v_circ, radii
+
+
+def compute_vmax(snapshot, n_soft=5):
+    v_circ, radii = compute_rotation_curves(snapshot, n_soft=n_soft)
+
+    max_idx = [np.argmax(v) for v in v_circ]
+    vmax = np.array([v[i] for v, i in zip(v_circ, max_idx)])
+    rmax = np.array([r[i] for r, i in zip(radii, max_idx)])
+
+    return vmax, rmax
 
 
 def mass_accumulation_to_array(snapshot):
@@ -63,8 +121,8 @@ def mass_accumulation_to_array(snapshot):
     splitting_points = np.cumsum(np.concatenate(sublentype))[:-1] \
         .astype(int)
     raw_cmass = snapshot.get_subhalos('MassAccum')
-    radii = raw_cmass[:, 0]
-    cmass = raw_cmass[:, 1]
+    cmass = raw_cmass[:, 0]
+    radii = raw_cmass[:, 1]
     cmass = np.array(np.split(cmass, splitting_points)).reshape(
         (np.size(sublentype, axis=0), 6))
     radii = np.array(np.split(radii, splitting_points)).reshape(

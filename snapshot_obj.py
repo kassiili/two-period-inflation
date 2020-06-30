@@ -169,7 +169,7 @@ class Snapshot:
 
             # Create dataset in grpf:
             with h5py.File(self.grp_file, 'r+') as grpf:
-                grpf.create_dataset('/extended/{}'.format(dataset), \
+                grpf.create_dataset('/extended/{}'.format(dataset),
                                     data=out)
 
         return out
