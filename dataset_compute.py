@@ -27,7 +27,7 @@ def split_satellites(snap, dataset, fnums=[]):
     data = snap.get_subhalos(dataset, fnums=fnums)
 
     # Divide into satellites and isolated galaxies:
-    data_sat= data[sgns != 0]
+    data_sat = data[sgns != 0]
     data_isol = data[sgns == 0]
 
     return (data_sat, data_isol)
@@ -42,6 +42,77 @@ def generate_dataset(snapshot, dataset):
         return compute_v1kpc(snapshot)
 
     return None
+
+
+def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
+
+    # In order to not mix indices between arrays, we need all particle
+    # arrays from grouping method:
+    grouped_coords = group_particles_by_subhalo(snapshot, 'Coordinates',
+                                                part_type=part_type)
+    grouped_mass = group_particles_by_subhalo(snapshot, 'Masses',
+                                              part_type=part_type)
+    grouped_gns = group_particles_by_subhalo(snapshot, 'GroupNumber',
+                                              part_type=part_type)
+    grouped_sgns = group_particles_by_subhalo(snapshot, 'SubGroupNumber',
+                                              part_type=part_type)
+
+    cops = snapshot.get_subhalos('CentreOfPotential')
+
+    # Get particle radii from their host halo (wrapped):
+    h = snapshot.get_attribute('HubbleParam', 'Header')
+    boxs = snapshot.get_attribute('BoxSize', 'Header')
+    boxs = snapshot.convert_to_cgs_group(boxs, 'CentreOfPotential') / h
+    grouped_radii = [np.linalg.norm(
+        np.mod(coords - cop + 0.5 * boxs, boxs) - 0.5 * boxs, axis=1)
+        for coords, cop in zip(grouped_coords, cops)]
+
+    # Sort particles, first by subhalo, then by distance from host:
+    gns = np.concatenate(grouped_gns)
+    sgns = np.concatenate(grouped_sgns)
+    radii = np.concatenate(grouped_radii)
+    sort = np.lexsort((radii, sgns, gns))
+
+    # Sort particle mass array:
+    mass = np.concatenate(grouped_mass)
+    part_num = [np.size(arr) for arr in grouped_mass]
+    splitting_points = np.cumsum(part_num)[:-1]
+    mass_split = np.split(mass[sort], splitting_points)
+
+    # Sort also array of radii:
+    grouped_radii = np.split(radii[sort], splitting_points)
+
+    # Compute mass accumulation with radius for each subhalo:
+    cum_mass = [np.cumsum(mass) for mass in mass_split]
+
+    return cum_mass, grouped_radii
+
+
+def group_particles_by_subhalo(snapshot, dataset, part_type=[0, 1, 4, 5]):
+    # Get particle data:
+    gns = snapshot.get_particles('GroupNumber', part_type=part_type)
+    sgns = snapshot.get_particles('SubGroupNumber', part_type=part_type)
+    data = snapshot.get_particles(dataset, part_type=part_type)
+
+    # Get subhalo data:
+    part_num = snapshot.get_subhalos('SubLengthType')[:,
+               part_type].astype(int)
+
+    # Exclude particles that are not bound to a subhalo:
+    mask_bound = (sgns < np.max(gns))
+    gns = gns[mask_bound]
+    sgns = sgns[mask_bound]
+    data = data[mask_bound]
+
+    # Sort particles first by group number then by subgroup number:
+    sort = np.lexsort((sgns, gns))
+    data = data[sort]
+
+    # Split particle data by halo:
+    splitting_points = np.cumsum(np.sum(part_num, axis=1))[:-1]
+    out = np.split(data, splitting_points)
+
+    return out
 
 
 def compute_v1kpc(snapshot):
