@@ -55,12 +55,14 @@ class Snapshot:
         self.grp_file = '.groups_{}_{}.hdf5'.format(sim_id, snap_id)
         self.part_file = '.particles_{}_{}.hdf5'.format(sim_id, snap_id)
 
-        path = data_file_manipulation.get_data_path('group', sim_id, snap_id)
+        path = data_file_manipulation.get_data_path('group', sim_id,
+                                                    snap_id)
         data_file_manipulation.combine_data_files( \
             np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))), \
             self.grp_file)
 
-        path = data_file_manipulation.get_data_path('part', sim_id, snap_id)
+        path = data_file_manipulation.get_data_path('part', sim_id,
+                                                    snap_id)
         data_file_manipulation.combine_data_files( \
             np.array(glob.glob(os.path.join(path, 'snap*'))), \
             self.part_file)
@@ -282,6 +284,33 @@ class Snapshot:
             Requested dataset in cgs units.
         """
 
+        out = []
+        if dataset == 'Masses':
+            out = self.get_particle_masses(part_type)
+        else:
+            out = self.get_particle_catalogue(dataset, part_type=part_type,
+                                              fnums=fnums)
+
+        return out
+
+    def get_particle_catalogue(self, dataset, part_type=[0, 1, 4, 5],
+                               fnums=[]):
+        """ Reads the dataset from particle catalogues.
+
+        Parameters
+        ----------
+        dataset : str
+            Dataset to be retrieved.
+        part_type : list of int, optional
+            Types of particles, whose attribute values are retrieved (the
+            default is set for high-res part types)
+
+        Returns
+        -------
+        out : HDF5 dataset
+            Requested dataset in cgs units.
+        """
+
         # Output array.
         out = []
 
@@ -338,7 +367,8 @@ class Snapshot:
                         .attrs.get('NumPart_Total')[pt]
                     mass.append(np.ones(dm_n, dtype='f8') * dm_mass)
             else:
-                mass.append(self.get_particles('Masses', part_type=[pt]))
+                mass.append(self.get_particle_catalogue('Masses',
+                                                        part_type=[pt]))
 
         mass = np.concatenate(mass)
 
