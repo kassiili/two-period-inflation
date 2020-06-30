@@ -40,11 +40,52 @@ def generate_dataset(snapshot, dataset):
 
     if dataset == 'V1kpc':
         return compute_v1kpc(snapshot)
+    elif dataset == 'MassAccum':
+        ma, r = compute_mass_accumulation(snapshot, part_type=[0])
+        for pt in [1, 4, 5]:
+            ma_add, r_add = compute_mass_accumulation(snapshot,
+                                                      part_type=[pt])
+            ma += ma_add
+            r += r_add
+
+        ma = np.concatenate(ma)
+        r = np.concatenate(r)
+
+        combined = np.column_stack((r, ma))
+
+        return combined
 
     return None
 
 
+def mass_accumulation_to_array(snapshot):
+    sublentype = snapshot.get_subhalos('SubLengthType')
+    splitting_points = np.cumsum(np.concatenate(sublentype))[:-1] \
+        .astype(int)
+    raw_cmass = snapshot.get_subhalos('MassAccum')
+    radii = raw_cmass[:, 0]
+    cmass = raw_cmass[:, 1]
+    cmass = np.array(np.split(cmass, splitting_points)).reshape(
+        (np.size(sublentype, axis=0), 6))
+    radii = np.array(np.split(radii, splitting_points)).reshape(
+        (np.size(sublentype, axis=0), 6))
+
+    return cmass, radii
+
+
 def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
+    """
+
+    Parameters
+    ----------
+    snapshot
+    part_type
+
+    Returns
+    -------
+    cum_mass, grouped_radii : ndarray of list
+
+    """
 
     # In order to not mix indices between arrays, we need all particle
     # arrays from grouping method:
@@ -53,7 +94,7 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     grouped_mass = group_particles_by_subhalo(snapshot, 'Masses',
                                               part_type=part_type)
     grouped_gns = group_particles_by_subhalo(snapshot, 'GroupNumber',
-                                              part_type=part_type)
+                                             part_type=part_type)
     grouped_sgns = group_particles_by_subhalo(snapshot, 'SubGroupNumber',
                                               part_type=part_type)
 
@@ -80,10 +121,11 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     mass_split = np.split(mass[sort], splitting_points)
 
     # Sort also array of radii:
-    grouped_radii = np.split(radii[sort], splitting_points)
+    grouped_radii = np.array([list(r) for r in np.split(radii[sort],
+                                                        splitting_points)])
 
     # Compute mass accumulation with radius for each subhalo:
-    cum_mass = [np.cumsum(mass) for mass in mass_split]
+    cum_mass = np.array([list(np.cumsum(mass)) for mass in mass_split])
 
     return cum_mass, grouped_radii
 
