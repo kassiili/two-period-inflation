@@ -4,7 +4,10 @@ Figures/
 snapshots/
 snapshots
 Dump/
-Gadgetviewer/
+Gadgetviewer/Settings
+Gadgetviewer/Images
+Gadgetviewer/Movies
+Gadgetviewer/Movie_params
 .ipynb_checkpoints/
 *.hdf5
 *.dat
