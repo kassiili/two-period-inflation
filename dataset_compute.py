@@ -5,6 +5,35 @@ import astropy.units as u
 from astropy.constants import G
 
 
+def split_subhalos_distict1(snap, dataset, split_luminous=False):
+    gns = snap.get_subhalos('GroupNumber')
+    sgns = snap.get_subhalos('SubGroupNumber')
+
+    # Extract MW and M31 satellites vs. isolated by group numbers:
+    mask_sat = np.logical_and(np.logical_or(gns == 1, gns == 2), sgns != 0)
+    mask_isol = np.logical_and(np.logical_or(gns != 1, gns != 2),
+                               sgns == 0)
+    if split_luminous:
+        sm = snap.get_subhalos('Stars/Mass')
+        mask_lum = (sm > 0)
+        mask_dark = (sm == 0)
+        satellites = {'luminous': dataset[np.logical_and(mask_sat,
+                                                         mask_lum)],
+                      'dark': dataset[np.logical_and(mask_sat,
+                                                     mask_dark)]}
+        isolated = {'luminous': dataset[np.logical_and(mask_isol,
+                                                       mask_lum)],
+                    'dark': dataset[np.logical_and(mask_isol,
+                                                   mask_dark)]}
+    else:
+        satellites = dataset[mask_sat]
+        isolated = dataset[mask_isol]
+
+    split_data = {'satellites': satellites, 'isolated': isolated}
+
+    return split_data
+
+
 def split_satellites(snap, dataset, fnums=[]):
     """ Reads an attribute from snapshot and divides into satellites and
     isolated galaxies.
