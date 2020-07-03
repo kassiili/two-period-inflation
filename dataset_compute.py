@@ -119,6 +119,15 @@ def compute_vcirc(snapshot, r):
 
 
 def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
+    """ Compute the smoothed rotation curves of all subhalos.
+
+    Parameters
+    ----------
+    snapshot : Snapshot object
+    n_soft : int, optional
+        Number of particles summed over for a single point on the
+        rotation curve.
+    """
     cmass, radii = compute_mass_accumulation(snapshot, part_type=part_type)
 
     # Compute running average:
@@ -170,7 +179,7 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
 
     Returns
     -------
-    cum_mass, grouped_radii : ndarray of list
+    cum_mass, grouped_radii : ndarray of ndarray
 
     Notes
     -----
@@ -206,11 +215,11 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     mass_split = np.split(mass[sort], splitting_points)
 
     # Sort also array of radii:
-    grouped_radii = np.array([list(r) for r in np.split(radii[sort],
+    grouped_radii = np.array([r for r in np.split(radii[sort],
                                                         splitting_points)])
 
     # Compute mass accumulation with radius for each subhalo:
-    cum_mass = np.array([list(np.cumsum(mass)) for mass in mass_split])
+    cum_mass = np.array([np.cumsum(mass) for mass in mass_split])
 
     return cum_mass, grouped_radii
 

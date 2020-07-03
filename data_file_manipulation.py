@@ -105,4 +105,36 @@ def create_dataset(snapshot, dataset, group):
         with h5py.File(snapshot.grp_file, 'r+') as grpf:
             grpf.create_dataset('/{}/{}'.format(group, dataset), data=out)
 
+    elif subgroup_list[1] == 'RotationCurve':
+        part_type = subgroup_list[2]
+        pt_list = []
+        if part_type == 'All':
+            pt_list = [0, 1, 4, 5]
+        else:
+            pt_list = [int(part_type[-1])]
+
+        v_circ, radii = dataset_compute.compute_rotation_curves(
+            snapshot, n_soft=10, part_type=pt_list)
+
+        # Save array lengths, and concatenate to single array (which is
+        # HDF5 compatible):
+        sub_length = np.array([r.size for r in radii])
+        sub_offset = np.concatenate((np.array([0]),
+                                     np.cumsum(sub_length)[:-1]))
+        v_circ = np.concatenate(v_circ)
+        radii = np.concatenate(radii)
+        combined = np.column_stack((v_circ, radii))
+
+        # Set return value:
+        if dataset == 'Vcirc':
+            out = combined
+        elif dataset == 'SubOffset':
+            out = sub_offset
+
+        # Create datasets in grpf:
+        with h5py.File(snapshot.grp_file, 'r+') as grpf:
+            grpf.create_dataset('/{}/Vcirc'.format(group), data=combined)
+            grpf.create_dataset('/{}/SubOffset'.format(group),
+                                data=sub_offset)
+
     return out
