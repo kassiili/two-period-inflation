@@ -4,15 +4,50 @@ import h5py
 import astropy.units as u
 from astropy.constants import G
 
-
-def split_subhalos_distict1(snap, dataset, split_luminous=False):
+def get_satellites(snap, dataset, galaxy, split_luminous=False,
+                            prune_vmax=True):
     gns = snap.get_subhalos('GroupNumber')
     sgns = snap.get_subhalos('SubGroupNumber')
 
-    # Extract MW and M31 satellites vs. isolated by group numbers:
-    mask_sat = np.logical_and(np.logical_or(gns == 1, gns == 2), sgns != 0)
+    # Extract MW and/or M31 satellites vs. isolated by group numbers:
+    mask_sat = np.logical_and(gns == galaxy, sgns != 0)
+
+    if prune_vmax:
+        maxpoint = snap.get_subhalos("Max_Vcirc")
+        vmax = maxpoint[:, 0]
+        mask_sat = np.logical_and(mask_sat, vmax > 0)
+
+    if split_luminous:
+        sm = snap.get_subhalos('Stars/Mass')
+        mask_lum = (sm > 0)
+        mask_dark = (sm == 0)
+        satellites = {'luminous': dataset[np.logical_and(mask_sat,
+                                                         mask_lum)],
+                      'dark': dataset[np.logical_and(mask_sat,
+                                                     mask_dark)]}
+    else:
+        satellites = dataset[mask_sat]
+
+    return satellites
+
+
+def split_subhalos_distict1(snap, dataset, split_luminous=False,
+                            prune_vmax=True):
+    gns = snap.get_subhalos('GroupNumber')
+    sgns = snap.get_subhalos('SubGroupNumber')
+
+    # Extract MW and/or M31 satellites vs. isolated by group numbers:
+    mask_sat = np.logical_and(np.logical_or(gns == 1, gns == 2),
+                              sgns != 0)
     mask_isol = np.logical_and(np.logical_or(gns != 1, gns != 2),
                                sgns == 0)
+
+    if prune_vmax:
+        maxpoint = snap.get_subhalos("Max_Vcirc")
+        vmax = maxpoint[:, 0]
+        mask_sat = np.logical_and(mask_sat, vmax > 0)
+        mask_isol = np.logical_and(mask_isol, vmax > 0)
+
     if split_luminous:
         sm = snap.get_subhalos('Stars/Mass')
         mask_lum = (sm > 0)
