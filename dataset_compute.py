@@ -1,7 +1,6 @@
 import numpy as np
-import h5py
 
-import astropy.units as u
+from astropy import units
 from astropy.constants import G
 
 def get_satellites(snap, dataset, galaxy, split_luminous=False,
@@ -9,11 +8,11 @@ def get_satellites(snap, dataset, galaxy, split_luminous=False,
     gns = snap.get_subhalos('GroupNumber')
     sgns = snap.get_subhalos('SubGroupNumber')
 
-    # Extract MW and/or M31 satellites vs. isolated by group numbers:
+    # Extract satellites:
     mask_sat = np.logical_and(gns == galaxy, sgns != 0)
 
     if prune_vmax:
-        maxpoint = snap.get_subhalos("Max_Vcirc")
+        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
         vmax = maxpoint[:, 0]
         mask_sat = np.logical_and(mask_sat, vmax > 0)
 
@@ -36,14 +35,14 @@ def split_subhalos_distict1(snap, dataset, split_luminous=False,
     gns = snap.get_subhalos('GroupNumber')
     sgns = snap.get_subhalos('SubGroupNumber')
 
-    # Extract MW and/or M31 satellites vs. isolated by group numbers:
+    # Extract MW and M31 satellites vs. isolated by group numbers:
     mask_sat = np.logical_and(np.logical_or(gns == 1, gns == 2),
                               sgns != 0)
     mask_isol = np.logical_and(np.logical_or(gns != 1, gns != 2),
                                sgns == 0)
 
     if prune_vmax:
-        maxpoint = snap.get_subhalos("Max_Vcirc")
+        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
         vmax = maxpoint[:, 0]
         mask_sat = np.logical_and(mask_sat, vmax > 0)
         mask_isol = np.logical_and(mask_isol, vmax > 0)
@@ -68,6 +67,78 @@ def split_subhalos_distict1(snap, dataset, split_luminous=False,
 
     return split_data
 
+
+def split_subhalos_distict2(snap, dataset, split_luminous=False,
+                            prune_vmax=True):
+
+    cops = snap.get_subhalos("CentreOfPotential")
+    M31_idx = snap.index_of_halo(1, 0)
+    MW_idx = snap.index_of_halo(2, 0)
+    M31_cop = cops[M31_idx]
+    MW_cop = cops[MW_idx]
+
+    # Compute distance to centrals:
+    distance_to_M31 = np.linalg.norm(periodic_wrap(snap, M31_cop, cops) - \
+                                     M31_cop, axis=1)
+    distance_to_MW = np.linalg.norm(periodic_wrap(snap, MW_cop, cops) - \
+                                    MW_cop, axis=1)
+
+    # Compute distance to Local Group centre:
+    LG_centre = compute_LG_centre(snap)
+    distance_to_LG = np.linalg.norm(periodic_wrap(snap, LG_centre, cops) \
+                                    - LG_centre, axis=1)
+
+    # Extract MW and M31 satellites by distance (excluding M31 and MW):
+    index = np.arange(np.size(cops, axis=0))
+    mask_sat = np.logical_and.reduce(
+        [np.logical_or(distance_to_M31 < 300 * units.kpc.to(units.cm),
+                      distance_to_MW < 300 * units.kpc.to(units.cm)),
+         index != M31_idx, index != MW_idx])
+
+    # Extract isolated galaxies, making sure they are well inside zoom
+    # region:
+    sgns = snap.get_subhalos('SubGroupNumber')
+    mask_isol = np.logical_and(
+        np.logical_not(mask_sat),
+        distance_to_LG < 2 * units.Mpc.to(units.cm),
+        sgns == 0)
+
+    if prune_vmax:
+        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
+        vmax = maxpoint[:, 0]
+        mask_sat = np.logical_and(mask_sat, vmax > 0)
+        mask_isol = np.logical_and(mask_isol, vmax > 0)
+
+    if split_luminous:
+        sm = snap.get_subhalos('Stars/Mass')
+        mask_lum = (sm > 0)
+        mask_dark = (sm == 0)
+        satellites = {'luminous': dataset[np.logical_and(mask_sat,
+                                                         mask_lum)],
+                      'dark': dataset[np.logical_and(mask_sat,
+                                                     mask_dark)]}
+        isolated = {'luminous': dataset[np.logical_and(mask_isol,
+                                                       mask_lum)],
+                    'dark': dataset[np.logical_and(mask_isol,
+                                                   mask_dark)]}
+    else:
+        satellites = dataset[mask_sat]
+        isolated = dataset[mask_isol]
+
+    split_data = {'satellites': satellites, 'isolated': isolated}
+
+    return split_data
+
+
+def compute_LG_centre(snap):
+
+    # LG centre is in the middle between M31 and MW centres:
+    cops = snap.get_subhalos("CentreOfPotential")
+    M31_cop = cops[snap.index_of_halo(1, 0)]
+    MW_cop = cops[snap.index_of_halo(2, 0)]
+    LG_centre = (M31_cop + periodic_wrap(snap, M31_cop, MW_cop)) / 2
+
+    return LG_centre
 
 def split_satellites(snap, dataset, fnums=[]):
     """ Reads an attribute from snapshot and divides into satellites and
@@ -112,7 +183,7 @@ def compute_vcirc(snapshot, r):
                      if condition(len(cm), n) else 0
                      for cm, n in zip(cmass, n_parts_inside_r)]
 
-    myG = G.to(u.cm ** 3 * u.g ** -1 * u.s ** -2).value
+    myG = G.to(units.cm ** 3 * units.g ** -1 * units.s ** -2).value
     v_circ_at_r = np.array([np.sqrt(m * myG / r) for m in mass_inside_r])
 
     return v_circ_at_r
@@ -134,7 +205,7 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
     radii = [np.array(r[n_soft::n_soft]) for r in radii]
     cmass = [np.array(cm[n_soft::n_soft]) for cm in cmass]
 
-    myG = G.to(u.cm ** 3 * u.g ** -1 * u.s ** -2).value
+    myG = G.to(units.cm ** 3 * units.g ** -1 * units.s ** -2).value
     v_circ = [np.sqrt(cm * myG / r) for cm, r in zip(cmass, radii)]
 
     # Add zero:
@@ -280,18 +351,15 @@ def group_particles_by_subhalo(snapshot, *datasets,
     return grouped_data
 
 
-
 def periodic_wrap(snapshot, cop, coords):
     """ Account for the periodic boundary conditions by moving particles 
     to the periodic location, which is closest to the cop of their host
     halo. """
 
-    # Periodic wrap coordinates around centre.
-    with h5py.File(snapshot.part_file, 'r') as partf:
-        h = partf['link0/Header'].attrs.get('HubbleParam')
-        boxs = partf['link0/Header'].attrs.get('BoxSize')
-        boxs = snapshot.convert_to_cgs_group(np.array([boxs]),
-                                             'CentreOfPotential') / h
+    h = snapshot.get_attribute('HubbleParam', 'Header')
+    boxs = snapshot.get_attribute('BoxSize', 'Header')
+    boxs = snapshot.convert_to_cgs_group(np.array([boxs]),
+                                         'CentreOfPotential')[0] / h
     wrapped = np.mod(coords - cop + 0.5 * boxs, boxs) + cop - 0.5 * boxs
 
     return wrapped
@@ -304,12 +372,12 @@ def calculate_V1kpc_inProgress(snapshot):
 
     # Get particle data:
     coords = snapshot.get_particles('Coordinates') \
-             * u.cm.to(u.kpc)
-    mass = snapshot.get_particle_masses() * u.g.to(u.Msun)
+             * units.cm.to(units.kpc)
+    mass = snapshot.get_particle_masses() * units.g.to(units.Msun)
 
     # Get halo data:
     COPs = snapshot.get_subhalos('CentreOfPotential', \
-                                 divided=False)[0] * u.cm.to(u.kpc)
+                                 divided=False)[0] * units.cm.to(units.kpc)
     part_idx = get_subhalo_part_idx(snapshot)
 
     massWithin1kpc = np.zeros((COPs[:, 0].size))
@@ -327,7 +395,7 @@ def calculate_V1kpc_inProgress(snapshot):
 
         massWithin1kpc[idx] = halo_mass[r1kpc_mask].sum()
 
-    myG = G.to(u.km ** 2 * u.kpc * u.Msun ** -1 * u.s ** -2).value
+    myG = G.to(units.km ** 2 * units.kpc * units.Msun ** -1 * units.s ** -2).value
     v1kpc = np.sqrt(massWithin1kpc * myG)
 
     return v1kpc
