@@ -196,7 +196,7 @@ def mass_accumulation_to_array(snapshot):
 
 
 def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
-    """
+    """ For each subhalo, compute the mass accumulation by radius.
 
     Parameters
     ----------
@@ -207,17 +207,15 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     -------
     cum_mass, grouped_radii : ndarray of list
 
+    Notes
+    -----
+    Only particles bound to a subhalo contribute to its mass.
     """
 
     # In order to not mix indices between arrays, we need all particle
     # arrays from grouping method:
-    grouped_coords = group_particles_by_subhalo(snapshot, 'Coordinates',
-                                                part_type=part_type)
-    grouped_mass = group_particles_by_subhalo(snapshot, 'Masses',
-                                              part_type=part_type)
-    grouped_gns = group_particles_by_subhalo(snapshot, 'GroupNumber',
-                                             part_type=part_type)
-    grouped_sgns = group_particles_by_subhalo(snapshot, 'SubGroupNumber',
+    grouped_data = group_particles_by_subhalo(snapshot, 'Coordinates',
+                                              'Masses',
                                               part_type=part_type)
 
     cops = snapshot.get_subhalos('CentreOfPotential')
@@ -228,17 +226,17 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     boxs = snapshot.convert_to_cgs_group(boxs, 'CentreOfPotential') / h
     grouped_radii = [np.linalg.norm(
         np.mod(coords - cop + 0.5 * boxs, boxs) - 0.5 * boxs, axis=1)
-        for coords, cop in zip(grouped_coords, cops)]
+        for coords, cop in zip(grouped_data['Coordinates'], cops)]
 
     # Sort particles, first by subhalo, then by distance from host:
-    gns = np.concatenate(grouped_gns)
-    sgns = np.concatenate(grouped_sgns)
+    gns = np.concatenate(grouped_data['GroupNumber'])
+    sgns = np.concatenate(grouped_data['SubGroupNumber'])
     radii = np.concatenate(grouped_radii)
     sort = np.lexsort((radii, sgns, gns))
 
     # Sort particle mass array:
-    mass = np.concatenate(grouped_mass)
-    part_num = [np.size(arr) for arr in grouped_mass]
+    mass = np.concatenate(grouped_data['Masses'])
+    part_num = [np.size(arr) for arr in grouped_data['Masses']]
     splitting_points = np.cumsum(part_num)[:-1]
     mass_split = np.split(mass[sort], splitting_points)
 
@@ -252,11 +250,38 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     return cum_mass, grouped_radii
 
 
-def group_particles_by_subhalo(snapshot, dataset, part_type=[0, 1, 4, 5]):
+def group_particles_by_subhalo(snapshot, *datasets,
+                               part_type=[0, 1, 4, 5]):
+    """ Get given datasets of bound particles and split them by host
+    halo.
+
+    Parameters
+    ----------
+    snapshot : Snapshot object
+        Snapshot from which the datasets are retrieved.
+    *datasets : list of str
+        Names of the datasets to be retrieved and grouped.
+    part_type : list of int, optional
+        Specifies which particle types are retrieved.
+
+    Returns
+    -------
+    grouped_data : dict
+        A dictionary of the requested grouped datasets, with the names
+        of the dataset as the keys.
+
+    Notes
+    -----
+    The particles are sorted, first by group number of the host halo,
+    then by its subgroup number. """
+
     # Get particle data:
     gns = snapshot.get_particles('GroupNumber', part_type=part_type)
     sgns = snapshot.get_particles('SubGroupNumber', part_type=part_type)
-    data = snapshot.get_particles(dataset, part_type=part_type)
+    grouped_data = {'GroupNumber': gns, 'SubGroupNumber': sgns}
+    for dataset in datasets:
+        grouped_data[dataset] = snapshot.get_particles(dataset,
+                                               part_type=part_type)
 
     # Get subhalo data:
     part_num = snapshot.get_subhalos('SubLengthType')[:,
@@ -264,112 +289,22 @@ def group_particles_by_subhalo(snapshot, dataset, part_type=[0, 1, 4, 5]):
 
     # Exclude particles that are not bound to a subhalo:
     mask_bound = (sgns < np.max(gns))
-    gns = gns[mask_bound]
-    sgns = sgns[mask_bound]
-    data = data[mask_bound]
+    for key in grouped_data.keys():
+        grouped_data[key] = grouped_data[key][mask_bound]
 
     # Sort particles first by group number then by subgroup number:
-    sort = np.lexsort((sgns, gns))
-    data = data[sort]
+    sort = np.lexsort((grouped_data['SubGroupNumber'],
+                       grouped_data['GroupNumber']))
+    for key in grouped_data.keys():
+        grouped_data[key] = grouped_data[key][sort]
 
     # Split particle data by halo:
     splitting_points = np.cumsum(np.sum(part_num, axis=1))[:-1]
-    out = np.split(data, splitting_points)
+    for key in grouped_data.keys():
+        grouped_data[key] = np.split(grouped_data[key], splitting_points)
 
-    return out
+    return grouped_data
 
-
-def compute_v1kpc(snapshot):
-    """ For each subhalo, calculate the circular velocity at 1kpc. """
-
-    # Get particle data:
-    part = {'gns': snapshot.get_particles('GroupNumber'),
-            'sgns': snapshot.get_particles('SubGroupNumber'),
-            'coords': snapshot.get_particles('Coordinates'),
-            'mass': snapshot.get_particle_masses()}
-
-    # Get subhalodata:
-    halo = {'gns': snapshot.get_subhalos('GroupNumber'),
-            'sgns': snapshot.get_subhalos('SubGroupNumber'),
-            'COPs': snapshot.get_subhalos('CentreOfPotential')}
-
-    mass_within1kpc = np.zeros(halo['gns'].size)
-
-    # Loop through subhalos:
-    for idx, (gn, sgn, cop) in \
-            enumerate(zip(halo['gns'], halo['sgns'], halo['COPs'])):
-        # Get coordinates and masses of the particles in the halo:
-        halo_mask = np.logical_and(part['gns'] == gn,
-                                   part['sgns'] == sgn)
-        coords = part['coords'][halo_mask]
-        mass = part['mass'][halo_mask]
-
-        # Calculate distances to cop:
-        wrapped_coords = periodic_wrap(snapshot, cop, coords)
-        r = np.linalg.norm(wrapped_coords - cop, axis=1)
-
-        # Get coordinates within 1kpc from COP:
-        r1kpc_mask = np.logical_and(r > 0, r < u.kpc.to(u.cm))
-        mass_within1kpc[idx] = mass[r1kpc_mask].sum()
-
-    myG = G.to(u.cm ** 3 * u.g ** -1 * u.s ** -2).value
-    v1kpc = np.sqrt(mass_within1kpc * myG / u.kpc.to(u.cm))
-
-    return v1kpc
-
-
-def compute_rotation_curve(snapshot, gn, sgn, part_type=[0, 1, 4, 5],
-                           jump=10):
-    """ Compute circular velocity by radius for a given halo. 
-    
-    Parameters
-    ----------
-    jump : int, optional
-        Reduce noise by only computing circular velocity at the location
-        of every nth particle, where n = jump
-    Returns
-    -------
-    (r,v_circ) : tuple
-        Circular velocities, v_circ, at distances r to halo centre in
-        cgs units.
-    """
-
-    # Get centre of potential:
-    sgns = snapshot.get_subhalos("SubGroupNumber")
-    gns = snapshot.get_subhalos("GroupNumber")
-    cops = snapshot.get_subhalos("CentreOfPotential")
-
-    halo_mask = np.logical_and(sgns == sgn, gns == gn)
-    cop = cops[halo_mask]
-
-    # Get coordinates and masses of the halo:
-    sgns = snapshot.get_particles("SubGroupNumber", part_type=part_type)
-    gns = snapshot.get_particles("GroupNumber", part_type=part_type)
-    coords = snapshot.get_particles("Coordinates", part_type=part_type)
-    mass = snapshot.get_particle_masses(part_type=part_type)
-
-    halo_mask = np.logical_and(sgns == sgn, gns == gn)
-    coords = periodic_wrap(snapshot, cop, coords[halo_mask])
-    mass = mass[halo_mask]
-
-    # Calculate distance to centre and cumulative mass:
-    r = np.linalg.norm(coords - cop, axis=1)
-    sorting = np.argsort(r)
-    r = r[sorting]
-    cmass = np.cumsum(mass[sorting])
-
-    # Clean up:
-    mask = r > 0;
-    r = r[mask];
-    cumass = cmass[mask]
-    r = r[jump::jump]
-    cumass = cumass[jump::jump]
-
-    # Compute velocity.
-    myG = G.to(u.cm ** 3 * u.g ** -1 * u.s ** -2).value
-    v_circ = np.sqrt((myG * cumass) / r)
-
-    return r, v_circ
 
 
 def periodic_wrap(snapshot, cop, coords):
