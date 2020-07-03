@@ -67,13 +67,15 @@ class Snapshot:
             np.array(glob.glob(os.path.join(path, 'snap*'))), \
             self.part_file)
 
-    def get_subhalos(self, dataset, fnums=[], units='cgs'):
+    def get_subhalos(self, dataset, group='Subhalo', units='cgs'):
         """ Retrieves a dataset for subhaloes in the snapshot.
-        
+
         Parameters
         ----------
         dataset : str
             Name of dataset to be retrieved.
+        group : str, optional
+            Name of the group that contains the dataset.
         fnums : list of ints, optional
             Specifies files, which are to be read.
 
@@ -86,20 +88,25 @@ class Snapshot:
         # Output array.
         out = np.empty((0))
 
-        is_extension = False
-        with h5py.File(self.grp_file, 'r') as grpf:
-            if dataset not in grpf['link0/Subhalo']:
-                is_extension = True
+        # Check whether dataset is in the catalogues or an extension:
+        if str.split(group, '/')[0] == 'Extended':
+            # Check if the dataset is already stored in grpf:
+            in_grpf = False
+            with h5py.File(self.grp_file, 'r') as grpf:
+                if '{}/{}'.format(group, dataset) in grpf:
+                    out = grpf['{}/{}'.format(group, dataset)][...]
+                    in_grpf = True
 
-        if is_extension:
-            out = self.get_subhalo_extended(dataset)
+            if not in_grpf:
+                out = data_file_manipulation.create_dataset(self, dataset,
+                                                            group)
 
-        else:
-            out = self.get_subhalo_catalogue(dataset, fnums, units)
+        elif str.split(group, '/')[0] == 'Subhalo':
+            out = self.get_subhalo_catalogue(dataset, group, [], units)
 
         return out
 
-    def get_subhalo_catalogue(self, dataset, fnums, units):
+    def get_subhalo_catalogue(self, dataset, group, fnums, units):
         """ Retrieves a dataset from the subhalo catalogues.
 
         Parameters
@@ -123,7 +130,7 @@ class Snapshot:
             links = [f for (name, f) in grpf.items() \
                      if name in link_names]
             for f in links:
-                tmp = f['Subhalo/{}'.format(dataset)][...]
+                tmp = f['{}/{}'.format(group, dataset)][...]
                 out.append(tmp)
 
         # Sort by link number:
@@ -136,41 +143,7 @@ class Snapshot:
             out = np.concatenate(out)
 
         if units == 'cgs':
-            out = self.convert_to_cgs_group(out, dataset)
-
-        return out
-
-    def get_subhalo_extended(self, dataset):
-        """ Retrieves dataset from file if it is already calculated. 
-        If not, calculates it and then returns it.
-
-        Paramaters
-        ----------
-        dataset : str
-            Name of (extended) dataset to be retrieved.
-
-        Returns
-        -------
-        out : HDF5 dataset
-            Requested dataset in cgs units.
-        """
-
-        out = []
-
-        # Check if the dataset is already stored in grpf:
-        in_grpf = False
-        with h5py.File(self.grp_file, 'r') as grpf:
-            if 'extended/{}'.format(dataset) in grpf:
-                out = grpf['extended/{}'.format(dataset)][...]
-                in_grpf = True
-
-        if not in_grpf:
-            out = dataset_compute.generate_dataset(self, dataset)
-
-            # Create dataset in grpf:
-            with h5py.File(self.grp_file, 'r+') as grpf:
-                grpf.create_dataset('/extended/{}'.format(dataset),
-                                    data=out)
+            out = self.convert_to_cgs_group(out, dataset, group)
 
         return out
 
@@ -426,7 +399,7 @@ class Snapshot:
 
         return keys[sorting], sorting
 
-    def convert_to_cgs_group(self, data, dataset):
+    def convert_to_cgs_group(self, data, dataset, group='Subhalo'):
         """ Read conversion factors for a halo dataset and convert it 
         into cgs units.
 
@@ -447,11 +420,11 @@ class Snapshot:
 
         with h5py.File(self.grp_file, 'r') as grpf:
             # Get conversion factors.
-            cgs = grpf['link0/Subhalo/{}'.format(dataset)].attrs \
+            cgs = grpf['link0/{}/{}'.format(group, dataset)].attrs \
                 .get('CGSConversionFactor')
-            aexp = grpf['link0/Subhalo/{}'.format(dataset)].attrs \
+            aexp = grpf['link0/{}/{}'.format(group, dataset)].attrs \
                 .get('aexp-scale-exponent')
-            hexp = grpf['link0/Subhalo/{}'.format(dataset)].attrs \
+            hexp = grpf['link0/{}/{}'.format(group, dataset)].attrs \
                 .get('h-scale-exponent')
 
             # Get expansion factor and Hubble parameter from the 

@@ -97,41 +97,6 @@ def split_satellites(snap, dataset, fnums=[]):
     return (data_sat, data_isol)
 
 
-def generate_dataset(snapshot, dataset):
-    """ An interface to the functions of this module. Uses the correct
-    function to construct the dataset.
-    """
-
-    if dataset == 'V1kpc':
-        return compute_vcirc(snapshot, u.kpc.to(u.cm))
-
-    elif dataset == 'MassAccum':
-        # Combine all particles from all subhalos into one long array.
-        # Particles are ordered first by halo, then by particle
-        # type, and lastly by distance to host halo.
-
-        ma, r = compute_mass_accumulation(snapshot, part_type=[0])
-        for pt in [1, 4, 5]:
-            ma_add, r_add = compute_mass_accumulation(snapshot,
-                                                      part_type=[pt])
-            ma += ma_add
-            r += r_add
-
-        ma = np.concatenate(ma)
-        r = np.concatenate(r)
-
-        combined = np.column_stack((ma, r))
-
-        return combined
-
-    elif dataset == 'Max_Vcirc':
-        vmax, rmax = compute_vmax(snapshot)
-        combined = np.column_stack((vmax, rmax))
-        return combined
-
-    return None
-
-
 def compute_vcirc(snapshot, r):
     cmass, radii = compute_mass_accumulation(snapshot)
 
@@ -184,7 +149,7 @@ def mass_accumulation_to_array(snapshot):
     sublentype = snapshot.get_subhalos('SubLengthType')
     splitting_points = np.cumsum(np.concatenate(sublentype))[:-1] \
         .astype(int)
-    raw_cmass = snapshot.get_subhalos('MassAccum')
+    raw_cmass = snapshot.get_subhalos('MassAccum', group='Extended')
     cmass = raw_cmass[:, 0]
     radii = raw_cmass[:, 1]
     cmass = np.array(np.split(cmass, splitting_points)).reshape(

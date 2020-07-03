@@ -1,6 +1,9 @@
 import numpy as np
 import os
 import h5py
+from astropy import units
+
+import dataset_compute
 
 
 def combine_data_files(files, filename):
@@ -60,3 +63,46 @@ def get_data_path(data_category, simID, snapID):
 
     return path
 
+
+def create_dataset(snapshot, dataset, group):
+    """ An interface to the functions of this module. Uses the correct
+    function to construct the dataset.
+    """
+
+    out = []
+    subgroup_list = str.split(group, '/')
+    if len(subgroup_list) == 1:
+        if dataset == 'V1kpc':
+            out = dataset_compute.compute_vcirc(snapshot,
+                                                units.kpc.to(units.cm))
+
+        elif dataset == 'MassAccum':
+            # Combine all particles from all subhalos into one long array.
+            # Particles are ordered first by halo, then by particle
+            # type, and lastly by distance to host halo.
+
+            ma, r = dataset_compute.compute_mass_accumulation(
+                snapshot, part_type=[0])
+            for pt in [1, 4, 5]:
+                ma_add, r_add = dataset_compute.compute_mass_accumulation(
+                    snapshot, part_type=[pt])
+                ma += ma_add
+                r += r_add
+
+            ma = np.concatenate(ma)
+            r = np.concatenate(r)
+
+            combined = np.column_stack((ma, r))
+
+            out = combined
+
+        elif dataset == 'Max_Vcirc':
+            vmax, rmax = dataset_compute.compute_vmax(snapshot)
+            combined = np.column_stack((vmax, rmax))
+            out = combined
+
+        # Create dataset in grpf:
+        with h5py.File(snapshot.grp_file, 'r+') as grpf:
+            grpf.create_dataset('/{}/{}'.format(group, dataset), data=out)
+
+    return out
