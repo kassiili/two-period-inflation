@@ -47,24 +47,25 @@ class Snapshot:
         self.snap_id = snap_id
         # If not given, construct name from IDs:
         if not name:
-            self.name = str(sim_id) + "_" + str(snap_id)
+            self.name = "{}_{:03d}".format(sim_id, snap_id)
         else:
             self.name = name
 
         # Generate combined data files:
-        self.grp_file = '.groups_{}_{}.hdf5'.format(sim_id, snap_id)
-        self.part_file = '.particles_{}_{}.hdf5'.format(sim_id, snap_id)
+        self.grp_file = '.groups_{}_{:03d}.hdf5'.format(sim_id, snap_id)
+        self.part_file = '.particles_{}_{:03d}.hdf5'.format(sim_id,
+                                                            snap_id)
 
         path = data_file_manipulation.get_data_path('group', sim_id,
                                                     snap_id)
-        data_file_manipulation.combine_data_files( \
-            np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))), \
+        data_file_manipulation.combine_data_files(
+            np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))),
             self.grp_file)
 
         path = data_file_manipulation.get_data_path('part', sim_id,
                                                     snap_id)
-        data_file_manipulation.combine_data_files( \
-            np.array(glob.glob(os.path.join(path, 'snap*'))), \
+        data_file_manipulation.combine_data_files(
+            np.array(glob.glob(os.path.join(path, 'snap*'))),
             self.part_file)
 
     def get_subhalos(self, dataset, group='Subhalo', units='cgs'):

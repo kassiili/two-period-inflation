@@ -58,7 +58,7 @@ def get_data_path(data_category, simID, snapID):
 
     # Find the snapshot directory and add to path:
     for dir_name in os.listdir(path):
-        if prefix + str(snapID) in dir_name:
+        if "{}{:03d}".format(prefix, snapID) in dir_name:
             path = os.path.join(path,dir_name)
 
     return path
