@@ -3,8 +3,10 @@ import numpy as np
 from astropy import units
 from astropy.constants import G
 
-def get_satellites(snap, dataset, galaxy, split_luminous=False,
-                            prune_vmax=True):
+
+def get_satellites_by_group_number(snap, dataset, galaxy,
+                                   split_luminous=False,
+                                   prune_vmax=True):
     gns = snap.get_subhalos('GroupNumber')
     sgns = snap.get_subhalos('SubGroupNumber')
 
@@ -30,14 +32,43 @@ def get_satellites(snap, dataset, galaxy, split_luminous=False,
     return satellites
 
 
-def split_subhalos_distict1(snap, dataset, split_luminous=False,
-                            prune_vmax=True):
+def get_satellites_by_distance(snap, dataset, galaxy, split_luminous=False,
+                               prune_vmax=True, distance=300):
+    gns = snap.get_subhalos('GroupNumber')
+    sgns = snap.get_subhalos('SubGroupNumber')
+
+    # Extract satellites:
+    mask_sat = np.logical_and(gns == galaxy, sgns != 0)
+
+    if prune_vmax:
+        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
+        vmax = maxpoint[:, 0]
+        mask_sat = np.logical_and(mask_sat, vmax > 0)
+
+    if split_luminous:
+        sm = snap.get_subhalos('Stars/Mass')
+        mask_lum = (sm > 0)
+        mask_dark = (sm == 0)
+        satellites = {'luminous': dataset[np.logical_and(mask_sat,
+                                                         mask_lum)],
+                      'dark': dataset[np.logical_and(mask_sat,
+                                                     mask_dark)]}
+    else:
+        satellites = dataset[mask_sat]
+
+    return satellites
+
+
+def split_subhalos_by_group_number(snap, dataset, split_luminous=False,
+                                   prune_vmax=True, m31=(1, 0), mw=(2, 0)):
     gns = snap.get_subhalos('GroupNumber')
     sgns = snap.get_subhalos('SubGroupNumber')
 
     # Extract MW and M31 satellites vs. isolated by group numbers:
-    mask_sat = np.logical_and(np.logical_or(gns == 1, gns == 2),
-                              sgns != 0)
+    mask_sat = np.logical_and.reduce([np.logical_or(gns == m31[0],
+                                                    gns == mw[0]),
+                                      sgns != m31[1], sgns != mw[1],
+                                      sgns != 0])
     mask_isol = np.logical_and(np.logical_or(gns != 1, gns != 2),
                                sgns == 0)
 
@@ -68,12 +99,11 @@ def split_subhalos_distict1(snap, dataset, split_luminous=False,
     return split_data
 
 
-def split_subhalos_distict2(snap, dataset, split_luminous=False,
-                            prune_vmax=True):
-
+def split_subhalos_by_distance(snap, dataset, split_luminous=False,
+                               prune_vmax=True, m31=(1, 0), mw=(2, 0)):
     cops = snap.get_subhalos("CentreOfPotential")
-    M31_idx = snap.index_of_halo(1, 0)
-    MW_idx = snap.index_of_halo(2, 0)
+    M31_idx = snap.index_of_halo(m31[0], m31[1])
+    MW_idx = snap.index_of_halo(mw[0], mw[1])
     M31_cop = cops[M31_idx]
     MW_cop = cops[MW_idx]
 
@@ -90,48 +120,57 @@ def split_subhalos_distict2(snap, dataset, split_luminous=False,
 
     # Extract MW and M31 satellites by distance (excluding M31 and MW):
     index = np.arange(np.size(cops, axis=0))
-    mask_sat = np.logical_and.reduce(
-        [np.logical_or(distance_to_M31 < 300 * units.kpc.to(units.cm),
-                      distance_to_MW < 300 * units.kpc.to(units.cm)),
-         index != M31_idx, index != MW_idx])
+    max_dist_sat = 300 * units.kpc.to(units.cm)
+    mask_sat_m31 = np.logical_and(distance_to_M31 < max_dist_sat,
+                                  index != M31_idx)
+    mask_sat_mw = np.logical_and(distance_to_MW < max_dist_sat,
+                                  index != MW_idx)
 
     # Extract isolated galaxies, making sure they are well inside zoom
     # region:
     sgns = snap.get_subhalos('SubGroupNumber')
-    mask_isol = np.logical_and(
-        np.logical_not(mask_sat),
+    mask_isol = np.logical_and.reduce([
+        np.logical_not(mask_sat_m31),
+        np.logical_not(mask_sat_mw),
         distance_to_LG < 2 * units.Mpc.to(units.cm),
-        sgns == 0)
+        sgns == 0])
 
     if prune_vmax:
         maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
         vmax = maxpoint[:, 0]
-        mask_sat = np.logical_and(mask_sat, vmax > 0)
+        mask_sat_m31 = np.logical_and(mask_sat_m31, vmax > 0)
+        mask_sat_mw = np.logical_and(mask_sat_mw, vmax > 0)
         mask_isol = np.logical_and(mask_isol, vmax > 0)
 
     if split_luminous:
         sm = snap.get_subhalos('Stars/Mass')
         mask_lum = (sm > 0)
         mask_dark = (sm == 0)
-        satellites = {'luminous': dataset[np.logical_and(mask_sat,
+        split_data = {'M31_satellites':
+                        {'luminous': dataset[np.logical_and(mask_sat_m31,
                                                          mask_lum)],
-                      'dark': dataset[np.logical_and(mask_sat,
-                                                     mask_dark)]}
-        isolated = {'luminous': dataset[np.logical_and(mask_isol,
-                                                       mask_lum)],
-                    'dark': dataset[np.logical_and(mask_isol,
-                                                   mask_dark)]}
-    else:
-        satellites = dataset[mask_sat]
-        isolated = dataset[mask_isol]
+                         'dark': dataset[np.logical_and(mask_sat_m31,
+                                                        mask_dark)]},
 
-    split_data = {'satellites': satellites, 'isolated': isolated}
+                      'MW_satellites':
+                          {'luminous': dataset[np.logical_and(mask_sat_mw,
+                                                           mask_lum)],
+                           'dark': dataset[np.logical_and(mask_sat_mw,
+                                                          mask_dark)]},
+                      'isolated':
+                          {'luminous': dataset[np.logical_and(mask_isol,
+                                                              mask_lum)],
+                           'dark': dataset[np.logical_and(mask_isol,
+                                                          mask_dark)]}}
+    else:
+        split_data= {'M31_satellites': dataset[mask_sat_m31],
+                     'MW_satellites': dataset[mask_sat_mw],
+                     'isolated': dataset[mask_isol]}
 
     return split_data
 
 
 def compute_LG_centre(snap):
-
     # LG centre is in the middle between M31 and MW centres:
     cops = snap.get_subhalos("CentreOfPotential")
     M31_cop = cops[snap.index_of_halo(1, 0)]
@@ -139,6 +178,7 @@ def compute_LG_centre(snap):
     LG_centre = (M31_cop + periodic_wrap(snap, M31_cop, MW_cop)) / 2
 
     return LG_centre
+
 
 def split_satellites(snap, dataset, fnums=[]):
     """ Reads an attribute from snapshot and divides into satellites and
@@ -287,7 +327,7 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
 
     # Sort also array of radii:
     grouped_radii = np.array([r for r in np.split(radii[sort],
-                                                        splitting_points)])
+                                                  splitting_points)])
 
     # Compute mass accumulation with radius for each subhalo:
     cum_mass = np.array([np.cumsum(mass) for mass in mass_split])
@@ -326,7 +366,7 @@ def group_particles_by_subhalo(snapshot, *datasets,
     grouped_data = {'GroupNumber': gns, 'SubGroupNumber': sgns}
     for dataset in datasets:
         grouped_data[dataset] = snapshot.get_particles(dataset,
-                                               part_type=part_type)
+                                                       part_type=part_type)
 
     # Get subhalo data:
     part_num = snapshot.get_subhalos('SubLengthType')[:,
@@ -395,7 +435,8 @@ def calculate_V1kpc_inProgress(snapshot):
 
         massWithin1kpc[idx] = halo_mass[r1kpc_mask].sum()
 
-    myG = G.to(units.km ** 2 * units.kpc * units.Msun ** -1 * units.s ** -2).value
+    myG = G.to(
+        units.km ** 2 * units.kpc * units.Msun ** -1 * units.s ** -2).value
     v1kpc = np.sqrt(massWithin1kpc * myG)
 
     return v1kpc
