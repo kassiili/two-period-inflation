@@ -4,209 +4,133 @@ from astropy import units
 from astropy.constants import G
 
 
-def get_satellites_by_group_number(snap, dataset, galaxy,
-                                   split_luminous=False,
-                                   prune_vmax=True):
-    gns = snap.get_subhalos('GroupNumber')
-    sgns = snap.get_subhalos('SubGroupNumber')
+def split_luminous(snap):
+    sm = snap.get_subhalos('Stars/Mass')
+    mask_lum = (sm > 0)
+    mask_dark = (sm == 0)
+    return mask_lum, mask_dark
 
-    # Extract satellites:
-    mask_sat = np.logical_and(gns == galaxy, sgns != 0)
+def prune_vmax(snap):
+    maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
+    vmax = maxpoint[:, 0]
+    mask = vmax > 0
+    return mask
 
-    if prune_vmax:
-        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
-        vmax = maxpoint[:, 0]
-        mask_sat = np.logical_and(mask_sat, vmax > 0)
+def mask_satellites_by_distance(snap, m31_ident, mw_ident,
+                                max_dist_sat=300,
+                                max_dist_isol=2000):
+    """ Select satellites and isolated galaxies from subhalos by their
+    distance to the M31 and MW galaxies and the LG barycentre, respectively
 
-    if split_luminous:
-        sm = snap.get_subhalos('Stars/Mass')
-        mask_lum = (sm > 0)
-        mask_dark = (sm == 0)
-        satellites = {'luminous': dataset[np.logical_and(mask_sat,
-                                                         mask_lum)],
-                      'dark': dataset[np.logical_and(mask_sat,
-                                                     mask_dark)]}
-    else:
-        satellites = dataset[mask_sat]
-
-    return satellites
-
-
-def get_satellites_by_distance(snap, dataset, galaxy, split_luminous=False,
-                               prune_vmax=True, distance=300):
-    gns = snap.get_subhalos('GroupNumber')
-    sgns = snap.get_subhalos('SubGroupNumber')
-
-    # Extract satellites:
-    mask_sat = np.logical_and(gns == galaxy, sgns != 0)
-
-    if prune_vmax:
-        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
-        vmax = maxpoint[:, 0]
-        mask_sat = np.logical_and(mask_sat, vmax > 0)
-
-    if split_luminous:
-        sm = snap.get_subhalos('Stars/Mass')
-        mask_lum = (sm > 0)
-        mask_dark = (sm == 0)
-        satellites = {'luminous': dataset[np.logical_and(mask_sat,
-                                                         mask_lum)],
-                      'dark': dataset[np.logical_and(mask_sat,
-                                                     mask_dark)]}
-    else:
-        satellites = dataset[mask_sat]
-
-    return satellites
-
-
-def split_subhalos_by_group_number(snap, dataset, split_luminous=False,
-                                   prune_vmax=True, m31=(1, 0), mw=(2, 0)):
-    gns = snap.get_subhalos('GroupNumber')
-    sgns = snap.get_subhalos('SubGroupNumber')
-
-    # Extract MW and M31 satellites vs. isolated by group numbers:
-    mask_sat = np.logical_and.reduce([np.logical_or(gns == m31[0],
-                                                    gns == mw[0]),
-                                      sgns != m31[1], sgns != mw[1],
-                                      sgns != 0])
-    mask_isol = np.logical_and(np.logical_or(gns != 1, gns != 2),
-                               sgns == 0)
-
-    if prune_vmax:
-        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
-        vmax = maxpoint[:, 0]
-        mask_sat = np.logical_and(mask_sat, vmax > 0)
-        mask_isol = np.logical_and(mask_isol, vmax > 0)
-
-    if split_luminous:
-        sm = snap.get_subhalos('Stars/Mass')
-        mask_lum = (sm > 0)
-        mask_dark = (sm == 0)
-        satellites = {'luminous': dataset[np.logical_and(mask_sat,
-                                                         mask_lum)],
-                      'dark': dataset[np.logical_and(mask_sat,
-                                                     mask_dark)]}
-        isolated = {'luminous': dataset[np.logical_and(mask_isol,
-                                                       mask_lum)],
-                    'dark': dataset[np.logical_and(mask_isol,
-                                                   mask_dark)]}
-    else:
-        satellites = dataset[mask_sat]
-        isolated = dataset[mask_isol]
-
-    split_data = {'satellites': satellites, 'isolated': isolated}
-
-    return split_data
-
-
-def split_subhalos_by_distance(snap, dataset, split_luminous=False,
-                               prune_vmax=True, m31=(1, 0), mw=(2, 0)):
-    cops = snap.get_subhalos("CentreOfPotential")
-    M31_idx = snap.index_of_halo(m31[0], m31[1])
-    MW_idx = snap.index_of_halo(mw[0], mw[1])
-    M31_cop = cops[M31_idx]
-    MW_cop = cops[MW_idx]
-
-    # Compute distance to centrals:
-    distance_to_M31 = np.linalg.norm(periodic_wrap(snap, M31_cop, cops) - \
-                                     M31_cop, axis=1)
-    distance_to_MW = np.linalg.norm(periodic_wrap(snap, MW_cop, cops) - \
-                                    MW_cop, axis=1)
-
-    # Compute distance to Local Group centre:
-    LG_centre = compute_LG_centre(snap)
-    distance_to_LG = np.linalg.norm(periodic_wrap(snap, LG_centre, cops) \
-                                    - LG_centre, axis=1)
-
-    # Extract MW and M31 satellites by distance (excluding M31 and MW):
-    index = np.arange(np.size(cops, axis=0))
-    max_dist_sat = 300 * units.kpc.to(units.cm)
-    mask_sat_m31 = np.logical_and(distance_to_M31 < max_dist_sat,
-                                  index != M31_idx)
-    mask_sat_mw = np.logical_and(distance_to_MW < max_dist_sat,
-                                  index != MW_idx)
-
-    # Extract isolated galaxies, making sure they are well inside zoom
-    # region:
-    sgns = snap.get_subhalos('SubGroupNumber')
-    mask_isol = np.logical_and.reduce([
-        np.logical_not(mask_sat_m31),
-        np.logical_not(mask_sat_mw),
-        distance_to_LG < 2 * units.Mpc.to(units.cm),
-        sgns == 0])
-
-    if prune_vmax:
-        maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
-        vmax = maxpoint[:, 0]
-        mask_sat_m31 = np.logical_and(mask_sat_m31, vmax > 0)
-        mask_sat_mw = np.logical_and(mask_sat_mw, vmax > 0)
-        mask_isol = np.logical_and(mask_isol, vmax > 0)
-
-    if split_luminous:
-        sm = snap.get_subhalos('Stars/Mass')
-        mask_lum = (sm > 0)
-        mask_dark = (sm == 0)
-        split_data = {'M31_satellites':
-                        {'luminous': dataset[np.logical_and(mask_sat_m31,
-                                                         mask_lum)],
-                         'dark': dataset[np.logical_and(mask_sat_m31,
-                                                        mask_dark)]},
-
-                      'MW_satellites':
-                          {'luminous': dataset[np.logical_and(mask_sat_mw,
-                                                           mask_lum)],
-                           'dark': dataset[np.logical_and(mask_sat_mw,
-                                                          mask_dark)]},
-                      'isolated':
-                          {'luminous': dataset[np.logical_and(mask_isol,
-                                                              mask_lum)],
-                           'dark': dataset[np.logical_and(mask_isol,
-                                                          mask_dark)]}}
-    else:
-        split_data= {'M31_satellites': dataset[mask_sat_m31],
-                     'MW_satellites': dataset[mask_sat_mw],
-                     'isolated': dataset[mask_isol]}
-
-    return split_data
-
-
-def compute_LG_centre(snap):
-    # LG centre is in the middle between M31 and MW centres:
-    cops = snap.get_subhalos("CentreOfPotential")
-    M31_cop = cops[snap.index_of_halo(1, 0)]
-    MW_cop = cops[snap.index_of_halo(2, 0)]
-    LG_centre = (M31_cop + periodic_wrap(snap, M31_cop, MW_cop)) / 2
-
-    return LG_centre
-
-
-def split_satellites(snap, dataset, fnums=[]):
-    """ Reads an attribute from snapshot and divides into satellites and
-    isolated galaxies.
-    
     Parameters
     ----------
-    dataset : str
-        attribute to be retrieved
-    fnums : list of ints, optional
-        Specifies files, which are to be read
+    snap : Snapshot object
+    m31_ident : tuple of two int
+        Group number and subgroup number of the M31 halo.
+    mw1_ident : tuple of two int
+        Group number and subgroup number of the MW halo.
 
     Returns
     -------
-    data : tuple of HDF5 datasets
-        Satellite data in the first entry and isolated galaxies data in
-        the second.
+    masks_sat, mask_isol : ndarray of bool
+
+    Notes
+    -----
+    Satellites of a central halo are defined as subhalos lying within a
+    distance (like 300kpc) from the central. In case the satellites of the
+    two given centrals intersect, they are assigned to their hosts by
+    distance. Isolated galaxies are defined as the subhalos that are not
+    bound to another halo (i.e. have subgroup number == 0), and lie within
+    a distance from the barycentre of the two centrals but are not
+    satellites.
     """
 
-    sgns = snap.get_subhalos('SubGroupNumber', fnums=fnums)
-    data = snap.get_subhalos(dataset, fnums=fnums)
+    centrals = [m31_ident, mw_ident]
+    cops = snap.get_subhalos("CentreOfPotential")
+    sgns = snap.get_subhalos("SubGroupNumber")
 
-    # Divide into satellites and isolated galaxies:
-    data_sat = data[sgns != 0]
-    data_isol = data[sgns == 0]
+    # Select satellites:
+    dist_to_centrals = [distance_to_point(
+        snap, cops[snap.index_of_halo(c[0], c[1])])
+        for c in centrals]
+    min_dist = 0.01 * units.kpc.to(units.cm)
+    max_dist_sat = max_dist_sat * units.kpc.to(units.cm)
+    masks_sat = [within_distance_range(d, min_dist, max_dist_sat)
+                 for d in dist_to_centrals]
 
-    return (data_sat, data_isol)
+    # Find intersection and split by distance to centrals:
+    mask_intersect = np.logical_and.reduce(masks_sat)
+    mask_closer_to0 = dist_to_centrals[0] >= dist_to_centrals[1]
+    mask_intersect_split = [
+        np.logical_and(mask_intersect, mask_closer_to0),
+        np.logical_and(mask_intersect,
+                       np.logical_not(mask_closer_to0))
+        ]
 
+    # Remove satellites closer to the other halo:
+    masks_sat[0] = np.logical_and(
+        masks_sat[0], np.logical_not(mask_intersect_split[1]))
+    masks_sat[1] = np.logical_and(
+        masks_sat[1], np.logical_not(mask_intersect_split[0]))
+
+    # Select isolated galaxies:
+    dist_to_lg = distance_to_point(snap,
+                             compute_LG_centre(snap, m31_ident, mw_ident))
+    max_dist_isol = max_dist_isol * units.kpc.to(units.cm)
+    mask_isol = within_distance_range(dist_to_lg, 0, max_dist_isol)
+    mask_isol = np.logical_and.reduce([mask_isol,
+                                       np.logical_not(masks_sat[0]),
+                                       np.logical_not(masks_sat[1]),
+                                       sgns == 0])
+    return masks_sat, mask_isol
+
+def mask_satellites_by_group_number(snap, *centrals):
+    gns = snap.get_subhalos("GroupNumber")
+    sgns = snap.get_subhalos("SubGroupNumber")
+
+    masks_sat = []
+    for c in centrals:
+        if c[1] == 0:
+            exclude_centrals = [np.logical_not(np.logical_and(
+                gns == c_any[0], sgns == c_any[1])) for c_any in centrals]
+            masks_sat.append(np.logical_and.reduce(
+                exclude_centrals + [sgns != 0, gns == c[0]]))
+        else:
+            masks_sat.append(gns == -gns)
+
+    mask_isol = np.logical_and.reduce([gns != c[0] for c in centrals] +
+                                      [sgns == 0])
+
+    return masks_sat, mask_isol
+
+def within_distance_range(dist, min_r, max_r):
+    """ Find subhalos within a radius of a given subhalo.
+
+    Returns
+    -------
+    mask_within_radius, dist : ndarray of bool, ndarray of float
+        Mask array of subhalos within a given distance, along with
+        distances to the given subhalo.
+
+    """
+    mask_within_radius = np.logical_and(dist < max_r, dist > min_r)
+
+    return mask_within_radius
+
+def distance_to_point(snap, point):
+    """ For all halos in a snapshot, compute distnace to a given point. """
+    cops = snap.get_subhalos("CentreOfPotential")
+    dist = np.linalg.norm(periodic_wrap(snap, point, cops) - point, axis=1)
+    return dist
+
+def compute_LG_centre(snap, m31_ident, mw_ident):
+    # LG centre is in the middle between M31 and MW centres:
+    cops = snap.get_subhalos("CentreOfPotential")
+    m31_cop = cops[snap.index_of_halo(m31_ident[0], m31_ident[1])]
+    mw_cop = cops[snap.index_of_halo(mw_ident[0], mw_ident[1])]
+    LG_centre = (m31_cop + periodic_wrap(snap, m31_cop, mw_cop)) / 2
+
+    return LG_centre
 
 def compute_vcirc(snapshot, r):
     cmass, radii = compute_mass_accumulation(snapshot)
