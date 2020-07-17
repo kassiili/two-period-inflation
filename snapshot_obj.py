@@ -1,11 +1,8 @@
 import os
-import re
-from pathlib import Path
 import glob
 import numpy as np
 import h5py
 
-import dataset_compute
 import data_file_manipulation
 
 
@@ -77,8 +74,6 @@ class Snapshot:
             Name of dataset to be retrieved.
         group : str, optional
             Name of the group that contains the dataset.
-        fnums : list of ints, optional
-            Specifies files, which are to be read.
 
         Returns
         -------
@@ -87,7 +82,7 @@ class Snapshot:
         """
 
         # Output array.
-        out = np.empty((0))
+        out = np.empty(0)
 
         # Check whether dataset is in the catalogues or an extension:
         if str.split(group, '/')[0] == 'Extended':
@@ -114,6 +109,8 @@ class Snapshot:
         ----------
         dataset : str
             Name of dataset to be retrieved.
+        group : str
+            Name of the HDF5 group, which encloses dataset.
         fnums : list of ints, optional
             Specifies files, which are to be read.
 
@@ -128,7 +125,7 @@ class Snapshot:
 
         with h5py.File(self.grp_file, 'r') as grpf:
 
-            links = [f for (name, f) in grpf.items() \
+            links = [f for (name, f) in grpf.items()
                      if name in link_names]
             for f in links:
                 tmp = f['{}/{}'.format(group, dataset)][...]
@@ -148,7 +145,7 @@ class Snapshot:
 
         return out
 
-    def get_subhalos_IDs(self, part_type, fnums=[]):
+    def get_subhalos_IDs(self, part_type, fnums=None):
         """ Read IDs of bound particles of given type for each halo.
         
         Paramaters
@@ -165,6 +162,8 @@ class Snapshot:
             Dataset of ndarrays of bound particles
         """
 
+        if fnums is None:
+            fnums = []
         IDs_bound = self.get_bound_particles("ParticleID")
 
         # Construct mask for selecting bound particles of type pt:

@@ -133,6 +133,7 @@ def compute_LG_centre(snap, m31_ident, mw_ident):
     return LG_centre
 
 def compute_vcirc(snapshot, r):
+    """ Compute subhalo circular velocities at given radius. """
     cmass, radii = compute_mass_accumulation(snapshot)
 
     n_parts_inside_r = [np.sum(np.array(radii_halo) < r) for radii_halo in
@@ -151,7 +152,6 @@ def compute_vcirc(snapshot, r):
     v_circ_at_r = np.array([np.sqrt(m * myG / r) for m in mass_inside_r])
 
     return v_circ_at_r
-
 
 def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
     """ Compute the smoothed rotation curves of all subhalos.
@@ -178,8 +178,8 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
 
     return v_circ, radii
 
-
 def compute_vmax(snapshot, n_soft=5):
+    """ Compute subhalo maximum circular velocity. """
     v_circ, radii = compute_rotation_curves(snapshot, n_soft=n_soft)
 
     max_idx = [np.argmax(v) for v in v_circ]
@@ -188,7 +188,7 @@ def compute_vmax(snapshot, n_soft=5):
 
     return vmax, rmax
 
-
+# Perhaps useless?
 def mass_accumulation_to_array(snapshot):
     sublentype = snapshot.get_subhalos('SubLengthType')
     splitting_points = np.cumsum(np.concatenate(sublentype))[:-1] \
@@ -202,7 +202,6 @@ def mass_accumulation_to_array(snapshot):
         (np.size(sublentype, axis=0), 6))
 
     return cmass, radii
-
 
 def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     """ For each subhalo, compute the mass accumulation by radius.
@@ -257,7 +256,6 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     cum_mass = np.array([np.cumsum(mass) for mass in mass_split])
 
     return cum_mass, grouped_radii
-
 
 def group_particles_by_subhalo(snapshot, *datasets,
                                part_type=[0, 1, 4, 5]):
@@ -314,7 +312,6 @@ def group_particles_by_subhalo(snapshot, *datasets,
 
     return grouped_data
 
-
 def periodic_wrap(snapshot, cop, coords):
     """ Account for the periodic boundary conditions by moving particles 
     to the periodic location, which is closest to the cop of their host
@@ -327,90 +324,3 @@ def periodic_wrap(snapshot, cop, coords):
     wrapped = np.mod(coords - cop + 0.5 * boxs, boxs) + cop - 0.5 * boxs
 
     return wrapped
-
-
-def calculate_V1kpc_inProgress(snapshot):
-    """ For each subhalo, calculate the circular velocity at 1kpc. 
-    Assume that there are no jumps in the SubGroupNumber values in any
-    of the groups."""
-
-    # Get particle data:
-    coords = snapshot.get_particles('Coordinates') \
-             * units.cm.to(units.kpc)
-    mass = snapshot.get_particle_masses() * units.g.to(units.Msun)
-
-    # Get halo data:
-    COPs = snapshot.get_subhalos('CentreOfPotential', \
-                                 divided=False)[0] * units.cm.to(units.kpc)
-    part_idx = get_subhalo_part_idx(snapshot)
-
-    massWithin1kpc = np.zeros((COPs[:, 0].size))
-
-    for idx, (cop, idx_list) in enumerate(zip(COPs, part_idx)):
-        # Get coords and mass of the particles in the corresponding halo:
-        halo_coords = coords[idx_list]
-        halo_mass = mass[idx_list]
-
-        # Calculate distances to COP:
-        r = np.linalg.norm(halo_coords - cop, axis=1)
-
-        # Get coordinates within 1kpc from COP:
-        r1kpc_mask = np.logical_and(r > 0, r < 1)
-
-        massWithin1kpc[idx] = halo_mass[r1kpc_mask].sum()
-
-    myG = G.to(
-        units.km ** 2 * units.kpc * units.Msun ** -1 * units.s ** -2).value
-    v1kpc = np.sqrt(massWithin1kpc * myG)
-
-    return v1kpc
-
-
-def get_subhalo_part_idx(snapshot):
-    """ Finds indices of the particles in each halo. """
-
-    # Get subhalos:
-    halo_gns = snapshot.get_subhalos('GroupNumber', \
-                                     divided=False)[0].astype(int)
-    halo_sgns = snapshot.get_subhalos('SubGroupNumber', \
-                                      divided=False)[0].astype(int)
-
-    # Get particles:
-    part_gns = snapshot.get_particles('GroupNumber')
-    part_sgns = snapshot.get_particles('SubGroupNumber')
-
-    # Get halo indices:
-    sorting = np.lexsort((halo_sgns, halo_gns))
-    print(halo_gns.size)
-
-    # Invert sorting:
-    inv_sorting = [0] * len(sorting)
-    for idx, val in enumerate(sorting):
-        inv_sorting[val] = idx
-
-    # Loop through particles and save indices to lists. Halos in the
-    # list behind the part_idx key are arranged in ascending order 
-    # with gn and sgn, i.e. in the order lexsort would arrange them:
-    gn_count = np.bincount(halo_gns)
-    print(halo_gns.size + sum(gn_count == 0))
-    print(gn_count.sum() + sum(gn_count == 0))
-    part_idx = [[] for i in range(halo_gns.size + sum(gn_count == 0))]
-    for idx, (gn, sgn) in enumerate(zip(part_gns, part_sgns)):
-        # Exclude unbounded particles (for unbounded: sgn = max_int):
-        if sgn < 10 ** 6:
-            i = gn_count[:gn].sum() + sgn
-            if i >= len(part_idx):
-                print(i)
-                print(gn, sgn)
-            part_idx[i].append(idx)
-
-    print(len(part_idx))
-    # Strip from empty lists:
-    part_idx = [l for l in part_idx if not (not l)]
-    print(len(part_idx))
-
-    # Convert to ndarray and sort in order corresponding to the halo
-    # datasets:
-    part_idx = np.array(part_idx)[inv_sorting]
-
-    return part_idx
