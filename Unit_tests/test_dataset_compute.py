@@ -26,7 +26,7 @@ class TestDatasetCompute(unittest.TestCase):
         self.max_r = 300 * units.kpc.to(units.cm)
 
     def test_split_satellites_by_distance(self):
-        masks_sat, mask_isol = dataset_compute.mask_satellites_by_distance(
+        masks_sat, mask_isol = dataset_compute.split_satellites_by_distance(
             self.snapshot, self.m31, self.mw)
 
         mask_sat_all = np.logical_or(
@@ -49,10 +49,10 @@ class TestDatasetCompute(unittest.TestCase):
 
     def test_split_satellites_consistency_below_300kpc(self):
         masks_sat_gn, mask_isol_gn = \
-            dataset_compute.mask_satellites_by_group_number(
+            dataset_compute.split_satellites_by_group_number(
                 self.snapshot, self.m31, self.mw)
         masks_sat_r, mask_isol_r = \
-            dataset_compute.mask_satellites_by_distance(
+            dataset_compute.split_satellites_by_distance(
                 self.snapshot, self.m31, self.mw)
 
         mask_below_r_m31 = (self.dist_to_m31 < self.max_r)
@@ -72,7 +72,7 @@ class TestDatasetCompute(unittest.TestCase):
 
         # Check that there is no intersection between isolated and
         # satellites:
-        masks_sat, mask_isol = dataset_compute.mask_satellites_by_distance(
+        masks_sat, mask_isol = dataset_compute.split_satellites_by_distance(
             self.snapshot, self.m31, self.mw)
         self.assertFalse(np.any(np.logical_and(masks_sat[0], mask_isol)))
         self.assertFalse(np.any(np.logical_and(masks_sat[1], mask_isol)))

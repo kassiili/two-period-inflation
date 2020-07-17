@@ -16,9 +16,9 @@ def prune_vmax(snap):
     mask = vmax > 0
     return mask
 
-def mask_satellites_by_distance(snap, m31_ident, mw_ident,
-                                max_dist_sat=300,
-                                max_dist_isol=2000):
+def split_satellites_by_distance(snap, m31_ident, mw_ident,
+                                 max_dist_sat=300,
+                                 max_dist_isol=2000):
     """ Select satellites and isolated galaxies from subhalos by their
     distance to the M31 and MW galaxies and the LG barycentre, respectively
 
@@ -84,7 +84,7 @@ def mask_satellites_by_distance(snap, m31_ident, mw_ident,
                                        sgns == 0])
     return masks_sat, mask_isol
 
-def mask_satellites_by_group_number(snap, *centrals):
+def split_satellites_by_group_number(snap, *centrals):
     gns = snap.get_subhalos("GroupNumber")
     sgns = snap.get_subhalos("SubGroupNumber")
 
