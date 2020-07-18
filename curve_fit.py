@@ -8,34 +8,105 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import make_pipeline
 
 
-def median_trend(x, y, points_per_bar=10):
-    xy = np.vstack([x, y])
-    xy = xy[:, xy[0, :].argsort()]
-    datapoints = xy[0, :].size
-    bars = datapoints // points_per_bar
+def median_trend(x, y, n_points_per_bar=10):
 
-    # Excĺude first elements (if necessary) to allow reshaping:
-    if (datapoints % bars != 0):
-        tmpX = xy[0, (datapoints % bars):]
-        tmpY = xy[1, (datapoints % bars):]
-        datapoints -= datapoints % bars
-    else:
-        tmpX = xy[0, :]
-        tmpY = xy[1, :]
+    # Function will return None if it is not possible to split the
+    # arrays into bars such that:
+    #   - the first and last bar have the same number of points,
+    #   which is either n_points_per_bar or n_points_per_bar-1
+    #   - the difference in number of points between any two bars is at
+    #   most 1
+    #
+    # First, try to split the array so that the number of points in the
+    # bars at the ends is n_points_per_bar, and decreasing the number of
+    # points in the bars in the middle.
+    #   If that does not work, set the number of points in the bars at the
+    # ends to n_points_per_bar-1, and try increasing the number of points
+    # in the bars in the middle.
 
-    # Reshape into a 2D numpy array with number of rows = bars:
-    tmpX = tmpX.reshape((bars, int(datapoints / bars)))
-    tmpY = tmpY.reshape((bars, int(datapoints / bars)))
+    # Compute number of bars and the number of bars that will have
+    # n_points_per_bar - 1 points:
+    n_bars = x.size // n_points_per_bar + (x.size % n_points_per_bar > 0)
+    n_alt_bars = (n_points_per_bar - x.size % n_points_per_bar) \
+                 % n_points_per_bar
+    alternation = -1
 
-    # Calculate the medians of the rows of the reshaped arrays:
-    medianX = np.median(tmpX, axis=1)
-    medianY = np.median(tmpY, axis=1)
+#    print("# bars:", n_bars)
+#    print("# altered bars:",n_alt_bars)
+    if n_bars - 2 < n_alt_bars:
+#        print("trying smaller bars at ends")
+        alternation = 1
+        n_points_per_bar -= 1
+        # Compute number of bars and the number of bars that will have
+        # n_points_per_bar + 1 points:
+        n_bars = x.size // n_points_per_bar
+        n_alt_bars = x.size % n_points_per_bar
+#        print("# bars:", n_bars)
+#        print("# altered bars:", n_alt_bars)
+        if n_bars - 2 < n_alt_bars:
+#            print("nope")
+            return None
 
-    return [medianX, medianY]
+    # Sort by x:
+    argsort = np.argsort(x)
+    x = x[argsort]
+    y = y[argsort]
+
+    medianx = np.zeros(n_bars)
+    mediany = np.zeros(n_bars)
+
+    # Iterate over bars and compute median for each of the, keeping
+    # track of the index of the lower side of the bar:
+    index = 0
+    for i_bar in range(n_bars):
+        down = index
+
+        # Alter the size of bars in the middle to fit the bars to the
+        # array:
+        if i_bar > 0 and i_bar <= n_alt_bars:
+            up = index + n_points_per_bar + alternation
+        else:
+            up = index + n_points_per_bar
+
+#        print(down, up)
+        medianx[i_bar] = np.median(x[down:up])
+        mediany[i_bar] = np.median(y[down:up])
+        index = up
+
+    return medianx, mediany
 
 
-def error_bars():
-    return None
+def median_trend_by_n_bars(x, y, n_bars):
+    if x.size > n_bars:
+        # Sort by x:
+        argsort = np.argsort(x)
+        x = x[argsort]; y = y[argsort]
+
+        n_over = x.size % n_bars
+        medianx = np.zeros(n_bars)
+        mediany = np.zeros(n_bars)
+
+        bar_size = x.size // n_bars
+        for i in range(n_bars):
+            if n_over < n_bars - 1:
+                if i > 0 and i <= n_over:
+                    down = i * bar_size
+                    up = (i + 1) * bar_size + 1
+                else:
+                    down = i * bar_size
+                    up = (i + 1) * bar_size
+            else:
+                if i == 1:
+                    down = i * bar_size
+                    up = (i + 1) * bar_size
+                else:
+                    down = i * bar_size
+                    up = (i + 1) * bar_size + 1
+
+            medianx[i] = np.median(x[down:up])
+            mediany[i] = np.median(y[down:up])
+
+        return medianx, mediany
 
 
 def PolynomialRegression(degree=2, **kwargs):
