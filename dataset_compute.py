@@ -20,7 +20,8 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
                                  max_dist_sat=300,
                                  max_dist_isol=2000):
     """ Select satellites and isolated galaxies from subhalos by their
-    distance to the M31 and MW galaxies and the LG barycentre, respectively
+    distance to the M31 and MW galaxies and the LG barycentre,
+    respectively.
 
     Parameters
     ----------
@@ -29,6 +30,12 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
         Group number and subgroup number of the M31 halo.
     mw1_ident : tuple of two int
         Group number and subgroup number of the MW halo.
+    max_dist_sat : float, optional
+        Maximum distance for satellite galaxies in units of kpc. Default
+        value is 300 kpc.
+    max_dist_isol : float, optional
+        Maximum distance for isolated galaxies in units of kpc. Default
+        value is 2000 kpc.
 
     Returns
     -------
@@ -47,6 +54,7 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
 
     centrals = [m31_ident, mw_ident]
     cops = snap.get_subhalos("CentreOfPotential")
+    gns = snap.get_subhalos("GroupNumber")
     sgns = snap.get_subhalos("SubGroupNumber")
 
     # Select satellites:
@@ -78,10 +86,13 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
                              compute_LG_centre(snap, m31_ident, mw_ident))
     max_dist_isol = max_dist_isol * units.kpc.to(units.cm)
     mask_isol = within_distance_range(dist_to_lg, 0, max_dist_isol)
+    exclude_centrals = [np.logical_not(np.logical_and(
+        gns == c_any[0], sgns == c_any[1])) for c_any in centrals]
     mask_isol = np.logical_and.reduce([mask_isol,
                                        np.logical_not(masks_sat[0]),
                                        np.logical_not(masks_sat[1]),
-                                       sgns == 0])
+                                       sgns == 0] +
+                                       exclude_centrals)
     return masks_sat, mask_isol
 
 def split_satellites_by_group_number(snap, *centrals):
