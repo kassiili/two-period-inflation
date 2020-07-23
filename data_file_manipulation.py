@@ -23,17 +23,17 @@ def combine_data_files(files, filename):
     files = files[sorting]
 
     # Create the file object with links to all the files:
-    with h5py.File(filename,'a') as f:
+    with h5py.File(filename, 'a') as f:
 
         # Iterate through data files and add missing links:
         for i,filename in enumerate(files):
             # Make an external link:
             if not 'link{}'.format(i) in f:
                 f['link{}'.format(i)] = \
-                        h5py.ExternalLink(filename,'/')
+                        h5py.ExternalLink(filename, '/')
 
 
-def get_data_path(data_category, simID, snapID):
+def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
     """ Constructs the path to data directory. 
     
     Paramaters
@@ -48,7 +48,10 @@ def get_data_path(data_category, simID, snapID):
     """
 
     home = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.join(home, "snapshots", simID)
+    if not path_to_snapshots:
+        path = os.path.join(home, "snapshots", sim_id)
+    else:
+        path = os.path.join(path_to_snapshots, sim_id)
 
     prefix = ""
     if data_category == "part":
@@ -58,8 +61,8 @@ def get_data_path(data_category, simID, snapID):
 
     # Find the snapshot directory and add to path:
     for dir_name in os.listdir(path):
-        if "{}{:03d}".format(prefix, snapID) in dir_name:
-            path = os.path.join(path,dir_name)
+        if "{}{:03d}".format(prefix, snap_id) in dir_name:
+            path = os.path.join(path, dir_name)
 
     return path
 

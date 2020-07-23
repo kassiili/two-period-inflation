@@ -25,19 +25,21 @@ class Snapshot:
 
     """
 
-    def __init__(self, sim_id, snap_id, name=""):
+    def __init__(self, sim_id, snap_id, name="", sim_path=""):
         """
         Parameters
         ----------
         sim_id : str
             Identifier of the simulation data -- should be equivalent to
-            the directory name of the directory containing all the data 
+            the directory name of the directory containing all the data
             of the simulation.
         snap_id : int
             The number identifying the snapshot.
         name : str, optional
             Label of the data set. If not given, is generated from simID
             and snapID.
+        sim_path : str, optional
+            Path to the simulation data directory.
         """
 
         self.sim_id = sim_id
@@ -53,14 +55,16 @@ class Snapshot:
         self.part_file = '.particles_{}_{:03d}.hdf5'.format(sim_id,
                                                             snap_id)
 
-        path = data_file_manipulation.get_data_path('group', sim_id,
-                                                    snap_id)
+        path = data_file_manipulation.get_data_path(
+            'group', sim_id, snap_id, path_to_snapshots=sim_path)
+
         data_file_manipulation.combine_data_files(
             np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))),
             self.grp_file)
 
-        path = data_file_manipulation.get_data_path('part', sim_id,
-                                                    snap_id)
+        path = data_file_manipulation.get_data_path(
+            'part', sim_id, snap_id, path_to_snapshots=sim_path)
+
         data_file_manipulation.combine_data_files(
             np.array(glob.glob(os.path.join(path, 'snap*'))),
             self.part_file)

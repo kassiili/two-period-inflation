@@ -9,6 +9,7 @@ Gadgetviewer/Images
 Gadgetviewer/Movies
 Gadgetviewer/Movie_params
 .ipynb_checkpoints/
+.idea
 *.hdf5
 *.dat
 *.npy
