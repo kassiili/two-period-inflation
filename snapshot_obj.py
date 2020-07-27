@@ -317,7 +317,8 @@ class Snapshot:
         else:
             out = np.concatenate(out)
 
-        out = self.convert_to_cgs_part(out, dataset)
+        group = "PartType{}".format(part_type[0])
+        out = self.convert_to_cgs_part(out, dataset, group)
 
         return out
 
@@ -339,7 +340,7 @@ class Snapshot:
                     dm_mass = partf['link0/Header'] \
                         .attrs.get('MassTable')[pt]
                     dm_mass = self.convert_to_cgs_part(
-                        np.array([dm_mass]), 'Masses')[0]
+                        np.array([dm_mass]), 'Masses', 'PartType0')[0]
                     dm_n = partf['link0/Header'] \
                         .attrs.get('NumPart_Total')[pt]
                     mass.append(np.ones(dm_n, dtype='f8') * dm_mass)
@@ -443,7 +444,7 @@ class Snapshot:
 
         return converted
 
-    def convert_to_cgs_part(self, data, dataset):
+    def convert_to_cgs_part(self, data, dataset, group):
         """ Read conversion factors for a dataset of particles and 
         convert it into cgs units.
 
@@ -464,12 +465,12 @@ class Snapshot:
 
         with h5py.File(self.part_file, 'r') as partf:
             # Get conversion factors (same for all types):
-            cgs = partf['link0/PartType0/{}'.format(dataset)] \
-                .attrs.get('CGSConversionFactor')
-            aexp = partf['link0/PartType0/{}'.format(dataset)] \
-                .attrs.get('aexp-scale-exponent')
-            hexp = partf['link0/PartType0/{}'.format(dataset)] \
-                .attrs.get('h-scale-exponent')
+            cgs = partf['link0/{}/{}'.format(group, dataset)].attrs \
+                .get('CGSConversionFactor')
+            aexp = partf['link0/{}/{}'.format(group, dataset)].attrs \
+                .get('aexp-scale-exponent')
+            hexp = partf['link0/{}/{}'.format(group, dataset)].attrs \
+                .get('h-scale-exponent')
 
             # Get expansion factor and Hubble parameter from the header:
             a = partf['link0/Header'].attrs.get('Time')
