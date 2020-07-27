@@ -323,6 +323,71 @@ def group_particles_by_subhalo(snapshot, *datasets,
 
     return grouped_data
 
+
+def group_selected_particles_by_subhalo(snapshot, selection_mask,
+                                        *datasets,
+                                        part_type=[0, 1, 4, 5]):
+    """ Get given datasets of bound particles and split them by host
+    halo.
+
+    Parameters
+    ----------
+    snapshot : Snapshot object
+        Snapshot from which the datasets are retrieved.
+    *datasets : list of str
+        Names of the datasets to be retrieved and grouped.
+    part_type : list of int, optional
+        Specifies which particle types are retrieved.
+
+    Returns
+    -------
+    grouped_data : dict
+        A dictionary of the requested grouped datasets, with the names
+        of the dataset as the keys.
+
+    Notes
+    -----
+    The particles are sorted, first by group number of the host halo,
+    then by its subgroup number. """
+
+    # Get particle data:
+    gns = snapshot.get_particles('GroupNumber', part_type=part_type)
+    sgns = snapshot.get_particles('SubGroupNumber', part_type=part_type)
+
+    # Exclude particles that are not bound to a subhalo:
+    mask = np.logical_and(selection_mask, sgns < np.max(gns))
+    gns = gns[mask]
+    sgns = sgns[mask]
+
+    sort, splitting_points = sort_and_split_by_subhalo(snapshot, gns, sgns)
+
+    grouped_data = {'GroupNumber': np.split(gns[sort], splitting_points),
+                    'SubGroupNumber': np.split(sgns[sort],
+                                               splitting_points)}
+
+    for dataset in datasets:
+        data = snapshot.get_particles(dataset, part_type=part_type)[mask]
+        grouped_data[dataset] = np.split(data[sort], splitting_points)
+
+    return grouped_data
+
+def sort_and_split_by_subhalo(snapshot, part_gns, part_sgns):
+
+    # Sort, first by group number then by subgroup number:
+    sort = np.lexsort((part_sgns, part_gns))
+
+    subhalo_gns = snapshot.get_subhalos("GroupNumber")
+    subhalo_sgns = snapshot.get_subhalos("SubGroupNumber")
+
+    # Count number of entries with each group number and subgroup number
+    # pairs:
+    counts = [np.sum(np.logical_and(part_gns == gn, part_sgns == sgn))
+              for gn, sgn in zip(subhalo_gns, subhalo_sgns)]
+
+    splitting_points = np.cumsum(counts)[:-1]
+
+    return sort, splitting_points
+
 def periodic_wrap(snapshot, cop, coords):
     """ Account for the periodic boundary conditions by moving particles 
     to the periodic location, which is closest to the cop of their host
