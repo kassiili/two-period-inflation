@@ -177,8 +177,8 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
     cmass, radii = compute_mass_accumulation(snapshot, part_type=part_type)
 
     # Compute running average:
-    radii = [np.array(r[n_soft::n_soft]) for r in radii]
-    cmass = [np.array(cm[n_soft::n_soft]) for cm in cmass]
+    radii = [np.array(r[n_soft-1::n_soft]) for r in radii]
+    cmass = [np.array(cm[n_soft-1::n_soft]) for cm in cmass]
 
     myG = G.to(units.cm ** 3 * units.g ** -1 * units.s ** -2).value
     v_circ = [np.sqrt(cm * myG / r) for cm, r in zip(cmass, radii)]
@@ -233,9 +233,8 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
 
     # In order to not mix indices between arrays, we need all particle
     # arrays from grouping method:
-    grouped_data = group_particles_by_subhalo(snapshot, 'Coordinates',
-                                              'Masses',
-                                              part_type=part_type)
+    grouped_data = group_particles_by_subhalo(
+        snapshot, 'Coordinates', 'Masses', part_type=part_type)
 
     cops = snapshot.get_subhalos('CentreOfPotential')
 
@@ -260,11 +259,10 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     mass_split = np.split(mass[sort], splitting_points)
 
     # Sort also array of radii:
-    grouped_radii = np.array([r for r in np.split(radii[sort],
-                                                  splitting_points)])
+    grouped_radii = [r for r in np.split(radii[sort], splitting_points)]
 
     # Compute mass accumulation with radius for each subhalo:
-    cum_mass = np.array([np.cumsum(mass) for mass in mass_split])
+    cum_mass = [np.cumsum(mass) for mass in mass_split]
 
     return cum_mass, grouped_radii
 
@@ -324,11 +322,11 @@ def group_particles_by_subhalo(snapshot, *datasets,
     return grouped_data
 
 
-def group_selected_particles_by_subhalo(snapshot, selection_mask,
-                                        *datasets,
-                                        part_type=[0, 1, 4, 5]):
-    """ Get given datasets of bound particles and split them by host
-    halo.
+def group_selected_particles_by_subhalo(snapshot, *datasets,
+                                        selection_mask=None,
+                                        part_type=None):
+    """ Get given datasets of bound particles, split them by host halo,
+    and order by particle type.
 
     Parameters
     ----------
@@ -350,16 +348,29 @@ def group_selected_particles_by_subhalo(snapshot, selection_mask,
     The particles are sorted, first by group number of the host halo,
     then by its subgroup number. """
 
+    if part_type is None:
+        part_type = [0, 1, 4, 5]
+
+    if selection_mask is None:
+        part_num = np.sum(
+            snapshot.get_attribute("NumPart_Total", "Header",
+                                   "particle")[part_type])
+        selection_mask = np.ones(part_num)
+
     # Get particle data:
     gns = snapshot.get_particles('GroupNumber', part_type=part_type)
     sgns = snapshot.get_particles('SubGroupNumber', part_type=part_type)
+    ptypes = snapshot.get_particles('PartType', part_type=part_type)
 
     # Exclude particles that are not bound to a subhalo:
     mask = np.logical_and(selection_mask, sgns < np.max(gns))
     gns = gns[mask]
     sgns = sgns[mask]
+    ptypes = ptypes[mask]
 
-    sort, splitting_points = sort_and_split_by_subhalo(snapshot, gns, sgns)
+    sort, splitting_points = sort_and_split_by_subhalo(snapshot, gns,
+                                                       sgns,
+                                                       add_sort=[ptypes])
 
     grouped_data = {'GroupNumber': np.split(gns[sort], splitting_points),
                     'SubGroupNumber': np.split(sgns[sort],
@@ -371,10 +382,19 @@ def group_selected_particles_by_subhalo(snapshot, selection_mask,
 
     return grouped_data
 
-def sort_and_split_by_subhalo(snapshot, part_gns, part_sgns):
+def sort_and_split_by_subhalo(snapshot, part_gns, part_sgns,
+                              add_sort=None):
+    """ Find indices that would sort particles first by subhalo and
+    indices that would split the sorted array by subhalo.
+    """
 
-    # Sort, first by group number then by subgroup number:
-    sort = np.lexsort((part_sgns, part_gns))
+    if add_sort is None:
+        add_sort = []
+
+    # Sort, first by group number then by subgroup number, and finally
+    # by potential additional sorting conditions:
+    sort_arrs = tuple(add_sort + [part_sgns, part_gns])
+    sort = np.lexsort(sort_arrs)
 
     subhalo_gns = snapshot.get_subhalos("GroupNumber")
     subhalo_sgns = snapshot.get_subhalos("SubGroupNumber")

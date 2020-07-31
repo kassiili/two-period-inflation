@@ -264,9 +264,28 @@ class Snapshot:
         out = []
         if dataset == 'Masses':
             out = self.get_particle_masses(part_type)
+        elif dataset == 'PartType':
+            out = self.get_particle_types(part_type=part_type)
         else:
             out = self.get_particle_catalogue(dataset, part_type=part_type,
                                               fnums=fnums)
+
+        return out
+
+    def get_particle_types(self, part_type=None):
+        """ Constructs an array of particle types of particles in the
+        order of the catalogue method. """
+
+        if part_type is None:
+            part_type = [0, 1, 4, 5]
+
+        # Read total number of particles of each type:
+        num_part_tot = self.get_attribute("NumPart_Total", "Header",
+                                          "particle")
+
+        # Construct an array indicating particle types of all particles:
+        out = np.concatenate([pt * np.ones(num_part_tot[pt])
+                              for pt in part_type])
 
         return out
 
