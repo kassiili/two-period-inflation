@@ -79,6 +79,10 @@ def create_dataset(snapshot, dataset, group):
             out = dataset_compute.compute_vcirc(snapshot,
                                                 units.kpc.to(units.cm))
 
+        if dataset == 'V2kpc':
+            out = dataset_compute.compute_vcirc(snapshot,
+                                                2 * units.kpc.to(units.cm))
+
         # DO NOT TRUST:
         elif dataset == 'MassAccum':
             # Combine all particles from all subhalos into one long array.
