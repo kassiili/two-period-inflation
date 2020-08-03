@@ -1,7 +1,7 @@
 import numpy as np
 
 from astropy import units
-from astropy.constants import G
+from astropy import constants
 
 
 def split_luminous(snap):
@@ -159,7 +159,8 @@ def compute_vcirc(snapshot, r):
                      if condition(len(cm), n) else 0
                      for cm, n in zip(cmass, n_parts_inside_r)]
 
-    myG = G.to(units.cm ** 3 * units.g ** -1 * units.s ** -2).value
+    myG = constants.G.to(units.cm ** 3 * units.g ** -1 * units.s **
+                         -2).value
     v_circ_at_r = np.array([np.sqrt(m * myG / r) for m in mass_inside_r])
 
     return v_circ_at_r
@@ -180,7 +181,8 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
     radii = [np.array(r[n_soft-1::n_soft]) for r in radii]
     cmass = [np.array(cm[n_soft-1::n_soft]) for cm in cmass]
 
-    myG = G.to(units.cm ** 3 * units.g ** -1 * units.s ** -2).value
+    myG = constants.G.to(units.cm ** 3 * units.g ** -1 * units.s **
+                         -2).value
     v_circ = [np.sqrt(cm * myG / r) for cm, r in zip(cmass, radii)]
 
     # Add zero:

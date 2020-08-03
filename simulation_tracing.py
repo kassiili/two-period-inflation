@@ -2,7 +2,6 @@ import h5py
 import numpy as np
 import os.path
 
-from snapshot_obj import Snapshot
 import halo_matching
 
 
@@ -104,3 +103,10 @@ class SimulationTracer:
             out = f['snapshot_ids'][self.earliest_snap:]
 
         return out
+
+    def get_redshifts(self):
+
+        z = np.array([snapshot_obj.Snapshot(self.sim_id, snap_id)
+                      for snap_id in self.get_snapshot_ids()])
+
+        return z
