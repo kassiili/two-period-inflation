@@ -87,7 +87,7 @@ class SubhaloTracer:
         idx_z0 = np.logical_and(gns == gn_z0, sgns == sgn_z0)
 
         # Create halo tracer:
-        halo_idx = sim_tracer.get_tracer()[idx_z0][0]
+        halo_idx = sim_tracer.get_tracer_array()[idx_z0][0]
         self.tracer = (np.array([None] * snap_ids.size), snap_ids)
         for i, (hidx, sid) in enumerate(zip(halo_idx, snap_ids)):
             if hidx != sim_tracer.no_match:

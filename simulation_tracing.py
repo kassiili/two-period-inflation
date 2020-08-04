@@ -3,6 +3,7 @@ import numpy as np
 import os.path
 
 import halo_matching
+import snapshot_obj
 
 
 class SimulationTracer:
@@ -64,12 +65,14 @@ class SimulationTracer:
         with h5py.File(self.tracer_file, "r") as f:
             tracer = f['tracer']
             no_match = tracer.attrs.get('no_match')
-            snap = Snapshot(self.sim_id, tracer.attrs.get('earliest_snap'))
+            snap = snapshot_obj.Snapshot(self.sim_id,
+                                         tracer.attrs.get('earliest_snap'))
             tracer = tracer[...]
             snap_ids = f['snapshot_ids'][...]
 
         while snap.snap_id > stop:
-            snap_next = Snapshot(self.sim_id, snap.snap_id - 1)
+            snap_next = snapshot_obj.Snapshot(self.sim_id,
+                                              snap.snap_id - 1)
             matches = halo_matching.match_snapshots(snap, snap_next,
                                                     no_match)
 
@@ -90,7 +93,7 @@ class SimulationTracer:
 
         return tracer[:, stop:], snap_ids[stop:]
 
-    def get_tracer(self):
+    def get_tracer_array(self):
 
         with h5py.File(self.tracer_file, 'r') as f:
             out = f['tracer'][:, self.earliest_snap:]
@@ -106,7 +109,8 @@ class SimulationTracer:
 
     def get_redshifts(self):
 
-        z = np.array([snapshot_obj.Snapshot(self.sim_id, snap_id)
+        z = np.array([snapshot_obj.Snapshot(self.sim_id, snap_id)\
+                      .get_attribute("Redshift", "Header")
                       for snap_id in self.get_snapshot_ids()])
 
         return z
