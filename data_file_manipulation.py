@@ -2,6 +2,7 @@ import numpy as np
 import os
 import h5py
 from astropy import units
+import re
 
 import dataset_compute
 
@@ -75,13 +76,11 @@ def create_dataset(snapshot, dataset, group):
     out = []
     subgroup_list = str.split(group, '/')
     if len(subgroup_list) == 1:
-        if dataset == 'V1kpc':
+        match_v_at_r = re.match("V([0-9]+)kpc", dataset)
+        if bool(match_v_at_r):
+            r = int(match_v_at_r.groups()[0])
             out = dataset_compute.compute_vcirc(snapshot,
-                                                units.kpc.to(units.cm))
-
-        if dataset == 'V2kpc':
-            out = dataset_compute.compute_vcirc(snapshot,
-                                                2 * units.kpc.to(units.cm))
+                                                r * units.kpc.to(units.cm))
 
         # DO NOT TRUST:
         elif dataset == 'MassAccum':
