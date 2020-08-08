@@ -2,13 +2,12 @@ import h5py
 import numpy as np
 import os.path
 
-import halo_matching
 import snapshot_obj
 
 
 class SimulationTracer:
 
-    def __init__(self, snap_z0, no_match=2 ** 32):
+    def __init__(self, snap_z0, matcher):
         """
 
         Parameters
@@ -19,7 +18,8 @@ class SimulationTracer:
         self.sim_id = snap_z0.sim_id
         self.n_halos = snap_z0.get_halo_number()
         self.earliest_snap = snap_z0.snap_id
-        self.no_match = no_match
+        self.matcher = matcher
+        self.sim_path = snap_z0.sim_path
 
         # Name of file for saving the tracer:
         self.tracer_file = ".tracer_{}.hdf5".format(snap_z0.sim_id)
@@ -29,7 +29,7 @@ class SimulationTracer:
             print('creating file {}'.format(self.tracer_file))
             # Initialize tracer:
             tracer_arr = np.ones((self.n_halos, snap_z0.snap_id + 1),
-                                 dtype=int) * no_match
+                                 dtype=int) * self.matcher.no_match
 
             # Identify halos in snap_z0 with themselves:
             tracer_arr[:, snap_z0.snap_id] = np.arange(self.n_halos)
@@ -38,7 +38,7 @@ class SimulationTracer:
             with h5py.File(self.tracer_file, "w") as f:
                 tracer_dset = f.create_dataset("tracer", data=tracer_arr)
                 tracer_dset.attrs['earliest_snap'] = snap_z0.snap_id
-                tracer_dset.attrs['no_match'] = no_match
+                tracer_dset.attrs['no_match'] = self.matcher.no_match
 
                 # For convenience, write snapshot ids as well:
                 f.create_dataset("snapshot_ids", data=np.arange(
@@ -64,21 +64,22 @@ class SimulationTracer:
         # Get the earliest traced snapshot and continue from there:
         with h5py.File(self.tracer_file, "r") as f:
             tracer = f['tracer']
-            no_match = tracer.attrs.get('no_match')
-            snap = snapshot_obj.Snapshot(self.sim_id,
-                                         tracer.attrs.get('earliest_snap'))
+            self.matcher.no_match = tracer.attrs.get('no_match')
+            snap = snapshot_obj.Snapshot(
+                self.sim_id,tracer.attrs.get('earliest_snap'),
+                sim_path=self.sim_path)
             tracer = tracer[...]
             snap_ids = f['snapshot_ids'][...]
 
         while snap.snap_id > stop:
             snap_next = snapshot_obj.Snapshot(self.sim_id,
-                                              snap.snap_id - 1)
-            matches = halo_matching.match_snapshots(snap, snap_next,
-                                                    no_match)
+                                              snap.snap_id - 1,
+                                              sim_path=self.sim_path)
+            matches = self.matcher.match_snapshots(snap, snap_next)
 
             # Get those matches that connect to redshift zero:
             for z0_idx, prev_idx in enumerate(tracer[:, snap.snap_id]):
-                if prev_idx != no_match:
+                if prev_idx != self.matcher.no_match:
                     tracer[z0_idx, snap_next.snap_id] = matches[prev_idx]
 
             # Save new matches:
@@ -109,8 +110,10 @@ class SimulationTracer:
 
     def get_redshifts(self):
 
-        z = np.array([snapshot_obj.Snapshot(self.sim_id, snap_id)\
-                      .get_attribute("Redshift", "Header")
-                      for snap_id in self.get_snapshot_ids()])
+        snaps = [snapshot_obj.Snapshot(self.sim_id, snap_id,
+                                       sim_path=self.sim_path)
+                 for snap_id in self.get_snapshot_ids()]
+        z = np.array([snap.get_attribute("Redshift", "Header")
+                      for snap in snaps])
 
         return z

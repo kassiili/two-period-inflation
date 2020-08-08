@@ -90,7 +90,7 @@ class SubhaloTracer:
         halo_idx = sim_tracer.get_tracer_array()[idx_z0][0]
         self.tracer = (np.array([None] * snap_ids.size), snap_ids)
         for i, (hidx, sid) in enumerate(zip(halo_idx, snap_ids)):
-            if hidx != sim_tracer.no_match:
+            if hidx != sim_tracer.matcher.no_match:
                 snap = Snapshot(self.sim_id, sid)
                 self.tracer[0][i] = SubhaloInstance(snap, idx=hidx)
 
