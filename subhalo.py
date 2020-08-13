@@ -74,7 +74,7 @@ class SubhaloTracer:
 
         Parameters
         ----------
-        sim_tracer : SimulationTracer
+        sim_tracer : MergerTree
         snap_z0 : Snapshot
         """
         self.sim_id = sim_tracer.sim_id

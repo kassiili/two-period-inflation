@@ -2,13 +2,121 @@ import numpy as np
 import math
 import heapq
 
-from snapshot_obj import Snapshot
+
+def get_data_for_matching(snap_ref, snap_exp):
+    """ Retrieve datasets for matching for the given set of group numbers.
+
+    Parameters
+    ----------
+    snap_ref : Snapshot object
+        Reference snapshot.
+    snap_exp : Snapshot object
+        Explored snapshot.
+
+    Returns
+    -------
+    (reference,explore) : tuple of dict
+        Matching data for both snapshots in dictionaries.
+    """
+
+    reference = {'GNs': snap_ref.get_subhalos('GroupNumber'),
+                 'SGNs': snap_ref.get_subhalos('SubGroupNumber'),
+                 'IDs': snap_ref.get_subhalos_IDs(part_type=1),
+                 'Mass': snap_ref.get_subhalos('MassType')[:, 1]}
+
+    explore = {'GNs': snap_exp.get_subhalos('GroupNumber'),
+               'SGNs': snap_exp.get_subhalos('SubGroupNumber'),
+               'IDs': snap_exp.get_subhalos_IDs(part_type=1),
+               'Mass': snap_exp.get_subhalos('MassType')[:, 1]}
+
+    return reference, explore
+
+
+def identify_group_numbers(gns1, gns2):
+    """ Identifies the indices, where (gn,sgn) pairs align, between
+    datasets 1 and 2.
+
+    Parameters
+    ----------
+    gns1 : ndarray of int
+        Group numbers of first dataset.
+    gns2 : ndarray of int
+        Group numbers of second dataset.
+
+    Returns
+    -------
+    idx_of1_in2 : list of int
+        Elements satisfy: GNs1[idx] == GNs2[idx_of1_in2[idx]] (unless
+        GNs1[idx] not in GNs2)
+
+    Notes
+    -----
+    If a certain pair in 1 does not exist in 2, it is identified with the
+    halo with the same gn, for which sgn is the largest. """
+
+    gns1 = gns1.astype(int)
+    gns2 = gns2.astype(int)
+    gn_cnt1 = np.bincount(gns1)
+    gn_cnt2 = np.bincount(gns2)
+
+    idx_of1_in2 = [None] * gns1.size
+    for gn in gns1:
+        for sgn in range(gn_cnt1[gn]):
+            idx1 = np.sum(gn_cnt1[:gn]) + sgn
+            # If halo with gn and sgn exists dataset 2, then identify
+            # those halos. If not, set indices equal:
+            if gn < gn_cnt2.size:
+                if sgn < gn_cnt2[gn]:
+                    idx2 = np.sum(gn_cnt2[:gn]) + sgn
+            else:
+                idx2 = min(gns2.size - 1, idx1)
+            idx_of1_in2[idx1] = idx2
+
+    return idx_of1_in2
+
+
+def get_index_at_step(idx_ref, step, lim):
+    """ Get the index of the next subhalo after step iterations from
+    idx_ref.
+
+    Parameters
+    ----------
+    idx_ref : int
+        Starting point of iterations.
+    step : int
+        Number of iterations completed.
+    lim : int
+        Upper limit for index value.
+
+    Returns
+    -------
+    idx : int
+        Index of next subhalo after step iterations from idx_ref.
+    """
+
+    # Iterate outwards from idx_ref, alternating between lower and higher
+    # index:
+    idx = idx_ref + int(math.copysign(
+        math.floor((step + 1) / 2), (step % 2) - 0.5))
+
+    # Check that index is not negative:
+    if abs(idx_ref - idx) > idx_ref:
+        idx = step
+    # Check that index is not out of array bounds:
+    elif abs(idx_ref - idx) > lim - 1 - idx_ref:
+        idx = lim - step
+
+    # If all values of array are consumed:
+    if idx < 0 or idx >= lim:
+        idx = idx_ref
+
+    return idx
 
 
 class SubhaloMatcher:
 
-    def __init__(self, no_match = 2 ** 32, n_link_ref = 15,
-                 f_link_exp = 1 / 5, f_mass_link = 3):
+    def __init__(self, no_match=2 ** 32, n_link_ref=15,
+                 f_link_exp=1 / 5, f_mass_link=3):
         """
 
         Parameters
@@ -47,17 +155,20 @@ class SubhaloMatcher:
             the halo in index i, then matches_ref[i] = [-1,-1].
         """
 
-        reference, explore = self.get_data_for_matching(snap_ref,
-                                                        snap_exp)
+        reference, explore = get_data_for_matching(snap_ref,
+                                                   snap_exp)
 
-        # Initialize matches:
+        # Initialize matches (ADD TO THE DICTIONARIES IN THE METHOD
+        # ABOVE):
         matches_ref = self.no_match * np.ones(reference['GNs'].size,
                                               dtype=int)
         matches_exp = self.no_match * np.ones(explore['GNs'].size,
                                               dtype=int)
+        out = -1 * np.ones((reference['GNs'].size, 2), dtype=int)
+
         # This is defined just make the code run a bit faster
-        init_idents = self.identify_group_numbers(reference['GNs'],
-                                                  explore['GNs'])
+        init_idents = identify_group_numbers(reference['GNs'],
+                                             explore['GNs'])
 
         # Initialize priority queue:
         pq = []
@@ -77,8 +188,8 @@ class SubhaloMatcher:
 
             # Get index of the halo to be tried next. step tells how far
             # to iterate from initial index:
-            idx_exp = self.get_index_at_step(idx_exp0, step,
-                                             explore['GNs'].size)
+            idx_exp = get_index_at_step(idx_exp0, step,
+                                        explore['GNs'].size)
 
             # Match:
             found_match = self.is_a_match(explore['IDs'][idx_exp],
@@ -90,6 +201,8 @@ class SubhaloMatcher:
                 n_matched += 1
                 matches_ref[idx_ref] = idx_exp
                 matches_exp[idx_exp] = idx_ref
+                out[idx_ref] = [explore['GNs'][idx_exp],
+                                explore['SGNs'][idx_exp]]
             else:
                 new_step = self.iterate_step(idx_exp0, step, matches_exp)
                 # If new_step == step, then all potential matches_ref for
@@ -100,78 +213,7 @@ class SubhaloMatcher:
         print("{} -> {}: {} trials, {} matches".format(snap_ref.snap_id,
                                                        snap_exp.snap_id,
                                                        trials, n_matched))
-        return matches_ref
-
-    def get_data_for_matching(self, snap_ref, snap_exp):
-        """ Retrieve datasets for matching for the given set of group numbers.
-
-        Parameters
-        ----------
-        snap_ref : Snapshot object
-            Reference snapshot.
-        snap_exp : Snapshot object
-            Explored snapshot.
-
-        Returns
-        -------
-        (reference,explore) : tuple of dict
-            Matching data for both snapshots in dictionaries.
-        """
-
-        reference = {'GNs': snap_ref.get_subhalos('GroupNumber'),
-                     'SGNs': snap_ref.get_subhalos('SubGroupNumber'),
-                     'IDs': snap_ref.get_subhalos_IDs(part_type=1),
-                     'Mass': snap_ref.get_subhalos('MassType')[:, 1]}
-
-        explore = {'GNs': snap_exp.get_subhalos('GroupNumber'),
-                   'SGNs': snap_exp.get_subhalos('SubGroupNumber'),
-                   'IDs': snap_exp.get_subhalos_IDs(part_type=1),
-                   'Mass': snap_exp.get_subhalos('MassType')[:, 1]}
-
-        return reference, explore
-
-
-    def identify_group_numbers(self, gns1, gns2):
-        """ Identifies the indices, where (gn,sgn) pairs align, between
-        datasets 1 and 2.
-
-        Parameters
-        ----------
-        gns1 : ndarray of int
-            Group numbers of first dataset.
-        gns2 : ndarray of int
-            Group numbers of second dataset.
-
-        Returns
-        -------
-        idx_of1_in2 : list of int
-            Elements satisfy: GNs1[idx] == GNs2[idx_of1_in2[idx]] (unless
-            GNs1[idx] not in GNs2)
-
-        Notes
-        -----
-        If a certain pair in 1 does not exist in 2, it is identified with the
-        halo with the same gn, for which sgn is the largest. """
-
-        gns1 = gns1.astype(int)
-        gns2 = gns2.astype(int)
-        gn_cnt1 = np.bincount(gns1)
-        gn_cnt2 = np.bincount(gns2)
-
-        idx_of1_in2 = [None] * gns1.size
-        for gn in gns1:
-            for sgn in range(gn_cnt1[gn]):
-                idx1 = np.sum(gn_cnt1[:gn]) + sgn
-                # If halo with gn and sgn exists dataset 2, then identify
-                # those halos. If not, set indices equal:
-                if gn < gn_cnt2.size:
-                    if sgn < gn_cnt2[gn]:
-                        idx2 = np.sum(gn_cnt2[:gn]) + sgn
-                else:
-                    idx2 = min(gns2.size - 1, idx1)
-                idx_of1_in2[idx1] = idx2
-
-        return idx_of1_in2
+        return out
 
     def iterate_step(self, idx_ref, step_start, matches,
                      one_to_one=False):
@@ -206,7 +248,7 @@ class SubhaloMatcher:
         step = step_start
         while step < term:
 
-            idx = self.get_index_at_step(idx_ref, step + 1, matches.size)
+            idx = get_index_at_step(idx_ref, step + 1, matches.size)
 
             # If all values of array are consumed:
             if idx == idx_ref:
@@ -220,44 +262,6 @@ class SubhaloMatcher:
             step += 1
 
         return step
-
-
-    def get_index_at_step(self, idx_ref, step, lim):
-        """ Get the index of the next subhalo after step iterations from
-        idx_ref.
-
-        Parameters
-        ----------
-        idx_ref : int
-            Starting point of iterations.
-        step : int
-            Number of iterations completed.
-        lim : int
-            Upper limit for index value.
-
-        Returns
-        -------
-        idx : int
-            Index of next subhalo after step iterations from idx_ref.
-        """
-
-        # Iterate outwards from idx_ref, alternating between lower and higher
-        # index:
-        idx = idx_ref + int(math.copysign(
-            math.floor((step + 1) / 2), (step % 2) - 0.5))
-
-        # Check that index is not negative:
-        if abs(idx_ref - idx) > idx_ref:
-            idx = step
-        # Check that index is not out of array bounds:
-        elif abs(idx_ref - idx) > lim - 1 - idx_ref:
-            idx = lim - step
-
-        # If all values of array are consumed:
-        if idx < 0 or idx >= lim:
-            idx = idx_ref
-
-        return idx
 
     def is_a_match(self, ids_ref, mass_ref, ids_exp, mass_exp):
         """ Check if two halos with given IDs and masses correspond to the same
@@ -313,8 +317,7 @@ class SubhaloMatcher:
 
         return found_match
 
-
-#def find_match(subhalo, snap_id, snap_exp):
+# def find_match(subhalo, snap_id, snap_exp):
 #    """ Attempts to match a given subhalo with another subhalo in a given
 #    snapshot.
 #
@@ -374,7 +377,7 @@ class SubhaloMatcher:
 #    return match
 #
 #
-#def neighborhood(snap, gn, sgn, min_halos):
+# def neighborhood(snap, gn, sgn, min_halos):
 #    """ Gets file numbers of files that contain a minimum amount of
 #    halos above and below a certain halo. """
 #
@@ -404,4 +407,3 @@ class SubhaloMatcher:
 #            break
 #
 #    return fnums
-

@@ -170,3 +170,8 @@ def create_dataset(snapshot, dataset, group):
                                 data=sub_offset)
 
     return out
+
+
+def save_dataset(data, dataset, group, snapshot):
+    with h5py.File(snapshot.grp_file, 'r+') as grpf:
+        grpf.create_dataset('/{}/{}'.format(group, dataset), data=data)
