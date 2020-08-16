@@ -13,7 +13,7 @@ class SubhaloTracer:
         # Initialize subhalo index array:
         sim_snap_ids = self.merger_tree.simulation.get_snap_ids()
         self.subhalo_index = np.array(sim_snap_ids.size)
-                # Assuming snapshot indexing starts at zero
+        # Assuming snapshot indexing starts at zero
         self.subhalo_index[:, 0] = sim_snap_ids
 
         # Set reference index:
@@ -72,7 +72,7 @@ class SnapshotTracer:
 
 class MergerTree:
 
-    def __init__(self, simulation, matcher, branching="backward",
+    def __init__(self, simulation, matcher, branching='backward',
                  min_snaps_traced=1):
         """
 
@@ -84,26 +84,47 @@ class MergerTree:
         """
         self.simulation = simulation
         self.matcher = matcher
-        self.branching = branching
+        if branching == 'forward':
+            self.branching = 'ForwardBranching'
+        else:
+            self.branching = 'BackwardBranching'
         self.min_snaps_traced = 1
-        self.storage_file = ".tracer_{}_{}.hdf5".format(
+        self.storage_file = '.tracer_{}_{}.hdf5'.format(
             self.branching, self.simulation.sim_id)
 
     def trace_all(self, snap_id_1, snap_id_2):
-        """ Traces all subhalos between snap_id_1 and snap_2. """
+        """ Find descendants and progenitors of all subhalos between
+        given snapshots.
+        """
 
-        if self.branching == 'backward':
-            snap_start = min(snap_id_1, snap_id_2)
-            snap_stop = max(snap_id_1, snap_id_2)
+        if self.branching == 'ForwardBranching':
+            out = self.trace_all_with_forward_branch(
+                snap_id_1, snap_id_2)
         else:
-            snap_start = max(snap_id_1, snap_id_2)
-            snap_stop = min(snap_id_1, snap_id_2)
+            out = self.trace_all_with_back_branch(
+                snap_id_1, snap_id_2)
+
+        return out
+
+    def trace_all_with_back_branch(self, snap_id_1, snap_id_2):
+        """" Find subhalo heritage iterating forward in time.
+
+        Notes
+        -----
+        In this case, when two subsequent snapshots are compared,
+        the subhalos in the earlier snapshot will only be matched with
+        a single subhalo in the next snapshot, so that branching only
+        happens 'backward' in time. """
+
+        snap_start = min(snap_id_1, snap_id_2)
+        snap_stop = max(snap_id_1, snap_id_2)
 
         # Get the first snapshot:
         snap = self.simulation.get_snapshot(snap_start)
 
         # Initialize return value:
-        out = dict()
+        out = {snap_id: dict() for snap_id in range(snap_start,
+                                                    snap_stop + 1)}
 
         while snap.snap_id != snap_stop:
             # Get next snapshot for matching:
@@ -113,25 +134,79 @@ class MergerTree:
 
             # If matches are already saved, read them - otherwise, do the
             # matching:
-            h5_group = 'Extended/Heritage/'
-            if self.branching == 'backward':
-                h5_group += 'BackwardBranching'
-                h5_dataset = 'Descendants'
-            else:
-                h5_group += 'ForwardBranching'
-                h5_dataset = 'Progenitors'
-            saved_matches = snap.get_subhalos(h5_dataset, h5_group)
+            h5_group = 'Extended/Heritage/BackwardBranching'
+            desc_exists = data_file_manipulation.group_dataset_exists(
+                snap, 'Descendants', h5_group)
+            prog_next_exists = \
+                data_file_manipulation.group_dataset_exists(
+                    snap_next, 'Progenitors', h5_group)
 
-            if saved_matches.size > 0:
-                matches = saved_matches
+            # Find descendants and progenitors:
+            if not desc_exists or not prog_next_exists:
+                descendants, progenitors_next = \
+                    self.matcher.match_snapshots(snap, snap_next)
             else:
-                matches = self.matcher.match_snapshots(snap, snap_next)
+                descendants = snap.get_subhalos('Descendants', h5_group)
+                progenitors_next = snap_next.get_subhalos('Progenitors',
+                                                          h5_group)
+            # Save matches to the subhalo catalogues:
+            if not desc_exists:
+                data_file_manipulation.save_dataset(
+                    descendants, 'Descendants', h5_group, snap)
+            if not prog_next_exists:
+                data_file_manipulation.save_dataset(
+                    progenitors_next, 'Progenitors', h5_group, snap_next)
+
+            # Add matches to the output:
+            out[snap.snap_id]['Descendants'] = descendants
+            out[snap_next.snap_id]['Progenitors'] = progenitors_next
+
+            snap = snap_next
+
+        # Remove connections of volatile subhalos:
+        if self.min_snaps_traced > 1:
+            self.prune_tree()
+
+        return out
+
+    # NOT VERIFIED!
+    def trace_all_with_forward_branch(self, snap_id_1, snap_id_2):
+
+        snap_start = max(snap_id_1, snap_id_2)
+        snap_stop = min(snap_id_1, snap_id_2)
+
+        # Get the first snapshot:
+        snap = self.simulation.get_snapshot(snap_start)
+
+        # Initialize return value:
+        out = {snap_id: dict() for snap_id in range(snap_stop,
+                                                    snap_start + 1)}
+
+        while snap.snap_id != snap_stop:
+            # Get next snapshot for matching:
+            snap_next = self.get_next_snap(snap.snap_id)
+            if snap_next is None:
+                break
+
+            # If matches are already saved, read them - otherwise, do the
+            # matching:
+            h5_group = 'Extended/Heritage/ForwardBranching'
+            progenitors = snap.get_subhalos('Progenitors', h5_group)
+            descendants_next = snap_next.get_subhalos('Descendants',
+                                                      h5_group)
+
+            if descendants_next.size == 0 or progenitors.size == 0:
+                descendants_next, progenitors = \
+                    self.matcher.match_snapshots(snap, snap_next)
                 # Save matches to the subhalo catalogues:
-                data_file_manipulation.save_dataset(matches, h5_dataset,
-                                                    h5_group, snap)
+                data_file_manipulation.save_dataset(
+                    descendants_next, 'Descendants', h5_group, snap_next)
+                data_file_manipulation.save_dataset(
+                    progenitors, 'Progenitors', h5_group, snap)
 
             # Add matches to the output array:
-            out[snap.snap_id] = matches
+            out[snap_next.snap_id]['Descendants'] = descendants_next
+            out[snap.snap_id]['Progenitors'] = progenitors
 
             snap = snap_next
 
@@ -143,10 +218,10 @@ class MergerTree:
 
     def get_next_snap(self, cur_snap_id):
         # Set snap_id incrementation value:
-        if self.branching == "backward":
-            incr = 1
-        else:
+        if self.branching == 'ForwardBranching':
             incr = -1
+        else:
+            incr = 1
 
         snap_next = self.simulation.get_snapshot(cur_snap_id + incr)
 

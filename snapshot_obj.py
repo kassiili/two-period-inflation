@@ -234,7 +234,7 @@ class Snapshot:
 
         return out
 
-    def get_halo_number(self, which_gns=[]):
+    def get_subhalo_number(self, which_gns=[]):
 
         n = 0
         gns = self.get_subhalos("GroupNumber")

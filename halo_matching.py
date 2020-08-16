@@ -3,35 +3,6 @@ import math
 import heapq
 
 
-def get_data_for_matching(snap_ref, snap_exp):
-    """ Retrieve datasets for matching for the given set of group numbers.
-
-    Parameters
-    ----------
-    snap_ref : Snapshot object
-        Reference snapshot.
-    snap_exp : Snapshot object
-        Explored snapshot.
-
-    Returns
-    -------
-    (reference,explore) : tuple of dict
-        Matching data for both snapshots in dictionaries.
-    """
-
-    reference = {'GNs': snap_ref.get_subhalos('GroupNumber'),
-                 'SGNs': snap_ref.get_subhalos('SubGroupNumber'),
-                 'IDs': snap_ref.get_subhalos_IDs(part_type=1),
-                 'Mass': snap_ref.get_subhalos('MassType')[:, 1]}
-
-    explore = {'GNs': snap_exp.get_subhalos('GroupNumber'),
-               'SGNs': snap_exp.get_subhalos('SubGroupNumber'),
-               'IDs': snap_exp.get_subhalos_IDs(part_type=1),
-               'Mass': snap_exp.get_subhalos('MassType')[:, 1]}
-
-    return reference, explore
-
-
 def identify_group_numbers(gns1, gns2):
     """ Identifies the indices, where (gn,sgn) pairs align, between
     datasets 1 and 2.
@@ -75,45 +46,7 @@ def identify_group_numbers(gns1, gns2):
     return idx_of1_in2
 
 
-def get_index_at_step(idx_ref, step, lim):
-    """ Get the index of the next subhalo after step iterations from
-    idx_ref.
-
-    Parameters
-    ----------
-    idx_ref : int
-        Starting point of iterations.
-    step : int
-        Number of iterations completed.
-    lim : int
-        Upper limit for index value.
-
-    Returns
-    -------
-    idx : int
-        Index of next subhalo after step iterations from idx_ref.
-    """
-
-    # Iterate outwards from idx_ref, alternating between lower and higher
-    # index:
-    idx = idx_ref + int(math.copysign(
-        math.floor((step + 1) / 2), (step % 2) - 0.5))
-
-    # Check that index is not negative:
-    if abs(idx_ref - idx) > idx_ref:
-        idx = step
-    # Check that index is not out of array bounds:
-    elif abs(idx_ref - idx) > lim - 1 - idx_ref:
-        idx = lim - step
-
-    # If all values of array are consumed:
-    if idx < 0 or idx >= lim:
-        idx = idx_ref
-
-    return idx
-
-
-class SubhaloMatcher:
+class SnapshotMatcher:
 
     def __init__(self, no_match=2 ** 32, n_link_ref=15,
                  f_link_exp=1 / 5, f_mass_link=3):
@@ -135,36 +68,51 @@ class SubhaloMatcher:
         self.f_mass_link = f_mass_link
         self.n_link_ref = n_link_ref
         self.no_match = no_match
+        self.snap = None
+        self.snap_search = None
+        self.subhalo_num_search = -1
 
-    def match_snapshots(self, snap_ref, snap_exp):
-        """ Try matching all halos in snap_ref with given group numbers with
-        halos in snap_exp with the same set of group numbers.
+    def match_snapshots(self, snap, snap_search, max_num_matched=3):
+        """ Try matching all subhalos in snap with subhalos in
+        snap_search.
 
         Parameters
         ----------
-        snap_ref : Snapshot object
-            Reference snapshot.
-        snap_exp : Snapshot object
-            Explored snapshot.
+        snap : Snapshot object
+            The snapshot, whose subhalos are being matched.
+            matched.
+        snap_search : Snapshot object
+            The snapshot, whose subhalos are being tried as matches for
+            subhalos in snap.
+        max_num_matched : int, optional
+            Maximum number of subhalos in self.snap, with which a single
+            subhalo in snap_search can be matched.
 
         Returns
         -------
-        matches_ref : ndarray of int of shape (# of halos,2)
-            Group numbers in the first column and subgroup numbers in the
-            second of matched halos in snap_exp. If no match was found for
-            the halo in index i, then matches_ref[i] = [-1,-1].
+        matches : ndarray of int
+            Array of indices of matched subhalos in snap_search.
+
+        Notes
+        -----
+        A subhalo in snap is only matched with one subhalo in
+        snap_search, but the same is not true of subhalos in snap_search.
+        I.e. the identification from ref to exp can be described as  a
+        function that is not necessarily injective. This feature is
+        logically inherited from the is_a_match method.
         """
 
-        reference, explore = get_data_for_matching(snap_ref,
-                                                   snap_exp)
+        self.snap = snap
+        self.snap_search = snap_search
+        self.subhalo_num_search = self.snap_search.get_subhalo_number()
+        reference, explore = self.get_data_for_matching()
 
         # Initialize matches (ADD TO THE DICTIONARIES IN THE METHOD
         # ABOVE):
-        matches_ref = self.no_match * np.ones(reference['GNs'].size,
-                                              dtype=int)
-        matches_exp = self.no_match * np.ones(explore['GNs'].size,
-                                              dtype=int)
-        out = -1 * np.ones((reference['GNs'].size, 2), dtype=int)
+        matches = self.no_match * np.ones(reference['GNs'].size,
+                                          dtype=int)
+        matches_search = self.no_match * np.ones(
+            (explore['GNs'].size, max_num_matched), dtype=int)
 
         # This is defined just make the code run a bit faster
         init_idents = identify_group_numbers(reference['GNs'],
@@ -172,8 +120,8 @@ class SubhaloMatcher:
 
         # Initialize priority queue:
         pq = []
-        for idx_ref, idx_exp in enumerate(init_idents):
-            heapq.heappush(pq, (0, (idx_ref, idx_exp)))
+        for idx, idx_search in enumerate(init_idents):
+            heapq.heappush(pq, (0, (idx, idx_search)))
 
         trials = 0
         n_matched = 0
@@ -183,85 +131,118 @@ class SubhaloMatcher:
             # Get next one for matching:
             next_item = heapq.heappop(pq)
             step = next_item[0]
-            idx_ref = next_item[1][0]
-            idx_exp0 = next_item[1][1]
+            idx = next_item[1][0]  # Index of subhalo in snap
+            idx_search_ref = next_item[1][1]  # Index of the
+            # iteration reference point in snap_search
 
             # Get index of the halo to be tried next. step tells how far
             # to iterate from initial index:
-            idx_exp = get_index_at_step(idx_exp0, step,
-                                        explore['GNs'].size)
+            idx_search = self.get_index_at_step(idx_search_ref, step)
+
+            # If all subhalos have been tried already:
+            if idx_search == idx_search_ref and step > 0:
+                continue
 
             # Match:
-            found_match = self.is_a_match(explore['IDs'][idx_exp],
-                                          explore['Mass'][idx_exp],
-                                          reference['IDs'][idx_ref],
-                                          reference['Mass'][idx_ref])
+            found_match = self.is_a_match(explore['IDs'][idx_search],
+                                          explore['Mass'][idx_search],
+                                          reference['IDs'][idx],
+                                          reference['Mass'][idx])
 
             if found_match:
                 n_matched += 1
-                matches_ref[idx_ref] = idx_exp
-                matches_exp[idx_exp] = idx_ref
-                out[idx_ref] = [explore['GNs'][idx_exp],
-                                explore['SGNs'][idx_exp]]
+                matches[idx] = idx_search
+                matches_search[idx_search] = self.add_to_matches(
+                    matches_search[idx_search], idx, reference['Mass'])
             else:
-                new_step = self.iterate_step(idx_exp0, step, matches_exp)
-                # If new_step == step, then all potential matches_ref for
-                # idx_ref have been explored:
-                if new_step != step:
-                    heapq.heappush(pq, (new_step, (idx_ref, idx_exp0)))
+                heapq.heappush(pq, (step + 1, (idx, idx_search_ref)))
 
-        print("{} -> {}: {} trials, {} matches".format(snap_ref.snap_id,
-                                                       snap_exp.snap_id,
+        print("{} -> {}: {} trials, {} matches".format(snap.snap_id,
+                                                       snap_search.snap_id,
                                                        trials, n_matched))
-        return out
+        return matches, matches_search
 
-    def iterate_step(self, idx_ref, step_start, matches,
-                     one_to_one=False):
-        """ Find the next index, which is nearest to idx_ref and has not yet
-        been matched, for matching.
+    def get_data_for_matching(self):
+        """ Retrieve datasets for matching for the given set of group numbers.
+
+        Returns
+        -------
+        (reference,explore) : tuple of dict
+            Matching data for both snapshots in dictionaries.
+        """
+
+        reference = {'GNs': self.snap.get_subhalos('GroupNumber'),
+                     'SGNs': self.snap.get_subhalos('SubGroupNumber'),
+                     'IDs': self.snap.get_subhalos_IDs(part_type=1),
+                     'Mass': self.snap.get_subhalos('MassType')[:, 1]}
+
+        explore = {'GNs': self.snap_search.get_subhalos('GroupNumber'),
+                   'SGNs': self.snap_search.get_subhalos(
+                       'SubGroupNumber'),
+                   'IDs': self.snap_search.get_subhalos_IDs(part_type=1),
+                   'Mass': self.snap_search.get_subhalos('MassType')[:,
+                           1]}
+
+        return reference, explore
+
+    def add_to_matches(self, matches, new_match, masses):
+        """ Try to insert the new match into the array of existing
+        matches. """
+
+        if matches[1] < self.no_match:
+            print(matches)
+
+        # Try insertion, and move the rest of the matches accordingly,
+        # if the insertion is successful:
+        insertion = new_match
+        for i, idx in enumerate(matches):
+            if idx == self.no_match:
+                matches[i] = insertion
+                break
+
+            if masses[idx] < masses[insertion]:
+                matches[i] = insertion
+                insertion = idx
+
+        return matches
+
+    def get_index_at_step(self, idx_ref, step):
+        """ Get the index of the next subhalo after step iterations from
+        idx_ref.
 
         Parameters
         ----------
         idx_ref : int
-            Starting point of iteration.
-        step_start : int
-            Current step at function call.
-        matches : ndarray
-            Array of already found matches of subhalos in reference snapshot.
-        one_to_one : bool, optional
-            ???
+            Starting point of iterations.
+        step : int
+            Number of iterations completed.
 
         Returns
         -------
-        step : int
-            The new step.
-
-        Notes
-        -----
-            step is the number of steps it takes to iterate from idx_ref to
-            the next index.
+        idx : int
+            Index of next subhalo after step iterations from idx_ref.
         """
 
-        # Set maximum number of iterations:
-        term = 10000
+        # Get the upper limit for the value of the index:
+        lim = self.subhalo_num_search
 
-        step = step_start
-        while step < term:
+        # Iterate outwards from idx_ref, alternating between lower and
+        # higher indices:
+        idx = idx_ref + int(math.copysign(
+            math.floor((step + 1) / 2), (step % 2) - 0.5))
 
-            idx = get_index_at_step(idx_ref, step + 1, matches.size)
+        # Check that index is not negative:
+        if abs(idx_ref - idx) > idx_ref:
+            idx = step
+        # Check that index is not out of array bounds:
+        elif abs(idx_ref - idx) > lim - 1 - idx_ref:
+            idx = lim - step
 
-            # If all values of array are consumed:
-            if idx == idx_ref:
-                break
+        # If all values of array are consumed:
+        if idx < 0 or idx >= lim:
+            idx = idx_ref
 
-            # If next index has not yet been matched:
-            if matches[idx] == self.no_match or not one_to_one:
-                step += 1
-                break
-
-            step += 1
-
-        return step
+        return idx
 
     def is_a_match(self, ids_ref, mass_ref, ids_exp, mass_exp):
         """ Check if two halos with given IDs and masses correspond to the same
@@ -317,7 +298,7 @@ class SubhaloMatcher:
 
         return found_match
 
-# def find_match(subhalo, snap_id, snap_exp):
+# def find_match(subhalo, snap_id, snap_search):
 #    """ Attempts to match a given subhalo with another subhalo in a given
 #    snapshot.
 #
@@ -327,7 +308,7 @@ class SubhaloMatcher:
 #        Matched subhalo.
 #    snap_id : int
 #        ID of the snapshot, at which the match is searched.
-#    snap_exp : Snapshot object
+#    snap_search : Snapshot object
 #        Explored snapshot.
 #
 #    Returns
@@ -346,16 +327,16 @@ class SubhaloMatcher:
 #
 #    # Read subhalos with group numbers and subgroup numbers near gn and
 #    # sgn:
-#    fnums = neighborhood(snap_exp, gn, sgn, term / 2)
-#    gns = snap_exp.get_subhalos('GroupNumber', fnums=fnums)
-#    sgns = snap_exp.get_subhalos('SubGroupNumber', fnums=fnums)
-#    ids_in_file = snap_exp.get_subhalos_IDs(part_type=1, fnums=fnums)
-#    mass_in_file = snap_exp.get_subhalos('MassType', fnums=fnums)[:, 1]
+#    fnums = neighborhood(snap_search, gn, sgn, term / 2)
+#    gns = snap_search.get_subhalos('GroupNumber', fnums=fnums)
+#    sgns = snap_search.get_subhalos('SubGroupNumber', fnums=fnums)
+#    ids_in_file = snap_search.get_subhalos_IDs(part_type=1, fnums=fnums)
+#    mass_in_file = snap_search.get_subhalos('MassType', fnums=fnums)[:, 1]
 #
 #    # Get index of halo with same sgn and gn as ref:
 #    idx0 = np.argwhere(np.logical_and((gns == gn), (sgns == sgn)))[0, 0]
 #    #    print('find match for:', gns[idx0], sgns[idx0], ' in ',
-#    #          snap_exp.snap_id)
+#    #          snap_search.snap_id)
 #
 #    # Initial value of match is returned if no match is found:
 #    match = (-1, -1)
