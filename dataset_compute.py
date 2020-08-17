@@ -145,6 +145,7 @@ def compute_LG_centre(snap, m31_ident, mw_ident):
 
 def compute_vcirc(snapshot, r):
     """ Compute subhalo circular velocities at given radius. """
+    print("Computing v_circ at {} kpc for {}...".format(r, snapshot.sim_id))
     cmass, radii = compute_mass_accumulation(snapshot)
 
     n_parts_inside_r = [np.sum(np.array(radii_halo) < r) for radii_halo in
@@ -163,6 +164,7 @@ def compute_vcirc(snapshot, r):
                          -2).value
     v_circ_at_r = np.array([np.sqrt(m * myG / r) for m in mass_inside_r])
 
+    print("Done.")
     return v_circ_at_r
 
 def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
@@ -175,6 +177,8 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
         Number of particles summed over for a single point on the
         rotation curve.
     """
+    print("Computing subhalo rotation curves for {}...".format(snapshot.sim_id))
+
     cmass, radii = compute_mass_accumulation(snapshot, part_type=part_type)
 
     # Compute running average:
@@ -189,6 +193,7 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
     radii = np.array([np.concatenate((np.array([0]), r)) for r in radii])
     v_circ = np.array([np.concatenate((np.array([0]), v)) for v in v_circ])
 
+    print("Done.")
     return v_circ, radii
 
 def compute_vmax(snapshot, n_soft=5):
