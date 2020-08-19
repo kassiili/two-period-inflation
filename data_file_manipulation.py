@@ -69,6 +69,15 @@ def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
     return path
 
 
+def group_dataset_exists(snapshot, dataset, group):
+    with h5py.File(snapshot.grp_file, 'r') as f:
+        if group not in f:
+            out = False
+        else:
+            out = dataset in f[group]
+    return out
+
+
 def get_snap_ids(sim_id, path_to_snapshots=""):
     """ Read the snapshot identifiers of snapshots in a simulation. """
 
@@ -134,8 +143,10 @@ def create_dataset(snapshot, dataset, group):
             out = combined
 
         # Create dataset in grpf:
-        with h5py.File(snapshot.grp_file, 'r+') as grpf:
-            grpf.create_dataset('/{}/{}'.format(group, dataset), data=out)
+        if out.size != 0:
+            with h5py.File(snapshot.grp_file, 'r+') as grpf:
+                grpf.create_dataset('/{}/{}'.format(group, dataset),
+                                    data=out)
 
     elif subgroup_list[1] == 'RotationCurve':
         part_type = subgroup_list[2]
@@ -173,5 +184,12 @@ def create_dataset(snapshot, dataset, group):
 
 
 def save_dataset(data, dataset, group, snapshot):
-    with h5py.File(snapshot.grp_file, 'r+') as grpf:
-        grpf.create_dataset('/{}/{}'.format(group, dataset), data=data)
+    # If the dataset already exists, replace it with the new data
+    if group_dataset_exists(snapshot, dataset, group):
+        with h5py.File(snapshot.grp_file, 'r+') as grpf:
+            grpf['/{}/{}'.format(group, dataset)][...] = data
+    # ...otherwise, create a new dataset:
+    else:
+        with h5py.File(snapshot.grp_file, 'r+') as grpf:
+            grpf.create_dataset('/{}/{}'.format(group, dataset),
+                                data=data)

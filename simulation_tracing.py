@@ -235,8 +235,12 @@ class MergerTree:
         # Save all non-empty entries to the storage file:
         with h5py.File(self.storage_file, 'w') as f:
             for snap_id, matches in match_dict.items():
-                if matches.size != 0:
-                    f.create_dataset(str(snap_id), data=matches)
+                h5_group = '/Heritage/{}/{}'.format(self.branching,
+                                                    str(snap_id))
+                f.create_group(h5_group)
+                for key, arr in matches.items():
+                    if arr.size != 0:
+                        f[h5_group].create_dataset(key, data=arr)
 
         return match_dict
 
@@ -250,52 +254,72 @@ class MergerTree:
         match_dict = dict()
         for snap_id in snap_ids:
             snap = self.simulation.get_snapshot(snap_id)
-            snap_next = self.get_next_snap(snap_id)
-            if snap is None or snap_next is None:
+            if snap is None:
                 continue
-            h5_group = "Extended/Matches/{}/{}".format(
-                self.simulation.sim_id, snap_next.snap_id)
-            matches = snap.get_subhalos("Matches", h5_group)
-            if matches.size != 0:
-                match_dict[snap_id] = matches
+
+            h5_group = 'Extended/Heritage/{}'.format(self.branching)
+            descendants = snap.get_subhalos('Descendants', h5_group)
+            progenitors = snap.get_subhalos('Progenitors', h5_group)
+            print(descendants.size, progenitors.size)
+            if descendants.size != 0 and progenitors.size != 0:
+                match_dict[snap_id] = {'Descendants': descendants,
+                                       'Progenitors': progenitors}
+            elif descendants.size != 0:
+                match_dict[snap_id] = {'Descendants': descendants}
+            elif progenitors.size != 0:
+                match_dict[snap_id] = {'Progenitors': progenitors}
 
         return match_dict
 
-    def get_matched_snapshots(self):
+    def read_from_storage(self):
 
-        # Get snapshot identifiers:
-        snap_ids = self.simulation.get_snap_ids()
+        match_dict = {}
 
-        matched_snap_ids = set()
-        for snap_id in snap_ids:
-            # Get the two potentially matched snapshots:
-            snap = self.simulation.get_snapshot(snap_id)
-            snap_next = self.get_next_snap(snap_id)
-            if snap is None or snap_next is None:
-                continue
+        with h5py.File(self.storage_file, 'r') as f:
+            for snap_id, matches in f['Heritage/{}'.format(
+                    self.branching)].items():
+                snap_id = int(snap_id)
+                match_dict[snap_id] = {}
 
-            # Get the matches, and if they exist, add to the set of
-            # matched:
-            h5_group = "Extended/Matches/{}/{}".format(
-                self.simulation.sim_id, snap_next.snap_id)
-            matches = snap.get_subhalos("Matches", h5_group)
-            if matches.size != 0:
-                matched_snap_ids.add(snap_id)
-                matched_snap_ids.add(snap_next.snap_id)
+                snap = self.simulation.get_snapshot(snap_id)
+                h5_group = 'Extended/Heritage/{}'.format(self.branching)
+                for key, dataset in matches.items():
+                    match_dict[snap_id][key] = dataset[...]
 
-        # Get the snapshots, ordered by identifiers:
-        matched_snaps = np.array(
-            [self.simulation.get_snapshot(snap_id) for snap_id in
-             np.sort(list(matched_snap_ids))])
+                    # Save matches to the subhalo catalogues:
+                    data_file_manipulation.save_dataset(
+                        dataset[...], key, h5_group, snap)
 
-        return matched_snaps
+        return match_dict
 
-    def get_redshifts(self):
-
-        z = np.array([snap.get_attribute("Redshift", "Header")
-                      for snap in self.get_matched_snapshots()])
-
-        return z
+    #    def get_matched_snapshots(self):
+    #
+    #        # Get snapshot identifiers:
+    #        snap_ids = self.simulation.get_snap_ids()
+    #
+    #        matched_snap_ids = set()
+    #        for snap_id in snap_ids:
+    #            # Get the two potentially matched snapshots:
+    #            snap = self.simulation.get_snapshot(snap_id)
+    #            snap_next = self.get_next_snap(snap_id)
+    #            if snap is None or snap_next is None:
+    #                continue
+    #
+    #            # Get the matches, and if they exist, add to the set of
+    #            # matched:
+    #            h5_group = "Extended/Matches/{}/{}".format(
+    #                self.simulation.sim_id, snap_next.snap_id)
+    #            matches = snap.get_subhalos("Matches", h5_group)
+    #            if matches.size != 0:
+    #                matched_snap_ids.add(snap_id)
+    #                matched_snap_ids.add(snap_next.snap_id)
+    #
+    #        # Get the snapshots, ordered by identifiers:
+    #        matched_snaps = np.array(
+    #            [self.simulation.get_snapshot(snap_id) for snap_id in
+    #             np.sort(list(matched_snap_ids))])
+    #
+    #        return matched_snaps
 
     def prune_tree(self):
         # Iterate through the snapshots, keeping track of how many
