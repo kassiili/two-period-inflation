@@ -12,6 +12,8 @@ class Simulation:
         else:
             self.sim_path = sim_path
         self.snapshots = self.create_snapshots()
+        self.m31 = (-1, -1)
+        self.mw = (-1, -1)
 
     def create_snapshots(self):
         """ Create a dictionary of snapshot objects with snapshot
@@ -22,6 +24,10 @@ class Simulation:
                      for snap_id in snap_ids]
         snapshots = {snap.snap_id: snap for snap in snapshots}
         return snapshots
+
+    def set_centrals(self, m31, mw):
+        self.m31 = m31
+        self.mw = mw
 
     def get_snap_ids(self):
         return data_file_manipulation.get_snap_ids(self.sim_id)
@@ -41,3 +47,16 @@ class Simulation:
 
     def get_snap_num(self):
         return max(self.snapshots) + 1
+
+    def get_redshifts(self, snap_start=None, snap_stop=None):
+
+        if snap_start is None:
+            snap_start = min(self.get_snap_ids())
+        if snap_stop is None:
+            snap_stop = max(self.get_snap_ids()) + 1
+
+        z = np.array([self.snapshots[snap_id].get_attribute("Redshift",
+                                                            "Header")
+                      for snap_id in range(snap_start, snap_stop)])
+
+        return z

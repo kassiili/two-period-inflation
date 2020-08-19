@@ -1,28 +1,40 @@
 import h5py
 import numpy as np
 
-import snapshot_obj
 import data_file_manipulation
+import halo_matching
 
 
-class SubhaloTracer:
+def find_subhalo_descendants(merger_tree, snap_id, index_of_subhalo):
+    tracer = merger_tree.get_all_matches()
 
-    def __init__(self, merger_tree, snap_id_ref, gn_ref, sgn_ref):
-        self.merger_tree = merger_tree
+    # Get descendants from reference snapshot:
+    descendant_idxs = []
+    idx = index_of_subhalo
+    while idx != merger_tree.no_match:
+        descendant_idxs.append(idx)
+        if 'Descendants' not in tracer[snap_id].keys():
+            break
+        idx = tracer[snap_id]['Descendants'][idx]
+        snap_id += 1
 
-        # Initialize subhalo index array:
-        sim_snap_ids = self.merger_tree.simulation.get_snap_ids()
-        self.subhalo_index = np.array(sim_snap_ids.size)
-        # Assuming snapshot indexing starts at zero
-        self.subhalo_index[:, 0] = sim_snap_ids
+    return descendant_idxs
 
-        # Set reference index:
-        snap_ref = self.merger_tree.simulation.get_snapshot(snap_id_ref)
-        idx_ref = snap_ref.index_of_halo(gn_ref, sgn_ref)
-        self.subhalo_index[snap_id_ref] = idx_ref
 
-    def trace(self, snap_start, snap_stop):
-        tracer = self.merger_tree.trace_all(snap_start, snap_stop)
+def find_subhalo_progenitors(merger_tree, snap_id, index_of_subhalo):
+    tracer = merger_tree.get_all_matches()
+
+    # Get descendants from reference snapshot:
+    progenitor_idxs = []
+    idx = index_of_subhalo
+    while idx != merger_tree.no_match:
+        progenitor_idxs.append(idx)
+        if 'Progenitors' not in tracer[snap_id].keys():
+            break
+        idx = tracer[snap_id]['Progenitors'][idx, 0]
+        snap_id -= 1
+
+    return progenitor_idxs
 
 
 class SnapshotTracer:
@@ -54,8 +66,8 @@ class SnapshotTracer:
                 # current snapshot:
                 idx_from_prev = match_dict[sid - 1]
 
-                # To avoid index out of bounds errors,
-                # fill insufficiently short index arrays with no_match:
+                # To avoid tracer out of bounds errors,
+                # fill insufficiently short tracer arrays with no_match:
                 if idx_from_prev.size < n_halos:
                     idx_from_prev = np.append(
                         idx_from_prev,
@@ -72,7 +84,7 @@ class SnapshotTracer:
 
 class MergerTree:
 
-    def __init__(self, simulation, matcher, branching='backward',
+    def __init__(self, simulation, matcher=None, branching='backward',
                  min_snaps_traced=1):
         """
 
@@ -83,12 +95,16 @@ class MergerTree:
             time), which is indicated by this value.
         """
         self.simulation = simulation
-        self.matcher = matcher
+        if matcher is None:
+            self.matcher = halo_matching.SnapshotMatcher()
+        else:
+            self.matcher = matcher
+        self.no_match = self.matcher.no_match
         if branching == 'forward':
             self.branching = 'ForwardBranching'
         else:
             self.branching = 'BackwardBranching'
-        self.min_snaps_traced = 1
+        self.min_snaps_traced = min_snaps_traced
         self.storage_file = '.tracer_{}_{}.hdf5'.format(
             self.branching, self.simulation.sim_id)
 
@@ -124,9 +140,9 @@ class MergerTree:
 
         # Initialize return value:
         out = {snap_id: dict() for snap_id in range(snap_start,
-                                                    snap_stop + 1)}
+                                                    snap_stop)}
 
-        while snap.snap_id != snap_stop:
+        while snap.snap_id != snap_stop - 1:
             # Get next snapshot for matching:
             snap_next = self.get_next_snap(snap.snap_id)
             if snap_next is None:
@@ -180,9 +196,9 @@ class MergerTree:
 
         # Initialize return value:
         out = {snap_id: dict() for snap_id in range(snap_stop,
-                                                    snap_start + 1)}
+                                                    snap_start)}
 
-        while snap.snap_id != snap_stop:
+        while snap.snap_id != snap_stop - 1:
             # Get next snapshot for matching:
             snap_next = self.get_next_snap(snap.snap_id)
             if snap_next is None:
@@ -260,7 +276,6 @@ class MergerTree:
             h5_group = 'Extended/Heritage/{}'.format(self.branching)
             descendants = snap.get_subhalos('Descendants', h5_group)
             progenitors = snap.get_subhalos('Progenitors', h5_group)
-            print(descendants.size, progenitors.size)
             if descendants.size != 0 and progenitors.size != 0:
                 match_dict[snap_id] = {'Descendants': descendants,
                                        'Progenitors': progenitors}
