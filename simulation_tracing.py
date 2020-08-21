@@ -38,53 +38,133 @@ def find_subhalo_progenitors(merger_tree, snap_id, index_of_subhalo):
 
 
 class SnapshotTracer:
+    """ Traces the subhalos in a single snapshot forward and backward
+    in time.
 
-    def __init__(self, snap_id, merger_tree, direction_in_time="forward"):
+    Notes
+    -----
+    When tracing in the direction, where the merger tree allows
+    branching, the family lines of the most massive relatives are
+    followed.
+    """
+
+    def __init__(self, snap_id, merger_tree):
         self.merger_tree = merger_tree
+        self.no_match = merger_tree.no_match
         self.snap_id = snap_id
-        self.direction = direction_in_time
+        n_halos = merger_tree.simulation.get_snapshot(
+            snap_id).get_subhalo_number()
+        n_snaps = merger_tree.simulation.get_snap_num()
+        self.tracer_array = merger_tree.no_match * \
+                            np.ones((n_halos, n_snaps), dtype=int)
+        self.tracer_array[:, snap_id] = np.arange(n_halos)
+        self.traced_snaps = [snap_id, snap_id + 1]
 
-    def trace(self, stop):
-        match_dict = self.merger_tree.trace_all(self.snap_id, stop)
-        n_halos = match_dict[self.snap_id].size
-        no_match = self.merger_tree.matcher.no_match
-        tracer = no_match * np.ones(
-            (n_halos, max(self.snap_id, stop) + 1), dtype=int)
+    def trace(self, start=None, stop=None):
 
-        tracer[:, self.snap_id] = np.arange(n_halos)
-        if self.direction == "forward":
-            for sid in range(self.snap_id + 1, stop + 1):
-                # Indices of the traced subhalos in the previous snapshot:
-                idx_in_prev = tracer[:, sid - 1]
+        n_snaps = np.size(self.tracer_array, axis=1)
 
-                # To avoid out of bounds errors, replace values equal
-                # to no_match:
-                idx_in_prev = np.where(idx_in_prev != no_match,
-                                       idx_in_prev, np.arange(n_halos))
+        if start is None and stop is None:
+            start = 0
+            stop = n_snaps
+        elif start is None or stop is None:
+            if start is None:
+                lim = stop
+            else:
+                lim = start
+            start = min(self.snap_id, lim)
+            stop = max(self.snap_id, lim)
 
-                # Indices of subhalos in the previous snapshot, in the
-                # current snapshot:
-                idx_from_prev = match_dict[sid - 1]
+        self.trace_forward(stop)
+        self.trace_backward(start)
 
-                # To avoid tracer out of bounds errors,
-                # fill insufficiently short tracer arrays with no_match:
-                if idx_from_prev.size < n_halos:
-                    idx_from_prev = np.append(
-                        idx_from_prev,
-                        no_match * np.ones(n_halos - idx_from_prev.size))
+        out = self.tracer_array[:, start:stop]
 
-                # Save new indices of subhalos that were traced up to
-                # the previous snapshot:
-                tracer[:, sid] = np.where(idx_in_prev != no_match,
-                                          idx_from_prev[idx_in_prev],
-                                          no_match)
+        return out
 
-        return tracer
+    def trace_forward(self, stop):
+
+        n_halos = np.size(self.tracer_array, axis=0)
+
+        # Set starting point to last untracked snapshot:
+        start = self.traced_snaps[1] - 1
+        heritage = self.merger_tree.trace_all(start, stop)
+
+        for sid in range(start + 1, stop):
+            # Indices of the traced subhalos in the previous snapshot:
+            idx_in_prev = self.tracer_array[:, sid - 1]
+
+            # Indices of subhalos in the previous snapshot, in the
+            # current snapshot:
+            idx_from_prev = heritage[sid - 1]
+            idx_from_prev = idx_from_prev['Descendants']
+
+            # To avoid tracer out of bounds errors,
+            # fill insufficiently short tracer arrays with no_match:
+            if idx_from_prev.size < n_halos:
+                fill = self.no_match * \
+                       np.ones(n_halos - idx_from_prev.size)
+                idx_from_prev = np.append(idx_from_prev, fill)
+
+            # To avoid out of bounds errors, replace values that are
+            # equal to no_match:
+            help_idx = np.where(idx_in_prev != self.no_match,
+                                idx_in_prev, np.arange(n_halos))
+
+            idx_from_start = idx_from_prev[help_idx]
+
+            # Save new indices of subhalos that were traced up to
+            # the previous snapshot:
+            self.tracer_array[:, sid] = np.where(
+                idx_in_prev != self.no_match, idx_from_start,
+                self.no_match)
+
+        self.traced_snaps[1] = max(self.traced_snaps[1], stop)
+
+    def trace_backward(self, start):
+
+        n_halos = np.size(self.tracer_array, axis=0)
+
+        # Set stopping point to first tracked snapshot:
+        stop = self.traced_snaps[0]
+        heritage = self.merger_tree.trace_all(start, stop + 1)
+
+        for sid in range(stop - 1, start - 1, -1):
+            # Indices of the traced subhalos in the following snapshot:
+            idx_in_foll = self.tracer_array[:, sid + 1]
+
+            # Indices of subhalos in the following snapshot, in the
+            # current snapshot:
+            idx_from_foll = heritage[sid + 1]
+            idx_from_foll = idx_from_foll['Progenitors'][:, 0]
+
+            # To avoid tracer out of bounds errors,
+            # fill insufficiently short tracer arrays with no_match:
+            if idx_from_foll.size < n_halos:
+                fill = self.no_match * \
+                       np.ones(n_halos - idx_from_foll.size)
+                idx_from_foll = np.append(idx_from_foll, fill)
+
+            # To avoid out of bounds errors, replace values that are
+            # equal to no_match:
+            help_idx = np.where(idx_in_foll != self.no_match,
+                                idx_in_foll, np.arange(n_halos))
+
+            idx_from_start = idx_from_foll[help_idx]
+
+            # Save new indices of subhalos that were traced up to
+            # the previous snapshot:
+            self.tracer_array[:, sid] = np.where(
+                idx_in_foll != self.no_match, idx_from_start,
+                self.no_match)
+
+        self.traced_snaps[0] = min(self.traced_snaps[0], start)
 
 
 class MergerTree:
 
-    def __init__(self, simulation, matcher=None, branching='backward',
+    def __init__(self, simulation, matcher=None,
+                 branching='BackwardBranching',
                  min_snaps_traced=1):
         """
 
@@ -100,10 +180,7 @@ class MergerTree:
         else:
             self.matcher = matcher
         self.no_match = self.matcher.no_match
-        if branching == 'forward':
-            self.branching = 'ForwardBranching'
-        else:
-            self.branching = 'BackwardBranching'
+        self.branching = branching
         self.min_snaps_traced = min_snaps_traced
         self.storage_file = '.tracer_{}_{}.hdf5'.format(
             self.branching, self.simulation.sim_id)
@@ -142,7 +219,7 @@ class MergerTree:
         out = {snap_id: dict() for snap_id in range(snap_start,
                                                     snap_stop)}
 
-        while snap.snap_id != snap_stop - 1:
+        while snap.snap_id < snap_stop - 1:
             # Get next snapshot for matching:
             snap_next = self.get_next_snap(snap.snap_id)
             if snap_next is None:

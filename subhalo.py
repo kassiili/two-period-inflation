@@ -72,7 +72,8 @@ class SubhaloInstance:
 
 class SubhaloTracer:
 
-    def __init__(self, simulation, snap_id_ref, gn_ref, sgn_ref):
+    def __init__(self, simulation, snap_id_ref, gn_ref=None,
+                 sgn_ref=None, idx_ref=None):
         """
 
         Parameters
@@ -83,7 +84,8 @@ class SubhaloTracer:
 
         # Initialize tracer:
         snap_ref = self.simulation.get_snapshot(snap_id_ref)
-        self.tracer = [[SubhaloInstance(snap_ref, gn=gn_ref,
+
+        self.tracer = [[SubhaloInstance(snap_ref, idx=idx_ref, gn=gn_ref,
                                         sgn=sgn_ref)], [snap_id_ref]]
 
     def trace(self, merger_tree):
