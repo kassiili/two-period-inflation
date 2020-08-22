@@ -134,6 +134,10 @@ def within_distance_range(dist, min_r, max_r):
     return mask_within_radius
 
 
+def distance_to_subhalo(snap, gn, sgn):
+    cop = snap.get_subhalos("CentreOfPotential")[snap.index_of_halo(gn, sgn)]
+    return distance_to_point(snap, cop)
+
 def distance_to_point(snap, point):
     """ For all halos in a snapshot, compute distnace to a given point. """
     cops = snap.get_subhalos("CentreOfPotential")

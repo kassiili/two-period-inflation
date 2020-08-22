@@ -1,4 +1,6 @@
 import numpy as np
+from collections.abc import Iterable
+
 from snapshot_obj import Snapshot
 import data_file_manipulation
 
@@ -19,18 +21,35 @@ class Simulation:
         """ Create a dictionary of snapshot objects with snapshot
         identifiers as keys. """
         snap_ids = self.get_snap_ids()
-        snapshots = [Snapshot(self.sim_id, snap_id,
-                              sim_path=self.sim_path)
-                     for snap_id in snap_ids]
-        snapshots = {snap.snap_id: snap for snap in snapshots}
+        snapshots = {snap_id: Snapshot(self.sim_id, snap_id,
+                                       sim_path=self.sim_path)
+                     for snap_id in snap_ids}
         return snapshots
 
     def set_centrals(self, m31, mw):
         self.m31 = m31
         self.mw = mw
 
+    def get_subhalos_in_snapshots(self, snap_ids, dataset, group='Subhalo'):
+        data = [self.snapshots[snap_id].get_subhalos(dataset, group)
+                for snap_id in snap_ids]
+
+        return data
+
+    def compute_in_snapshots(self, snap_ids, func, *args):
+        data = [func(self.snapshots[snap_id], args)[:,0] for snap_id in
+                snap_ids]
+
+        return data
+
     def get_snap_ids(self):
         return data_file_manipulation.get_snap_ids(self.sim_id)
+
+    def get_snapshots(self, snap_start, snap_stop):
+        snaps = np.array([self.snapshots[snap_id] for snap_id in
+                          range(snap_start, snap_stop)])
+
+        return snaps
 
     def get_snapshot(self, snap_id):
         try:

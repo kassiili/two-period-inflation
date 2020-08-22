@@ -85,13 +85,14 @@ class SubhaloTracer:
         # Initialize tracer:
         snap_ref = self.simulation.get_snapshot(snap_id_ref)
 
-        self.tracer = [[SubhaloInstance(snap_ref, idx=idx_ref, gn=gn_ref,
-                                        sgn=sgn_ref)], [snap_id_ref]]
+        self.tracer = np.array([None for i in range(simulation.get_snap_num())])
+        self.tracer[snap_id_ref] = SubhaloInstance(snap_ref, idx=idx_ref,
+                                                   gn=gn_ref, sgn=sgn_ref)
 
     def trace(self, merger_tree):
-        subh_idx_ref = self.tracer[0][0].get_index()
-        snap_id_ref = self.tracer[1][0]
-        #print(snap_id_ref, subh_idx_ref)
+        snap_id_ref = [instance is not None for instance in
+                       self.tracer].index(True)
+        subh_idx_ref = self.tracer[snap_id_ref].get_index()
 
         # Find indices of descendants in their respective snapshots:
         desc_idx = simulation_tracing.find_subhalo_descendants(
@@ -107,8 +108,9 @@ class SubhaloTracer:
                 self.simulation.get_snapshot(snap_id), idx=subh_index))
 
         # Add descendants to tracer:
-        self.tracer[0] = self.tracer[0] + descendants
-        self.tracer[1] = self.tracer[1] + snap_ids
+        down = snap_id_ref + 1
+        up = down + len(descendants)
+        self.tracer[down:up] = descendants
 
         # Find indices of progenitors in their respective snapshots:
         prog_idx = simulation_tracing.find_subhalo_progenitors(
@@ -124,8 +126,14 @@ class SubhaloTracer:
                 self.simulation.get_snapshot(snap_id), idx=subh_index))
 
         # Add progenitors to tracer:
-        self.tracer[0] = progenitors + self.tracer[0]
-        self.tracer[1] = snap_ids + self.tracer[1]
+        self.tracer[snap_id_ref - len(progenitors):snap_id_ref] = \
+            progenitors
+
+    def get_identifier(self, snap):
+        gn = self.tracer[snap].gn
+        sgn = self.tracer[snap].sgn
+
+        return gn, sgn
 
     def get_halo_data(self, data_name, snap_start=None, snap_stop=None):
         """ Retrieves a subhalo dataset in the given snapshot.
@@ -133,25 +141,20 @@ class SubhaloTracer:
 
         # If neither limit is given, return all snapshots:
         if snap_start is None and snap_stop is None:
-            idx_start = 0
-            idx_stop = len(self.tracer[1])
             data = np.array([shi.get_halo_data(data_name) for shi in
-                             self.tracer[0][idx_start:idx_stop]])
+                             self.tracer if shi is not None])
 
         # If only one is given, return only that snapshot:
         elif snap_start is None:
-            idx = self.tracer[1].index(snap_stop)
-            data = self.tracer[0][idx].get_halo_data(data_name)
+            data = self.tracer[snap_stop].get_halo_data(data_name)
         elif snap_stop is None:
-            idx = self.tracer[1].index(snap_start)
-            data = self.tracer[0][idx].get_halo_data(data_name)
+            data = self.tracer[snap_start].get_halo_data(data_name)
 
         # If both are given, return snapshots between the limits:
         else:
-            idx_start = self.tracer[1].index(snap_start)
-            idx_stop = self.tracer[1].index(snap_stop - 1) + 1
-            data = np.array([shi.get_halo_data(data_name) for shi in
-                             self.tracer[0][idx_start:idx_stop]])
+            data = np.array([shi.get_halo_data(data_name)
+                             for shi in self.tracer[snap_start:snap_stop]
+                             if shi is not None])
 
         return data
 
@@ -163,15 +166,23 @@ class SubhaloTracer:
 
         return ids
 
+    def get_traced_snapshots(self):
+        traced_snaps = np.nonzero(
+            [instance is not None for instance in self.tracer])[0]
+
+        return traced_snaps
+
     def distance_to_central(self, central_tracer, snap_start=None,
                             snap_stop=None):
         """ Compute distance to the central galaxy at the given snapshot.
         """
 
-        if snap_start is None or snap_start < min(self.tracer[1]):
-            snap_start = min(self.tracer[1])
-        if snap_stop is None or snap_stop > max(self.tracer[1]):
-            snap_stop = max(self.tracer[1]) + 1
+        min_snap = min(self.get_traced_snapshots())
+        max_snap = max(self.get_traced_snapshots())
+        if snap_start is None or snap_start < min_snap:
+            snap_start = min_snap
+        if snap_stop is None or snap_stop > max_snap:
+            snap_stop = max_snap + 1
 
         print(snap_start, snap_stop)
         halo_cop = self.get_halo_data("CentreOfPotential", snap_start,
@@ -183,6 +194,6 @@ class SubhaloTracer:
         halo_cop = np.array([dataset_compute.periodic_wrap(
             self.simulation.get_snapshot(sid), ctr, cop)
             for sid, ctr, cop in
-            zip(self.tracer[1], galactic_centre, halo_cop)])
+            zip(np.arange(snap_start, snap_stop), galactic_centre, halo_cop)])
 
         return halo_cop - galactic_centre

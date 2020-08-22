@@ -73,7 +73,7 @@ class SnapshotTracer:
             else:
                 lim = start
             start = min(self.snap_id, lim)
-            stop = max(self.snap_id, lim)
+            stop = max(self.snap_id + 1, lim)
 
         self.trace_forward(stop)
         self.trace_backward(start)
@@ -88,7 +88,7 @@ class SnapshotTracer:
 
         # Set starting point to last untracked snapshot:
         start = self.traced_snaps[1] - 1
-        heritage = self.merger_tree.trace_all(start, stop)
+        heritage = self.merger_tree.get_all_matches()
 
         for sid in range(start + 1, stop):
             # Indices of the traced subhalos in the previous snapshot:
@@ -127,7 +127,7 @@ class SnapshotTracer:
 
         # Set stopping point to first tracked snapshot:
         stop = self.traced_snaps[0]
-        heritage = self.merger_tree.trace_all(start, stop + 1)
+        heritage = self.merger_tree.get_all_matches()
 
         for sid in range(stop - 1, start - 1, -1):
             # Indices of the traced subhalos in the following snapshot:
@@ -185,21 +185,17 @@ class MergerTree:
         self.storage_file = '.tracer_{}_{}.hdf5'.format(
             self.branching, self.simulation.sim_id)
 
-    def trace_all(self, snap_id_1, snap_id_2):
+    def build_tree(self, snap_id_1, snap_id_2):
         """ Find descendants and progenitors of all subhalos between
         given snapshots.
         """
 
         if self.branching == 'ForwardBranching':
-            out = self.trace_all_with_forward_branch(
-                snap_id_1, snap_id_2)
+            self.build_tree_with_forward_branch(snap_id_1, snap_id_2)
         else:
-            out = self.trace_all_with_back_branch(
-                snap_id_1, snap_id_2)
+            self.build_tree_with_back_branch(snap_id_1, snap_id_2)
 
-        return out
-
-    def trace_all_with_back_branch(self, snap_id_1, snap_id_2):
+    def build_tree_with_back_branch(self, snap_id_1, snap_id_2):
         """" Find subhalo heritage iterating forward in time.
 
         Notes
@@ -214,10 +210,6 @@ class MergerTree:
 
         # Get the first snapshot:
         snap = self.simulation.get_snapshot(snap_start)
-
-        # Initialize return value:
-        out = {snap_id: dict() for snap_id in range(snap_start,
-                                                    snap_stop)}
 
         while snap.snap_id < snap_stop - 1:
             # Get next snapshot for matching:
@@ -250,30 +242,20 @@ class MergerTree:
                 data_file_manipulation.save_dataset(
                     progenitors_next, 'Progenitors', h5_group, snap_next)
 
-            # Add matches to the output:
-            out[snap.snap_id]['Descendants'] = descendants
-            out[snap_next.snap_id]['Progenitors'] = progenitors_next
-
             snap = snap_next
 
         # Remove connections of volatile subhalos:
         if self.min_snaps_traced > 1:
             self.prune_tree()
 
-        return out
-
     # NOT VERIFIED!
-    def trace_all_with_forward_branch(self, snap_id_1, snap_id_2):
+    def build_tree_with_forward_branch(self, snap_id_1, snap_id_2):
 
         snap_start = max(snap_id_1, snap_id_2)
         snap_stop = min(snap_id_1, snap_id_2)
 
         # Get the first snapshot:
         snap = self.simulation.get_snapshot(snap_start)
-
-        # Initialize return value:
-        out = {snap_id: dict() for snap_id in range(snap_stop,
-                                                    snap_start)}
 
         while snap.snap_id != snap_stop - 1:
             # Get next snapshot for matching:
@@ -297,17 +279,11 @@ class MergerTree:
                 data_file_manipulation.save_dataset(
                     progenitors, 'Progenitors', h5_group, snap)
 
-            # Add matches to the output array:
-            out[snap_next.snap_id]['Descendants'] = descendants_next
-            out[snap.snap_id]['Progenitors'] = progenitors
-
             snap = snap_next
 
         # Remove connections of volatile subhalos:
         if self.min_snaps_traced > 1:
             self.prune_tree()
-
-        return out
 
     def get_next_snap(self, cur_snap_id):
         # Set snap_id incrementation value:
