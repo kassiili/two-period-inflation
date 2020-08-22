@@ -44,6 +44,7 @@ class Snapshot:
 
         self.sim_id = sim_id
         self.snap_id = snap_id
+        self.sim_path = sim_path
         # If not given, construct name from IDs:
         if not name:
             self.name = "{}_{:03d}".format(sim_id, snap_id)
@@ -233,7 +234,7 @@ class Snapshot:
 
         return out
 
-    def get_halo_number(self, which_gns=[]):
+    def get_subhalo_number(self, which_gns=[]):
 
         n = 0
         gns = self.get_subhalos("GroupNumber")

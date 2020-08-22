@@ -3,6 +3,7 @@ import os
 import h5py
 from astropy import units
 import re
+import glob
 
 import dataset_compute
 
@@ -27,11 +28,11 @@ def combine_data_files(files, filename):
     with h5py.File(filename, 'a') as f:
 
         # Iterate through data files and add missing links:
-        for i,filename in enumerate(files):
+        for i, filename in enumerate(files):
             # Make an external link:
             if not 'link{}'.format(i) in f:
                 f['link{}'.format(i)] = \
-                        h5py.ExternalLink(filename, '/')
+                    h5py.ExternalLink(filename, '/')
 
 
 def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
@@ -68,19 +69,52 @@ def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
     return path
 
 
+def group_dataset_exists(snapshot, dataset, group):
+    with h5py.File(snapshot.grp_file, 'r') as f:
+        if group not in f:
+            out = False
+        else:
+            out = dataset in f[group]
+    return out
+
+
+def get_snap_ids(sim_id, path_to_snapshots=""):
+    """ Read the snapshot identifiers of snapshots in a simulation. """
+
+    # Construct paths to each snapshot file:
+    path_to_sim_data = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "snapshots", sim_id)
+
+    paths_to_snaps = glob.glob(os.path.join(path_to_sim_data,
+                                            "snapshot_*"))
+
+    # Get file names without path and extension:
+    fnames = [os.path.basename(os.path.normpath(path)) for path in
+              paths_to_snaps]
+
+    # Get the snapshot identifiers (second item in the name) and sort:
+    snap_ids = np.array([int(fname.split("_")[1]) for fname in fnames])
+    snap_ids.sort()
+
+    return snap_ids
+
+
 def create_dataset(snapshot, dataset, group):
     """ An interface to the functions of this module. Uses the correct
     function to construct the dataset.
     """
 
-    out = []
+    out = np.array([])
     subgroup_list = str.split(group, '/')
+
+    # Datasets at the root of the "Extended" group:
     if len(subgroup_list) == 1:
         match_v_at_r = re.match("V([0-9]+)kpc", dataset)
         if bool(match_v_at_r):
             r = int(match_v_at_r.groups()[0])
             out = dataset_compute.compute_vcirc(snapshot,
-                                                r * units.kpc.to(units.cm))
+                                                r * units.kpc.to(
+                                                    units.cm))
 
         # DO NOT TRUST:
         elif dataset == 'MassAccum':
@@ -109,8 +143,10 @@ def create_dataset(snapshot, dataset, group):
             out = combined
 
         # Create dataset in grpf:
-        with h5py.File(snapshot.grp_file, 'r+') as grpf:
-            grpf.create_dataset('/{}/{}'.format(group, dataset), data=out)
+        if out.size != 0:
+            with h5py.File(snapshot.grp_file, 'r+') as grpf:
+                grpf.create_dataset('/{}/{}'.format(group, dataset),
+                                    data=out)
 
     elif subgroup_list[1] == 'RotationCurve':
         part_type = subgroup_list[2]
@@ -145,3 +181,15 @@ def create_dataset(snapshot, dataset, group):
                                 data=sub_offset)
 
     return out
+
+
+def save_dataset(data, dataset, group, snapshot):
+    # If the dataset already exists, replace it with the new data
+    if group_dataset_exists(snapshot, dataset, group):
+        with h5py.File(snapshot.grp_file, 'r+') as grpf:
+            grpf['/{}/{}'.format(group, dataset)][...] = data
+    # ...otherwise, create a new dataset:
+    else:
+        with h5py.File(snapshot.grp_file, 'r+') as grpf:
+            grpf.create_dataset('/{}/{}'.format(group, dataset),
+                                data=data)

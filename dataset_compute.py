@@ -10,11 +10,13 @@ def split_luminous(snap):
     mask_dark = (sm == 0)
     return mask_lum, mask_dark
 
+
 def prune_vmax(snap):
     maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
     vmax = maxpoint[:, 0]
     mask = vmax > 0
     return mask
+
 
 def split_satellites_by_distance(snap, m31_ident, mw_ident,
                                  max_dist_sat=300,
@@ -73,7 +75,7 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
         np.logical_and(mask_intersect, mask_closer_to0),
         np.logical_and(mask_intersect,
                        np.logical_not(mask_closer_to0))
-        ]
+    ]
 
     # Remove satellites closer to the other halo:
     masks_sat[0] = np.logical_and(
@@ -83,7 +85,8 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
 
     # Select isolated galaxies:
     dist_to_lg = distance_to_point(snap,
-                             compute_LG_centre(snap, m31_ident, mw_ident))
+                                   compute_LG_centre(snap, m31_ident,
+                                                     mw_ident))
     max_dist_isol = max_dist_isol * units.kpc.to(units.cm)
     mask_isol = within_distance_range(dist_to_lg, 0, max_dist_isol)
     exclude_centrals = [np.logical_not(np.logical_and(
@@ -94,6 +97,7 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
                                        sgns == 0] +
                                        exclude_centrals)
     return masks_sat, mask_isol
+
 
 def split_satellites_by_group_number(snap, *centrals):
     gns = snap.get_subhalos("GroupNumber")
@@ -114,6 +118,7 @@ def split_satellites_by_group_number(snap, *centrals):
 
     return masks_sat, mask_isol
 
+
 def within_distance_range(dist, min_r, max_r):
     """ Find subhalos within a radius of a given subhalo.
 
@@ -128,11 +133,18 @@ def within_distance_range(dist, min_r, max_r):
 
     return mask_within_radius
 
+
+def distance_to_subhalo(snap, gn, sgn):
+    cop = snap.get_subhalos("CentreOfPotential")[snap.index_of_halo(gn, sgn)]
+    return distance_to_point(snap, cop)
+
 def distance_to_point(snap, point):
     """ For all halos in a snapshot, compute distnace to a given point. """
     cops = snap.get_subhalos("CentreOfPotential")
-    dist = np.linalg.norm(periodic_wrap(snap, point, cops) - point, axis=1)
+    dist = np.linalg.norm(periodic_wrap(snap, point, cops) - point,
+                          axis=1)
     return dist
+
 
 def compute_LG_centre(snap, m31_ident, mw_ident):
     # LG centre is in the middle between M31 and MW centres:
@@ -142,6 +154,7 @@ def compute_LG_centre(snap, m31_ident, mw_ident):
     LG_centre = (m31_cop + periodic_wrap(snap, m31_cop, mw_cop)) / 2
 
     return LG_centre
+
 
 def compute_vcirc(snapshot, r):
     """ Compute subhalo circular velocities at given radius. """
@@ -167,6 +180,7 @@ def compute_vcirc(snapshot, r):
     print("Done.")
     return v_circ_at_r
 
+
 def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
     """ Compute the smoothed rotation curves of all subhalos.
 
@@ -177,13 +191,18 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
         Number of particles summed over for a single point on the
         rotation curve.
     """
+<<<<<<< HEAD
     print("Computing subhalo rotation curves for {}...".format(snapshot.sim_id))
 
     cmass, radii = compute_mass_accumulation(snapshot, part_type=part_type)
+=======
+    cmass, radii = compute_mass_accumulation(snapshot,
+                                             part_type=part_type)
+>>>>>>> build_merger_tree
 
     # Compute running average:
-    radii = [np.array(r[n_soft-1::n_soft]) for r in radii]
-    cmass = [np.array(cm[n_soft-1::n_soft]) for cm in cmass]
+    radii = [np.array(r[n_soft - 1::n_soft]) for r in radii]
+    cmass = [np.array(cm[n_soft - 1::n_soft]) for cm in cmass]
 
     myG = constants.G.to(units.cm ** 3 * units.g ** -1 * units.s **
                          -2).value
@@ -191,10 +210,12 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
 
     # Add zero:
     radii = np.array([np.concatenate((np.array([0]), r)) for r in radii])
-    v_circ = np.array([np.concatenate((np.array([0]), v)) for v in v_circ])
+    v_circ = np.array(
+        [np.concatenate((np.array([0]), v)) for v in v_circ])
 
     print("Done.")
     return v_circ, radii
+
 
 def compute_vmax(snapshot, n_soft=5):
     """ Compute subhalo maximum circular velocity. """
@@ -205,6 +226,7 @@ def compute_vmax(snapshot, n_soft=5):
     rmax = np.array([r[i] for r, i in zip(radii, max_idx)])
 
     return vmax, rmax
+
 
 # Perhaps useless?
 def mass_accumulation_to_array(snapshot):
@@ -220,6 +242,7 @@ def mass_accumulation_to_array(snapshot):
         (np.size(sublentype, axis=0), 6))
 
     return cmass, radii
+
 
 def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     """ For each subhalo, compute the mass accumulation by radius.
@@ -272,6 +295,7 @@ def compute_mass_accumulation(snapshot, part_type=[0, 1, 4, 5]):
     cum_mass = [np.cumsum(mass) for mass in mass_split]
 
     return cum_mass, grouped_radii
+
 
 def group_particles_by_subhalo(snapshot, *datasets,
                                part_type=[0, 1, 4, 5]):
@@ -389,6 +413,7 @@ def group_selected_particles_by_subhalo(snapshot, *datasets,
 
     return grouped_data
 
+
 def sort_and_split_by_subhalo(snapshot, part_gns, part_sgns,
                               add_sort=None):
     """ Find indices that would sort particles first by subhalo and
@@ -414,6 +439,7 @@ def sort_and_split_by_subhalo(snapshot, part_gns, part_sgns,
     splitting_points = np.cumsum(counts)[:-1]
 
     return sort, splitting_points
+
 
 def periodic_wrap(snapshot, cop, coords):
     """ Account for the periodic boundary conditions by moving particles 

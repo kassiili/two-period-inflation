@@ -107,8 +107,8 @@ class TestSnapshot(ut.TestCase):
         self.assertTrue(isinstance(z, float))
 
     def test_get_halo_number(self):
-        print(self.snapshot.get_halo_number([]))
-        print(self.snapshot.get_halo_number([1]))
+        print(self.snapshot.get_subhalo_number([]))
+        print(self.snapshot.get_subhalo_number([1]))
         self.assertTrue(True)
 
 if __name__ == '__main__':
