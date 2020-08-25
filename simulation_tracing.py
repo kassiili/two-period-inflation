@@ -160,6 +160,9 @@ class SnapshotTracer:
 
         self.traced_snaps[0] = min(self.traced_snaps[0], start)
 
+    def get_indices_at_snapshot(self, snap_id):
+        return self.tracer_array[:, snap_id]
+
 
 class MergerTree:
 
@@ -212,6 +215,7 @@ class MergerTree:
         snap = self.simulation.get_snapshot(snap_start)
 
         while snap.snap_id < snap_stop - 1:
+            print(snap.snap_id)
             # Get next snapshot for matching:
             snap_next = self.get_next_snap(snap.snap_id)
             if snap_next is None:
