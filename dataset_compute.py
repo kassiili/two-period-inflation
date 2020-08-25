@@ -191,14 +191,8 @@ def compute_rotation_curves(snapshot, n_soft=10, part_type=[0, 1, 4, 5]):
         Number of particles summed over for a single point on the
         rotation curve.
     """
-<<<<<<< HEAD
     print("Computing subhalo rotation curves for {}...".format(snapshot.sim_id))
-
     cmass, radii = compute_mass_accumulation(snapshot, part_type=part_type)
-=======
-    cmass, radii = compute_mass_accumulation(snapshot,
-                                             part_type=part_type)
->>>>>>> build_merger_tree
 
     # Compute running average:
     radii = [np.array(r[n_soft - 1::n_soft]) for r in radii]

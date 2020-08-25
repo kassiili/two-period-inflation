@@ -160,6 +160,9 @@ class SnapshotTracer:
 
         self.traced_snaps[0] = min(self.traced_snaps[0], start)
 
+    def get_indices_at_snapshot(self, snap_id):
+        return self.tracer_array[:, snap_id]
+
 
 class MergerTree:
 
