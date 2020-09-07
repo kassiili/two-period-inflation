@@ -115,6 +115,8 @@
    },
    "outputs": [],
    "source": [
+<<<<<<< HEAD
+=======
     "snap_id = 127\n",
     "sim_ids = [\"V1_LR_fix\", \"V1_LR_curvaton_p082_fix\"]\n",
     "names = [\"LCDM\", \"p082\"]\n",
@@ -133,6 +135,7 @@
    },
    "outputs": [],
    "source": [
+>>>>>>> e3326d5c5b2db2827c8a6a1f3b51472fa01df276
     "data = {}\n",
     "for name, sim_id, sim_path, m31_ns, mw_ns in zip(names, sim_ids, paths, m31, mw):\n",
     "    data[name] = {\"snapshot\": snapshot_obj.Snapshot(sim_id, snap_id, name=name,\n",

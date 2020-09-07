@@ -163,6 +163,8 @@ class SnapshotTracer:
     def get_indices_at_snapshot(self, snap_id):
         return self.tracer_array[:, snap_id]
 
+<<<<<<< HEAD
+=======
     def find_creation(self):
         creation_snaps = -1 * np.ones(np.size(self.tracer_array, axis=0))
         self.trace_backward(0)
@@ -193,6 +195,7 @@ class SatelliteTracer:
         for snap_id in snap_ids:
             pass
 
+>>>>>>> e3326d5c5b2db2827c8a6a1f3b51472fa01df276
 
 class MergerTree:
 

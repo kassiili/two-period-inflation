@@ -23,8 +23,8 @@ class SubhaloInstance:
         if self.idx is None:
             self.idx = self.get_index()
         if self.gn is None or self.sgn is None:
-            self.gn = self.get_halo_data('GroupNumber')
-            self.sgn = self.get_halo_data('SubGroupNumber')
+            self.gn = int(self.get_halo_data('GroupNumber'))
+            self.sgn = int(self.get_halo_data('SubGroupNumber'))
 
     def get_index(self):
 
@@ -40,6 +40,10 @@ class SubhaloInstance:
         """
 
         data = self.snap.get_subhalos(data_name)[self.idx]
+        return data
+
+    def get_fof_data(self, data_name):
+        data = self.snap.get_subhalos(data_name, 'FOF')[self.gn]
         return data
 
     def find_group_numbers(self):
@@ -153,6 +157,29 @@ class SubhaloTracer:
         # If both are given, return snapshots between the limits:
         else:
             data = np.array([shi.get_halo_data(data_name)
+                             for shi in self.tracer[snap_start:snap_stop]
+                             if shi is not None])
+
+        return data
+
+    def get_fof_data(self, data_name, snap_start=None, snap_stop=None):
+        """ Retrieves a subhalo dataset in the given snapshot.
+        """
+
+        # If neither limit is given, return all snapshots:
+        if snap_start is None and snap_stop is None:
+            data = np.array([shi.get_fof_data(data_name) for shi in
+                             self.tracer if shi is not None])
+
+        # If only one is given, return only that snapshot:
+        elif snap_start is None:
+            data = self.tracer[snap_stop].get_fof_data(data_name)
+        elif snap_stop is None:
+            data = self.tracer[snap_start].get_fof_data(data_name)
+
+        # If both are given, return snapshots between the limits:
+        else:
+            data = np.array([shi.get_fof_data(data_name)
                              for shi in self.tracer[snap_start:snap_stop]
                              if shi is not None])
 
