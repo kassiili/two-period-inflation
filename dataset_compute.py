@@ -11,11 +11,25 @@ def split_luminous(snap):
     return mask_lum, mask_dark
 
 
-def prune_vmax(snap):
+def prune_vmax(snap, low_lim=10**(-10), up_lim=10**10):
     maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
     vmax = maxpoint[:, 0]
-    mask = vmax > 0
+    low_lim = low_lim * units.km.to(units.cm)
+    up_lim = up_lim * units.km.to(units.cm)
+    mask = np.logical_and(vmax >= low_lim, vmax < up_lim)
     return mask
+
+
+def split_satellites_by_r200(snap, m31_ident, mw_ident,
+                             max_dist_isol=2000):
+    r200_m31 = snap.get_subhalos("Group_R_Mean200", "FOF")[m31_ident[0]] \
+               * units.cm.to(units.kpc)
+    r200_mw = snap.get_subhalos("Group_R_Mean200", "FOF")[mw_ident[0]] \
+              * units.cm.to(units.kpc)
+
+    return split_satellites_by_distance(snap, m31_ident, mw_ident,
+                                        max_dist_sat=[r200_m31, r200_mw],
+                                        max_dist_isol=max_dist_isol)
 
 
 def split_satellites_by_distance(snap, m31_ident, mw_ident,
@@ -54,6 +68,10 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
     satellites.
     """
 
+    # If max_dist_sat is not a list, assume it is a float (or int):
+    if not isinstance(max_dist_sat, list):
+        max_dist_sat = [max_dist_sat, max_dist_sat]
+
     centrals = [m31_ident, mw_ident]
     cops = snap.get_subhalos("CentreOfPotential")
     gns = snap.get_subhalos("GroupNumber")
@@ -64,9 +82,9 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
         snap, cops[snap.index_of_halo(c[0], c[1])])
         for c in centrals]
     min_dist = 0.01 * units.kpc.to(units.cm)
-    max_dist_sat = max_dist_sat * units.kpc.to(units.cm)
-    masks_sat = [within_distance_range(d, min_dist, max_dist_sat)
-                 for d in dist_to_centrals]
+    max_dist_sat = [d * units.kpc.to(units.cm) for d in max_dist_sat]
+    masks_sat = [within_distance_range(d, min_dist, max_dist)
+                 for d, max_dist in zip(dist_to_centrals, max_dist_sat)]
 
     # Find intersection and split by distance to centrals:
     mask_intersect = np.logical_and.reduce(masks_sat)

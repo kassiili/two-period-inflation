@@ -163,6 +163,36 @@ class SnapshotTracer:
     def get_indices_at_snapshot(self, snap_id):
         return self.tracer_array[:, snap_id]
 
+    def find_creation(self):
+        creation_snaps = -1 * np.ones(np.size(self.tracer_array, axis=0))
+        self.trace_backward(0)
+
+        for snap_id in range(self.snap_id + 1):
+            # Get subhalos that existed at snap and did not exist at an
+            # earlier snap:
+            mask_created_at_snap = np.logical_and(
+                self.tracer_array[:, snap_id] != self.no_match,
+                creation_snaps == -1
+            )
+            creation_snaps = np.where(mask_created_at_snap, snap_id,
+                                      creation_snaps)
+
+        return creation_snaps
+
+
+class SatelliteTracer:
+
+    def __init__(self, merger_tree, satellite_selector):
+        self.merger_tree = merger_tree
+        self.satellite_selector = satellite_selector
+        self.tracer_arrays = []
+
+    def trace(self):
+        heritage = self.merger_tree.get_all_matches()
+        snap_ids = list(heritage.keys()).sort()
+        for snap_id in snap_ids:
+            pass
+
 
 class MergerTree:
 
