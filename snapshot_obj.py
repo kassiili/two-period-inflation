@@ -102,7 +102,7 @@ class Snapshot:
                 out = data_file_manipulation.create_dataset(self, dataset,
                                                             group)
 
-        elif str.split(group, '/')[0] == 'Subhalo':
+        else:
             out = self.get_subhalo_catalogue(dataset, group, [], units)
 
         return out
@@ -320,16 +320,13 @@ class Snapshot:
             # out are primarily ordered by particle type:
             for pt in part_type:
 
-                pt_out = []
-                links = [f for (name, f) in partf.items() \
+                links = [f for (name, f) in partf.items()
                          if name in link_names]
+                links = [links[i] for i in link_sort]
                 for f in links:
                     if 'PartType{}/{}'.format(pt, dataset) in f.keys():
                         tmp = f['PartType{}/{}'.format(pt, dataset)][...]
-                        pt_out.append(tmp)
-
-                # Sort by link number and add to main list:
-                out += [pt_out[i] for i in link_sort]
+                        out.append(tmp)
 
         # Combine to a single array.
         if len(out[0].shape) > 1:
