@@ -25,6 +25,9 @@ class SubhaloInstance:
         if self.gn is None or self.sgn is None:
             self.gn = int(self.get_halo_data('GroupNumber'))
             self.sgn = int(self.get_halo_data('SubGroupNumber'))
+        print("Created subhalo instance: {}, {} at {}".format(self.gn,
+                                                              self.sgn,
+                                                              snap.snap_id))
 
     def get_index(self):
 
@@ -103,6 +106,7 @@ class SubhaloTracer:
             merger_tree, snap_id_ref, subh_idx_ref)[1:]
         snap_ids = list(range(snap_id_ref + 1,
                               snap_id_ref + 1 + len(desc_idx)))
+        print("Got descendant indices")
 
         # Generate SubhaloInstances of descendants:
         descendants = []
@@ -121,6 +125,7 @@ class SubhaloTracer:
             merger_tree, snap_id_ref, subh_idx_ref)[:0:-1]
         snap_ids = list(range(snap_id_ref - len(prog_idx),
                               snap_id_ref))
+        print("Got progenitor indices")
 
         # Generate SubhaloInstances of progenitors:
         progenitors = []

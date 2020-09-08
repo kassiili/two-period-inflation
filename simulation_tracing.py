@@ -245,7 +245,6 @@ class MergerTree:
         snap = self.simulation.get_snapshot(snap_start)
 
         while snap.snap_id < snap_stop - 1:
-            print(snap.snap_id)
             # Get next snapshot for matching:
             snap_next = self.get_next_snap(snap.snap_id)
             if snap_next is None:
