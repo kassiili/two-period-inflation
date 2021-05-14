@@ -79,3 +79,16 @@ class Simulation:
                       for snap_id in range(snap_start, snap_stop)])
 
         return z
+
+    def get_hubble(self, snap_start=None, snap_stop=None):
+
+        if snap_start is None:
+            snap_start = min(self.get_snap_ids())
+        if snap_stop is None:
+            snap_stop = max(self.get_snap_ids()) + 1
+
+        hubble = np.array([self.snapshots[snap_id].get_attribute("H(z)",
+                                                                 "Header")
+                          for snap_id in range(snap_start, snap_stop)])
+
+        return hubble

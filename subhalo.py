@@ -25,9 +25,9 @@ class SubhaloInstance:
         if self.gn is None or self.sgn is None:
             self.gn = int(self.get_halo_data('GroupNumber'))
             self.sgn = int(self.get_halo_data('SubGroupNumber'))
-        print("Created subhalo instance: {}, {} at {}".format(self.gn,
-                                                              self.sgn,
-                                                              snap.snap_id))
+        #print("Created subhalo instance: {}, {} at {}".format(self.gn,
+        #                                                      self.sgn,
+        #                                                      snap.snap_id))
 
     def get_index(self):
 
@@ -106,7 +106,7 @@ class SubhaloTracer:
             merger_tree, snap_id_ref, subh_idx_ref)[1:]
         snap_ids = list(range(snap_id_ref + 1,
                               snap_id_ref + 1 + len(desc_idx)))
-        print("Got descendant indices")
+        #print("Got descendant indices")
 
         # Generate SubhaloInstances of descendants:
         descendants = []
@@ -125,7 +125,7 @@ class SubhaloTracer:
             merger_tree, snap_id_ref, subh_idx_ref)[:0:-1]
         snap_ids = list(range(snap_id_ref - len(prog_idx),
                               snap_id_ref))
-        print("Got progenitor indices")
+        #print("Got progenitor indices")
 
         # Generate SubhaloInstances of progenitors:
         progenitors = []
@@ -205,7 +205,7 @@ class SubhaloTracer:
         return traced_snaps
 
     def distance_to_central(self, central_tracer, snap_start=None,
-                            snap_stop=None):
+                            snap_stop=None, centre_name=None):
         """ Compute distance to the central galaxy at the given snapshot.
         """
 
@@ -215,12 +215,14 @@ class SubhaloTracer:
             snap_start = min_snap
         if snap_stop is None or snap_stop > max_snap:
             snap_stop = max_snap + 1
+        if centre_name is None:
+            centre_name = "CentreOfPotential"
 
-        print(snap_start, snap_stop)
-        halo_cop = self.get_halo_data("CentreOfPotential", snap_start,
+        #print(snap_start, snap_stop)
+        halo_cop = self.get_halo_data(centre_name, snap_start,
                                       snap_stop)
         galactic_centre = central_tracer.get_halo_data(
-            "CentreOfPotential", snap_start, snap_stop)
+            centre_name, snap_start, snap_stop)
 
         # Wrap around centre:
         halo_cop = np.array([dataset_compute.periodic_wrap(
@@ -228,4 +230,4 @@ class SubhaloTracer:
             for sid, ctr, cop in
             zip(np.arange(snap_start, snap_stop), galactic_centre, halo_cop)])
 
-        return halo_cop - galactic_centre
+        return galactic_centre - halo_cop
