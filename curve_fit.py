@@ -8,6 +8,39 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import make_pipeline
 
 
+def median_once_more(x, y, n_points_per_bar=None, min_dx=None):
+
+    if n_points_per_bar is None:
+        n_points_per_bar = 10
+
+    if min_dx is None:
+        min_dx = 0
+
+    # Sort by x:
+    argsort = np.argsort(x)
+    x = x[argsort]
+    y = y[argsort]
+
+    split_x = []
+    prev_split = x.size-1
+    new_split = prev_split
+    while new_split > 2 * n_points_per_bar:
+        new_split -= n_points_per_bar
+        dx = abs(x[new_split] - x[prev_split])
+        if dx < min_dx:
+            continue
+
+        split_x.append(new_split)
+        prev_split = new_split
+
+    split_x = split_x[::-1]
+    median_x = np.array([np.median(xi) for xi in np.split(x, split_x)])
+    median_y = np.array([np.median(yi) for yi in np.split(y, split_x)])
+
+    return median_x, median_y
+
+
+
 def median_trend(x, y, n_points_per_bar=10):
 
     # Function will return None if it is not possible to split the
