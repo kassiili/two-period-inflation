@@ -1,7 +1,7 @@
 import numpy as np
 
-import dataset_compute
-import simulation_tracing
+import dataset_comp
+import simtrace
 from snapshot_obj import Snapshot
 
 
@@ -71,7 +71,7 @@ class SubhaloInstance:
         galactic_centre = central.get_halo_data("CentreOfPotential",
                                                 snap_id)
         halo_cop = self.get_halo_data("CentreOfPotential", snap_id)
-        halo_cop = dataset_compute.periodic_wrap(Snapshot(
+        halo_cop = dataset_comp.periodic_wrap(Snapshot(
             self.sim_id, snap_id), galactic_centre, halo_cop)
 
         return halo_cop - galactic_centre
@@ -102,7 +102,7 @@ class SubhaloTracer:
         subh_idx_ref = self.tracer[snap_id_ref].get_index()
 
         # Find indices of descendants in their respective snapshots:
-        desc_idx = simulation_tracing.find_subhalo_descendants(
+        desc_idx = simtrace.find_subhalo_descendants(
             merger_tree, snap_id_ref, subh_idx_ref)[1:]
         snap_ids = list(range(snap_id_ref + 1,
                               snap_id_ref + 1 + len(desc_idx)))
@@ -121,7 +121,7 @@ class SubhaloTracer:
         self.tracer[down:up] = descendants
 
         # Find indices of progenitors in their respective snapshots:
-        prog_idx = simulation_tracing.find_subhalo_progenitors(
+        prog_idx = simtrace.find_subhalo_progenitors(
             merger_tree, snap_id_ref, subh_idx_ref)[:0:-1]
         snap_ids = list(range(snap_id_ref - len(prog_idx),
                               snap_id_ref))
@@ -225,7 +225,7 @@ class SubhaloTracer:
             centre_name, snap_start, snap_stop)
 
         # Wrap around centre:
-        halo_cop = np.array([dataset_compute.periodic_wrap(
+        halo_cop = np.array([dataset_comp.periodic_wrap(
             self.simulation.get_snapshot(sid), ctr, cop)
             for sid, ctr, cop in
             zip(np.arange(snap_start, snap_stop), galactic_centre, halo_cop)])

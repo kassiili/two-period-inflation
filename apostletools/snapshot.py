@@ -3,7 +3,7 @@ import glob
 import numpy as np
 import h5py
 
-import data_file_manipulation
+import datafile_oper
 
 
 class Snapshot:
@@ -56,17 +56,17 @@ class Snapshot:
         self.part_file = '.particles_{}_{:03d}.hdf5'.format(sim_id,
                                                             snap_id)
 
-        path = data_file_manipulation.get_data_path(
+        path = datafile_oper.get_data_path(
             'group', sim_id, snap_id, path_to_snapshots=sim_path)
 
-        data_file_manipulation.combine_data_files(
+        datafile_oper.combine_data_files(
             np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))),
             self.grp_file)
 
-        path = data_file_manipulation.get_data_path(
+        path = datafile_oper.get_data_path(
             'part', sim_id, snap_id, path_to_snapshots=sim_path)
 
-        data_file_manipulation.combine_data_files(
+        datafile_oper.combine_data_files(
             np.array(glob.glob(os.path.join(path, 'snap*'))),
             self.part_file)
 
@@ -99,8 +99,8 @@ class Snapshot:
                     in_grpf = True
 
             if not in_grpf:
-                out = data_file_manipulation.create_dataset(self, dataset,
-                                                            group)
+                out = datafile_oper.create_dataset(self, dataset,
+                                                   group)
 
         else:
             out = self.get_subhalo_catalogue(dataset, group, [], units)

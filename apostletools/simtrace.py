@@ -1,8 +1,8 @@
 import h5py
 import numpy as np
 
-import data_file_manipulation
-import halo_matching
+import datafile_oper
+import match_halo
 
 
 def find_subhalo_descendants(merger_tree, snap_id, index_of_subhalo):
@@ -209,7 +209,7 @@ class MergerTree:
         """
         self.simulation = simulation
         if matcher is None:
-            self.matcher = halo_matching.SnapshotMatcher()
+            self.matcher = match_halo.SnapshotMatcher()
         else:
             self.matcher = matcher
         self.no_match = self.matcher.no_match
@@ -253,10 +253,10 @@ class MergerTree:
             # If matches are already saved, read them - otherwise, do the
             # matching:
             h5_group = 'Extended/Heritage/BackwardBranching'
-            desc_exists = data_file_manipulation.group_dataset_exists(
+            desc_exists = datafile_oper.group_dataset_exists(
                 snap, 'Descendants', h5_group)
             prog_next_exists = \
-                data_file_manipulation.group_dataset_exists(
+                datafile_oper.group_dataset_exists(
                     snap_next, 'Progenitors', h5_group)
 
             # Find descendants and progenitors:
@@ -269,10 +269,10 @@ class MergerTree:
                                                           h5_group)
             # Save matches to the subhalo catalogues:
             if not desc_exists:
-                data_file_manipulation.save_dataset(
+                datafile_oper.save_dataset(
                     descendants, 'Descendants', h5_group, snap)
             if not prog_next_exists:
-                data_file_manipulation.save_dataset(
+                datafile_oper.save_dataset(
                     progenitors_next, 'Progenitors', h5_group, snap_next)
 
             snap = snap_next
@@ -307,9 +307,9 @@ class MergerTree:
                 descendants_next, progenitors = \
                     self.matcher.match_snapshots(snap, snap_next)
                 # Save matches to the subhalo catalogues:
-                data_file_manipulation.save_dataset(
+                datafile_oper.save_dataset(
                     descendants_next, 'Descendants', h5_group, snap_next)
-                data_file_manipulation.save_dataset(
+                datafile_oper.save_dataset(
                     progenitors, 'Progenitors', h5_group, snap)
 
             snap = snap_next
@@ -388,7 +388,7 @@ class MergerTree:
                     match_dict[snap_id][key] = dataset[...]
 
                     # Save matches to the subhalo catalogues:
-                    data_file_manipulation.save_dataset(
+                    datafile_oper.save_dataset(
                         dataset[...], key, h5_group, snap)
 
         return match_dict

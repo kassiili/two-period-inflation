@@ -2,7 +2,7 @@ import numpy as np
 from collections.abc import Iterable
 
 from snapshot_obj import Snapshot
-import data_file_manipulation
+import datafile_oper
 
 
 class Simulation:
@@ -43,7 +43,7 @@ class Simulation:
         return data
 
     def get_snap_ids(self):
-        return data_file_manipulation.get_snap_ids(self.sim_id)
+        return datafile_oper.get_snap_ids(self.sim_id)
 
     def get_snapshots(self, snap_start, snap_stop):
         snaps = np.array([self.snapshots[snap_id] for snap_id in

@@ -5,7 +5,7 @@ from astropy import units
 import re
 import glob
 
-import dataset_compute
+import dataset_comp
 
 
 def combine_data_files(files, filename):
@@ -47,9 +47,23 @@ def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
     -------
     path : str
         path to data directory
+
+    Notes
+    -----
+    Assume directory structure:
+    /home
+      /apostletools
+        __file__
+      /snapshots
+        /snapshot_...
+          [particle data files...]
+        /groups_...
+          [subhalo data files...]
     """
 
-    home = os.path.dirname(os.path.realpath(__file__))
+    home = os.path.abspath(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
+    )
     if not path_to_snapshots:
         path = os.path.join(home, "snapshots", sim_id)
     else:
@@ -112,8 +126,8 @@ def create_dataset(snapshot, dataset, group):
         match_v_at_r = re.match("V([0-9]+)kpc", dataset)
         if bool(match_v_at_r):
             r = int(match_v_at_r.groups()[0])
-            out = dataset_compute.compute_vcirc(snapshot,
-                                                r * units.kpc.to(
+            out = dataset_comp.compute_vcirc(snapshot,
+                                             r * units.kpc.to(
                                                     units.cm))
 
         # DO NOT TRUST:
@@ -122,10 +136,10 @@ def create_dataset(snapshot, dataset, group):
             # Particles are ordered first by halo, then by particle
             # type, and lastly by distance to host halo.
 
-            ma, r = dataset_compute.compute_mass_accumulation(
+            ma, r = dataset_comp.compute_mass_accumulation(
                 snapshot, part_type=[0])
             for pt in [1, 4, 5]:
-                ma_add, r_add = dataset_compute.compute_mass_accumulation(
+                ma_add, r_add = dataset_comp.compute_mass_accumulation(
                     snapshot, part_type=[pt])
                 ma += ma_add
                 r += r_add
@@ -138,7 +152,7 @@ def create_dataset(snapshot, dataset, group):
             out = combined
 
         elif dataset == 'Max_Vcirc':
-            vmax, rmax = dataset_compute.compute_vmax(snapshot)
+            vmax, rmax = dataset_comp.compute_vmax(snapshot)
             combined = np.column_stack((vmax, rmax))
             out = combined
 
@@ -156,7 +170,7 @@ def create_dataset(snapshot, dataset, group):
         else:
             pt_list = [int(part_type[-1])]
 
-        v_circ, radii = dataset_compute.compute_rotation_curves(
+        v_circ, radii = dataset_comp.compute_rotation_curves(
             snapshot, n_soft=10, part_type=pt_list)
 
         # Save array lengths, and concatenate to single array (which is
