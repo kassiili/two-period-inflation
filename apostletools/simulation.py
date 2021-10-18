@@ -1,7 +1,7 @@
 import numpy as np
 from collections.abc import Iterable
 
-from snapshot_obj import Snapshot
+from snapshot import Snapshot
 import datafile_oper
 
 

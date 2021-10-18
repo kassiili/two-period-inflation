@@ -8,6 +8,64 @@ import glob
 import dataset_comp
 
 
+def path_to_extended(path_from_home=".ext_data_files"):
+    """ Return the path to the extended data files.
+
+    Returns
+    -------
+    ext_dir : str
+        Path to the directory that contains all extended data files.
+
+    Notes
+    -----
+    The extended data files are HDF5 files that collect links to all snapshot
+    files of a given snapshot and work as storage for dataset extensions.
+    """
+
+    home = os.path.abspath(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
+    )
+
+    ext_dir = os.path.join(home, path_from_home)
+
+    return ext_dir
+
+
+def create_common_group_file(sim_id, snap_id):
+    """ Combine all group data files of a snapshot into a single HDF5 file. """
+
+    # Set the file path and name:
+    grp_file = os.path.join(
+        path_to_extended(),
+        ".groups_{}_{:03d}.hdf5".format(sim_id, snap_id)
+    )
+
+    data_path = get_data_path('group', sim_id, snap_id)
+    files = np.array(glob.glob(os.path.join(data_path, 'eagle_subfind_tab*')))
+
+    combine_data_files(files, grp_file)
+
+    return grp_file
+
+
+def create_common_part_file(sim_id, snap_id):
+    """ Combine all particle data files of a snapshot into a single HDF5
+    file. """
+
+    # Set the file path and name:
+    part_file = os.path.join(
+        path_to_extended(),
+        ".particles_{}_{:03d}.hdf5".format(sim_id, snap_id)
+    )
+
+    data_path = get_data_path('part', sim_id, snap_id)
+    files = np.array(glob.glob(os.path.join(data_path, 'snap*')))
+
+    combine_data_files(files, part_file)
+
+    return part_file
+
+
 def combine_data_files(files, filename):
     """ Create an HDF5 file object and add links to all given files
 
@@ -35,9 +93,37 @@ def combine_data_files(files, filename):
                     h5py.ExternalLink(filename, '/')
 
 
+def get_path_to_sim(sim_id, path_to_snapshots=""):
+    """ Constructs the path to the simulation data directory.
+
+    Notes
+    -----
+    Assume directory structure (if path_to_snapshots is not given):
+    /home
+      /apostletools
+        __file__
+        [...]
+      /snapshots
+        /snapshot_...
+          [particle data files...]
+        /groups_...
+          [subhalo data files...]
+    """
+
+    if not path_to_snapshots:
+        home = os.path.abspath(
+            os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
+        )
+        path = os.path.join(home, "snapshots", sim_id)
+    else:
+        path = os.path.join(path_to_snapshots, sim_id)
+
+    return path
+
+
 def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
-    """ Constructs the path to data directory. 
-    
+    """ Constructs the path to data directory.
+
     Paramaters
     ----------
     data_category : str
@@ -47,27 +133,9 @@ def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
     -------
     path : str
         path to data directory
-
-    Notes
-    -----
-    Assume directory structure:
-    /home
-      /apostletools
-        __file__
-      /snapshots
-        /snapshot_...
-          [particle data files...]
-        /groups_...
-          [subhalo data files...]
     """
 
-    home = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
-    )
-    if not path_to_snapshots:
-        path = os.path.join(home, "snapshots", sim_id)
-    else:
-        path = os.path.join(path_to_snapshots, sim_id)
+    path_to_sim = get_path_to_sim(sim_id, path_to_snapshots=path_to_snapshots)
 
     prefix = ""
     if data_category == "part":
@@ -76,35 +144,34 @@ def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
         prefix += "groups_"
 
     # Find the snapshot directory and add to path:
-    for dir_name in os.listdir(path):
+    for dir_name in os.listdir(path_to_sim):
         if "{}{:03d}".format(prefix, snap_id) in dir_name:
-            path = os.path.join(path, dir_name)
+            path = os.path.join(path_to_sim, dir_name)
 
     return path
 
 
-def group_dataset_exists(snapshot, dataset, group):
+def group_dataset_exists(snapshot, dataset, h5_group):
     with h5py.File(snapshot.grp_file, 'r') as f:
-        if group not in f:
+        if h5_group not in f:
             out = False
         else:
-            out = dataset in f[group]
+            out = dataset in f[h5_group]
     return out
 
 
 def get_snap_ids(sim_id, path_to_snapshots=""):
-    """ Read the snapshot identifiers of snapshots in a simulation. """
+    """ Read the snapshot identifiers of snapshots in a simulation.
+    """
 
-    # Construct paths to each snapshot file:
-    path_to_sim_data = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "snapshots", sim_id)
+    path_to_sim = get_path_to_sim(sim_id, path_to_snapshots=path_to_snapshots)
 
-    paths_to_snaps = glob.glob(os.path.join(path_to_sim_data,
-                                            "snapshot_*"))
+    # Construct list of paths to each snapshot file:
+    snapshot_paths = glob.glob(os.path.join(path_to_sim, "snapshot_*"))
 
     # Get file names without path and extension:
     fnames = [os.path.basename(os.path.normpath(path)) for path in
-              paths_to_snaps]
+              snapshot_paths]
 
     # Get the snapshot identifiers (second item in the name) and sort:
     snap_ids = np.array([int(fname.split("_")[1]) for fname in fnames])

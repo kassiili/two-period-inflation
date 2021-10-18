@@ -54,14 +54,14 @@ class SnapshotMatcher:
 
         Parameters
         ----------
-        no_match : float
+        no_match : int
             Value used to indicate that no match is found.
         n_link_ref : int
-            number of most bound in reference for matching
+            Number of most bound in reference used for matching.
         f_link_exp : float
-            Fraction of most bound in explored for matching
+            Fraction of most bound in explored used for matching.
         f_mass_link : float
-            Limit for mass difference between matching halos
+            Limit for mass difference between matching halos.
         """
 
         self.f_link_exp = f_link_exp
@@ -80,7 +80,6 @@ class SnapshotMatcher:
         ----------
         snap : Snapshot object
             The snapshot, whose subhalos are being matched.
-            matched.
         snap_search : Snapshot object
             The snapshot, whose subhalos are being tried as matches for
             subhalos in snap.
@@ -144,6 +143,7 @@ class SnapshotMatcher:
                 continue
 
             # Match:
+            # ARE THE ARGUMENTS THE WRONG WAY AROUND???
             found_match = self.is_a_match(explore['IDs'][idx_search],
                                           explore['Mass'][idx_search],
                                           reference['IDs'][idx],

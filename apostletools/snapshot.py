@@ -51,24 +51,29 @@ class Snapshot:
         else:
             self.name = name
 
+        self.grp_file = datafile_oper.create_common_group_file(self.sim_id,
+                                                               self.snap_id)
+        self.part_file = datafile_oper.create_common_part_file(self.sim_id,
+                                                               self.snap_id)
+
         # Generate combined data files:
-        self.grp_file = '.groups_{}_{:03d}.hdf5'.format(sim_id, snap_id)
-        self.part_file = '.particles_{}_{:03d}.hdf5'.format(sim_id,
-                                                            snap_id)
-
-        path = datafile_oper.get_data_path(
-            'group', sim_id, snap_id, path_to_snapshots=sim_path)
-
-        datafile_oper.combine_data_files(
-            np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))),
-            self.grp_file)
-
-        path = datafile_oper.get_data_path(
-            'part', sim_id, snap_id, path_to_snapshots=sim_path)
-
-        datafile_oper.combine_data_files(
-            np.array(glob.glob(os.path.join(path, 'snap*'))),
-            self.part_file)
+        # self.grp_file = '.groups_{}_{:03d}.hdf5'.format(sim_id, snap_id)
+        # self.part_file = '.particles_{}_{:03d}.hdf5'.format(sim_id,
+        #                                                     snap_id)
+        #
+        # path = datafile_oper.get_data_path(
+        #     'group', sim_id, snap_id, path_to_snapshots=sim_path)
+        #
+        # datafile_oper.combine_data_files(
+        #     np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))),
+        #     self.grp_file)
+        #
+        # path = datafile_oper.get_data_path(
+        #     'part', sim_id, snap_id, path_to_snapshots=sim_path)
+        #
+        # datafile_oper.combine_data_files(
+        #     np.array(glob.glob(os.path.join(path, 'snap*'))),
+        #     self.part_file)
 
     def get_subhalos(self, dataset, group='Subhalo', units='cgs'):
         """ Retrieves a dataset for subhaloes in the snapshot.
@@ -107,7 +112,8 @@ class Snapshot:
 
         return out
 
-    def get_subhalo_catalogue(self, dataset, group, fnums, units):
+    def get_subhalo_catalogue(self, dataset, group, fnums=None, units='cgs',
+                              comov=False):
         """ Retrieves a dataset from the subhalo catalogues.
 
         Parameters
@@ -124,6 +130,9 @@ class Snapshot:
         out : HDF5 dataset
             Requested dataset in cgs units.
         """
+
+        if fnums is None:
+            fnums = []
 
         out = []
         link_names, link_sort = self.link_select('group', fnums)

@@ -36,7 +36,7 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
                                  max_dist_sat=300,
                                  max_dist_isol=2000):
     """ Select satellites and isolated galaxies from subhalos by their
-    distance to the M31 and MW galaxies and the LG barycentre,
+    distance to the M31 and MW galaxies and to the LG barycentre,
     respectively.
 
     Parameters
@@ -47,11 +47,11 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
     mw1_ident : tuple of two int
         Group number and subgroup number of the MW halo.
     max_dist_sat : float, optional
-        Maximum distance for satellite galaxies in units of kpc. Default
-        value is 300 kpc.
+        Maximum (physical) distance for satellite galaxies in units of kpc.
+        Default value is 300 kpc.
     max_dist_isol : float, optional
-        Maximum distance for isolated galaxies in units of kpc. Default
-        value is 2000 kpc.
+        Maximum (physical) distance for isolated galaxies in units of kpc.
+        Default value is 2000 kpc.
 
     Returns
     -------
@@ -59,13 +59,13 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
 
     Notes
     -----
-    Satellites of a central halo are defined as subhalos lying within a
-    distance (like 300kpc) from the central. In case the satellites of the
-    two given centrals intersect, they are assigned to their hosts by
-    distance. Isolated galaxies are defined as the subhalos that are not
-    bound to another halo (i.e. have subgroup number == 0), and lie within
-    a distance from the barycentre of the two centrals but are not
-    satellites.
+    Satellites of a central halo are defined as subhalos lying within the
+    distance max_dist_sat from the central. In case a satellite is within
+    this distance from multiple centrals, it is assigned as a satellite of the
+    central that is closest. Isolated galaxies are defined as the subhalos
+    that are not bound to another halo (i.e. have subgroup number == 0),
+    and lie within the distance max_dist_isol from the barycentre of the two
+    centrals but are not satellites.
     """
 
     # If max_dist_sat is not a list, assume it is a float (or int):
@@ -81,7 +81,7 @@ def split_satellites_by_distance(snap, m31_ident, mw_ident,
     dist_to_centrals = [distance_to_point(
         snap, cops[snap.index_of_halo(c[0], c[1])])
         for c in centrals]
-    min_dist = 0.01 * units.kpc.to(units.cm)
+    min_dist = 0.01 * units.kpc.to(units.cm) # Exclude the central itself
     max_dist_sat = [d * units.kpc.to(units.cm) for d in max_dist_sat]
     masks_sat = [within_distance_range(d, min_dist, max_dist)
                  for d, max_dist in zip(dist_to_centrals, max_dist_sat)]
