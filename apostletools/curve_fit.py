@@ -8,6 +8,94 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import make_pipeline
 
 
+def running_median_by_x(x, y, kernel_width, n_bins=None):
+
+    if n_bins is None:
+        n_bins = 20
+
+    bin_points = np.linspace(np.min(x), np.max(x), num=n_bins)
+
+    # Sort by x:
+    argsort = np.argsort(x)
+    x = x[argsort]
+    y = y[argsort]
+
+    def mask_range(x, min, max):
+        return np.logical_and(x >= min, x < max)
+
+    print(10**bin_points)
+
+    for p in bin_points:
+        print("at {}: \n    {}".format(
+            10**p,
+            10**x[mask_range(x, p - kernel_width / 2, p + kernel_width / 2)]
+        ))
+
+    med_x = np.array([
+        np.median(
+            x[mask_range(x, p - kernel_width / 2, p + kernel_width / 2)]
+        )
+        for p in bin_points
+    ])
+    med_y = np.array([
+        np.median(
+            y[mask_range(x, p - kernel_width / 2, p + kernel_width / 2)]
+        )
+        for p in bin_points
+    ])
+
+    print(10**med_x)
+    print(10**med_y)
+    return med_x, med_y, bin_points
+
+
+def running_median(x, y, n_kernel=None, min_dx=None):
+
+    if n_kernel is None:
+        n_kernel = 5
+    else:
+        n_kernel = 2 * int(n_kernel / 2) + 1 # convert to odd
+
+    if min_dx is None:
+        min_dx = 0
+
+    # Sort by x:
+    argsort = np.argsort(x)
+    x = x[argsort]
+    y = y[argsort]
+
+    print(n_kernel)
+
+    med_x = np.zeros(x.size - (n_kernel - 1))
+    med_y = np.zeros(x.size - (n_kernel - 1))
+    idx = int(n_kernel / 2) + 1
+    while idx < x.size - int(n_kernel / 2) - 1:
+        med_x
+
+    med_x = np.array([np.median(x[i:(i+n_kernel)])
+                                for i in range(x.size-n_kernel)])
+    med_y = np.array([np.median(y[i:(i+n_kernel)])
+                                for i in range(x.size-n_kernel)])
+
+    return med_x, med_y
+
+    # x_med = []
+    # y_med = []
+    # idx = 0
+    # bin_down = idx
+    # bin_up = idx
+    # while bin_down < x.size - 1:
+    #     bin_up = min(bin_up + n_kernel, x.size - 1)
+    #     dx = abs(x[bin_up] - x[bin_down])
+    #     if dx < min_dx and bin_up < x.size - 1:
+    #         continue
+    #
+    #     x_med.append(np.median(x[bin_down, bin_up]))
+    #     y_med.append(np.median(y[bin_down, bin_up]))
+    #     bin_down = bin_up
+
+
+
 def median_once_more(x, y, n_points_per_bar=None, min_dx=None):
 
     if n_points_per_bar is None:

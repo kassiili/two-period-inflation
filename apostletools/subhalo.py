@@ -2,7 +2,7 @@ import numpy as np
 
 import dataset_comp
 import simtrace
-from snapshot_obj import Snapshot
+from snapshot import Snapshot
 
 
 class SubhaloInstance:
@@ -46,7 +46,9 @@ class SubhaloInstance:
         return data
 
     def get_fof_data(self, data_name):
-        data = self.snap.get_subhalos(data_name, 'FOF')[self.gn]
+        # The FOF datasets are ordered by ascending group number (with index
+        # 0 having gn 1):
+        data = self.snap.get_subhalos(data_name, 'FOF')[self.gn - 1]
         return data
 
     def find_group_numbers(self):
