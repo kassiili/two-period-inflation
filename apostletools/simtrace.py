@@ -41,11 +41,27 @@ class SnapshotTracer:
     """ Traces the subhalos in a single snapshot forward and backward
     in time.
 
+    Parameters
+    ----------
+    merger_tree : MergerTree object
+        Contains the information about the subhalo relations between
+        snapshots, based on which the tracing is done.
+    no_match : int
+        Value used to indicate that no match is found.
+    snap_id : int
+        Identifier of the snapshot that is used as the starting point of the
+        tracing.
+    tracer_array : ndarray of int
+        Contains the index places of descendants and progenitors of the
+        subhalos in snapshot snap_id.
+
     Notes
     -----
     When tracing in the direction, where the merger tree allows
     branching, the family lines of the most massive relatives are
-    followed.
+    followed. Thus, a subhalo at index place j in snapshot s, with
+    s > snap_id (s < snap_id), is the descendant (progenitor) of a subhalo at
+    index place i in snapshot snap_id, if j == tracer_array[i, s].
     """
 
     def __init__(self, snap_id, merger_tree):
@@ -195,6 +211,50 @@ class SatelliteTracer:
 
 
 class MergerTree:
+    """ Encapsulates the relations between subhalos in different snapshots.
+
+    Parameters
+    ----------
+    simulation : Simulation object
+        The simulation, whose merger tree this object represents.
+    matcher : SnapshotMatcher object
+        The object used, whenever identifications between subhalos in two
+        snapshots are searched.
+    no_match : int
+        Value used to indicate that no match is found.
+    branching : str
+        Either 'BackwardBranching' or 'ForwardBranching'. In the former case,
+        subhalo mergers are identified but fragmentation ignored, and vice
+        versa, in the latter case.
+    min_snaps_traced : int
+        NOT IMPLEMENTED!
+        The minimum number of snapshots that any subhalo must be traced over
+        in order for it to be treated as non-volatile. The connections
+        between snapshots of a volatile subhalo are ignored.
+    h5_group : str
+        Name of the HDF5 group, under which the merger tree information is
+        stored in each snapshot.
+    storage_file : str
+        File name of a backup storage file of the merger tree.
+
+    Notes
+    -----
+    The merger tree is implemented by two sets of NumPy arrays (of type int):
+    two arrays called descendants and progenitors are defined for each
+    snapshot in the simulation. The descendants array is defined by the
+    following statement:
+
+    Let a subhalo at index place i in snapshot s be identified (by matcher)
+    with a subhalo at index place j in snapshot s+1. Then:
+    j == descendants[i] is True.
+
+    Similarly, for the progenitors. These arrays are stored in the HDF5 files
+    of the corresponding snapshot.
+
+    Handling volatile subhalos (with min_snaps_traced) is not crucially
+    necessary, if the minimum number of subhalo member particles is
+    sufficiently high.
+    """
 
     def __init__(self, simulation, matcher=None,
                  branching='BackwardBranching',
@@ -215,6 +275,7 @@ class MergerTree:
         self.no_match = self.matcher.no_match
         self.branching = branching
         self.min_snaps_traced = min_snaps_traced
+        self.h5_group = 'Extended/Heritage/{}'.format(self.branching)
         self.storage_file = '.tracer_{}_{}.hdf5'.format(
             self.branching, self.simulation.sim_id)
 
@@ -252,34 +313,33 @@ class MergerTree:
 
             # If matches are already saved, read them - otherwise, do the
             # matching:
-            h5_group = 'Extended/Heritage/BackwardBranching'
             desc_exists = datafile_oper.group_dataset_exists(
-                snap, 'Descendants', h5_group)
+                snap, 'Descendants', self.h5_group)
             prog_next_exists = \
                 datafile_oper.group_dataset_exists(
-                    snap_next, 'Progenitors', h5_group)
+                    snap_next, 'Progenitors', self.h5_group)
 
             # Find descendants and progenitors:
             if not desc_exists or not prog_next_exists:
                 descendants, progenitors_next = \
                     self.matcher.match_snapshots(snap, snap_next)
             else:
-                descendants = snap.get_subhalos('Descendants', h5_group)
+                descendants = snap.get_subhalos('Descendants', self.h5_group)
                 progenitors_next = snap_next.get_subhalos('Progenitors',
-                                                          h5_group)
+                                                          self.h5_group)
             # Save matches to the subhalo catalogues:
             if not desc_exists:
                 datafile_oper.save_dataset(
-                    descendants, 'Descendants', h5_group, snap)
+                    descendants, 'Descendants', self.h5_group, snap)
             if not prog_next_exists:
                 datafile_oper.save_dataset(
-                    progenitors_next, 'Progenitors', h5_group, snap_next)
+                    progenitors_next, 'Progenitors', self.h5_group, snap_next)
 
             snap = snap_next
 
         # Remove connections of volatile subhalos:
         if self.min_snaps_traced > 1:
-            self.prune_tree()
+            self.prune_tree() # NOT IMPLEMENTED
 
     # NOT VERIFIED!
     def build_tree_with_forward_branch(self, snap_id_1, snap_id_2):
@@ -298,19 +358,18 @@ class MergerTree:
 
             # If matches are already saved, read them - otherwise, do the
             # matching:
-            h5_group = 'Extended/Heritage/ForwardBranching'
-            progenitors = snap.get_subhalos('Progenitors', h5_group)
+            progenitors = snap.get_subhalos('Progenitors', self.h5_group)
             descendants_next = snap_next.get_subhalos('Descendants',
-                                                      h5_group)
+                                                      self.h5_group)
 
             if descendants_next.size == 0 or progenitors.size == 0:
                 descendants_next, progenitors = \
                     self.matcher.match_snapshots(snap, snap_next)
                 # Save matches to the subhalo catalogues:
                 datafile_oper.save_dataset(
-                    descendants_next, 'Descendants', h5_group, snap_next)
+                    descendants_next, 'Descendants', self.h5_group, snap_next)
                 datafile_oper.save_dataset(
-                    progenitors, 'Progenitors', h5_group, snap)
+                    progenitors, 'Progenitors', self.h5_group, snap)
 
             snap = snap_next
 
@@ -330,7 +389,7 @@ class MergerTree:
         return snap_next
 
     def store_tracer(self):
-        """ Save another copy of the matches into a NumPy file. """
+        """ Save another copy of the matches into a HDF5 file. """
 
         match_dict = self.get_all_matches()
 
@@ -359,9 +418,8 @@ class MergerTree:
             if snap is None:
                 continue
 
-            h5_group = 'Extended/Heritage/{}'.format(self.branching)
-            descendants = snap.get_subhalos('Descendants', h5_group)
-            progenitors = snap.get_subhalos('Progenitors', h5_group)
+            descendants = snap.get_subhalos('Descendants', self.h5_group)
+            progenitors = snap.get_subhalos('Progenitors', self.h5_group)
             if descendants.size != 0 and progenitors.size != 0:
                 match_dict[snap_id] = {'Descendants': descendants,
                                        'Progenitors': progenitors}
@@ -383,13 +441,12 @@ class MergerTree:
                 match_dict[snap_id] = {}
 
                 snap = self.simulation.get_snapshot(snap_id)
-                h5_group = 'Extended/Heritage/{}'.format(self.branching)
                 for key, dataset in matches.items():
                     match_dict[snap_id][key] = dataset[...]
 
                     # Save matches to the subhalo catalogues:
                     datafile_oper.save_dataset(
-                        dataset[...], key, h5_group, snap)
+                        dataset[...], key, self.h5_group, snap)
 
         return match_dict
 
