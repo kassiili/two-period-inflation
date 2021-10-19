@@ -8,89 +8,163 @@ import glob
 import dataset_comp
 
 
-def path_to_extended(path_from_home=".ext_data_files"):
-    """ Return the path to the extended data files.
-
-    Returns
-    -------
-    ext_dir : str
-        Path to the directory that contains all extended data files.
-
-    Notes
-    -----
-    The extended data files are HDF5 files that collect links to all snapshot
-    files of a given snapshot and work as storage for dataset extensions.
+class DataEnvelope:
     """
 
-    home = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
-    )
-
-    ext_dir = os.path.join(home, path_from_home)
-
-    return ext_dir
-
-
-def create_common_group_file(sim_id, snap_id):
-    """ Combine all group data files of a snapshot into a single HDF5 file. """
-
-    # Set the file path and name:
-    grp_file = os.path.join(
-        path_to_extended(),
-        ".groups_{}_{:03d}.hdf5".format(sim_id, snap_id)
-    )
-
-    data_path = get_data_path('group', sim_id, snap_id)
-    files = np.array(glob.glob(os.path.join(data_path, 'eagle_subfind_tab*')))
-
-    combine_data_files(files, grp_file)
-
-    return grp_file
-
-
-def create_common_part_file(sim_id, snap_id):
-    """ Combine all particle data files of a snapshot into a single HDF5
-    file. """
-
-    # Set the file path and name:
-    part_file = os.path.join(
-        path_to_extended(),
-        ".particles_{}_{:03d}.hdf5".format(sim_id, snap_id)
-    )
-
-    data_path = get_data_path('part', sim_id, snap_id)
-    files = np.array(glob.glob(os.path.join(data_path, 'snap*')))
-
-    combine_data_files(files, part_file)
-
-    return part_file
-
-
-def combine_data_files(files, filename):
-    """ Create an HDF5 file object and add links to all given files
-
-    Parameters
+    Attributes
     ----------
-    files : str
-        path to files
-    filename : str
-        name of the combined file
+    data_path : str
+        Absolute path to the source data directory.
+    fname : str
+        Absolute path to the envelope file.
+
     """
 
-    # Sort in ascending order:
-    fnum = [int(fname.split(".")[-2]) for fname in files]
-    sorting = np.argsort(fnum)
-    files = files[sorting]
+    def __init__(self, data_files, env_fname, env_path=""):
+        """
 
-    # Create the file object with links to all the files:
-    with h5py.File(filename, 'a') as f:
+        Parameters
+        ----------
+        data_files : list of str
+            Absolute paths to files that are enveloped.
+        env_fname : str
+            Envelope file name.
+        env_path : str, optional
+            Absolute path for the envelope file. Default is the
+            ".ext_data_files" directory in the project home directory.
+        """
 
-        # Iterate through data files and add missing links:
-        for i, filename in enumerate(files):
-            # Make an external link:
-            if not 'link{}'.format(i) in f:
-                f['link{}'.format(i)] = \
-                    h5py.ExternalLink(filename, '/')
+        if not env_path:
+            env_path = os.path.abspath(os.path.join(
+                os.path.dirname(os.path.realpath(__file__)),
+                "..", ".ext_data_files"
+            ))
+        else:
+            env_path = os.path.abspath(env_path)
+        self.fname = os.path.join(env_path, env_fname)
+        self.create_envelope_file(data_files)
+
+    def create_envelope_file(self, files):
+        """ Create an HDF5 file with links to files given as argument.
+
+        Parameters
+        ----------
+        files : list of str
+            Absolute paths to files that are enveloped.
+
+        Notes
+        -----
+        The argument files is assumed to be ordered and the created links are
+        in corresponding order, with their number labelling starting from 0.
+        """
+
+        # Create the file object with links to all the files:
+        with h5py.File(self.fname, 'a') as f:
+
+            # Iterate through data files and add missing links:
+            for i, filename in enumerate(files):
+                # Make an external link:
+                if not 'link{}'.format(i) in f:
+                    f['link{}'.format(i)] = \
+                        h5py.ExternalLink(filename, '/')
+
+    def save_dataset(self, dataset, ds_name, h5_group):
+        # If the dataset already exists, replace it with the new data
+        if self.dataset_exists(ds_name, h5_group):
+            with h5py.File(self.fname, 'r+') as file:
+                file['/{}/{}'.format(h5_group, ds_name)][...] = dataset
+        # ...otherwise, create a new dataset:
+        else:
+            with h5py.File(self.fname, 'r+') as file:
+                file.create_dataset('/{}/{}'.format(h5_group, ds_name),
+                                    data=dataset)
+
+    def dataset_exists(self, ds_name, h5_group):
+        with h5py.File(self.fname, 'r') as f:
+            if h5_group not in f:
+                out = False
+            else:
+                out = ds_name in f[h5_group]
+        return out
+
+
+def create_dataset_in_group_envelope(snapshot, ds_name, h5_group):
+    """ An interface to the functions of this module. Uses the correct
+    function to construct the dataset.
+    """
+
+    out = np.array([])
+    subgroup_list = str.split(h5_group, '/')
+
+    # Datasets at the root of the "Extended" group:
+    if len(subgroup_list) == 1:
+        match_v_at_r = re.match("V([0-9]+)kpc", ds_name)
+        if bool(match_v_at_r):
+            r = int(match_v_at_r.groups()[0])
+            out = dataset_comp.compute_vcirc(snapshot,
+                                             r * units.kpc.to(units.cm))
+
+        # DO NOT TRUST:
+        elif ds_name == 'MassAccum':
+            # Combine all particles from all subhalos into one long array.
+            # Particles are ordered first by halo, then by particle
+            # type, and lastly by distance to host halo.
+
+            ma, r = dataset_comp.compute_mass_accumulation(
+                snapshot, part_type=[0])
+            for pt in [1, 4, 5]:
+                ma_add, r_add = dataset_comp.compute_mass_accumulation(
+                    snapshot, part_type=[pt])
+                ma += ma_add
+                r += r_add
+
+            ma = np.concatenate(ma)
+            r = np.concatenate(r)
+
+            combined = np.column_stack((ma, r))
+
+            out = combined
+
+        elif ds_name == 'Max_Vcirc':
+            vmax, rmax = dataset_comp.compute_vmax(snapshot)
+            combined = np.column_stack((vmax, rmax))
+            out = combined
+
+        # Create dataset in the group data file:
+        if out.size != 0:
+            snapshot.group_data.save_dataset(out, ds_name, h5_group)
+
+    elif subgroup_list[1] == 'RotationCurve':
+        part_type = subgroup_list[2]
+        pt_list = []
+        if part_type == 'All':
+            pt_list = [0, 1, 4, 5]
+        else:
+            pt_list = [int(part_type[-1])]
+
+        v_circ, radii = dataset_comp.compute_rotation_curves(
+            snapshot, n_soft=10, part_type=pt_list)
+
+        # Save array lengths, and concatenate to single array (which is
+        # HDF5 compatible):
+        sub_length = np.array([r.size for r in radii])
+        sub_offset = np.concatenate((np.array([0]),
+                                     np.cumsum(sub_length)[:-1]))
+        v_circ = np.concatenate(v_circ)
+        radii = np.concatenate(radii)
+        combined = np.column_stack((v_circ, radii))
+
+        # Set return value:
+        if ds_name == 'Vcirc':
+            out = combined
+        elif ds_name == 'SubOffset':
+            out = sub_offset
+
+        # Create datasets in the group data file:
+        snapshot.group_data.save_dataset(combined, 'Vcirc', h5_group)
+        snapshot.group_data.save_dataset(sub_offset, 'SubOffset', h5_group)
+
+    return out
 
 
 def get_path_to_sim(sim_id, path_to_snapshots=""):
@@ -121,47 +195,137 @@ def get_path_to_sim(sim_id, path_to_snapshots=""):
     return path
 
 
-def get_data_path(data_category, sim_id, snap_id, path_to_snapshots=""):
-    """ Constructs the path to data directory.
+def get_group_data_path(sim_id, snap_id, sim_path=""):
+    """ Constructs the path to the group data directory.
 
-    Paramaters
+    Parameters
     ----------
-    data_category : str
-        recognized values are: 'part' and 'group'
+    sim_id
+    snap_id
+    path_to_snapshots
 
     Returns
     -------
     path : str
-        path to data directory
+
+    Notes
+    -----
+    The assumed directory naming convention is:
+    "groups_[snapshot_ID]*", where in place of [snapshot_ID] there is a
+    three digit integer.
     """
 
-    path_to_sim = get_path_to_sim(sim_id, path_to_snapshots=path_to_snapshots)
-
-    prefix = ""
-    if data_category == "part":
-        prefix = "snapshot_"
+    if not sim_path:
+        path_to_sim = get_path_to_sim(sim_id)
     else:
-        prefix += "groups_"
+        path_to_sim = sim_path
 
     # Find the snapshot directory and add to path:
     for dir_name in os.listdir(path_to_sim):
-        if "{}{:03d}".format(prefix, snap_id) in dir_name:
+        if "groups_{:03d}".format(snap_id) in dir_name:
             path = os.path.join(path_to_sim, dir_name)
 
     return path
 
 
-def group_dataset_exists(snapshot, dataset, h5_group):
-    with h5py.File(snapshot.grp_file, 'r') as f:
-        if h5_group not in f:
-            out = False
-        else:
-            out = dataset in f[h5_group]
-    return out
+def get_particle_data_path(sim_id, snap_id, sim_path=""):
+    """ Constructs the path to the particle data directory.
+
+    Parameters
+    ----------
+    sim_id
+    snap_id
+    path_to_snapshots
+
+    Returns
+    -------
+    path : str
+
+    Notes
+    -----
+    The assumed directory naming convention is:
+    "snapshot_[snapshot_ID]*", where in place of [snapshot_ID] there is a
+    three digit integer.
+    """
+
+    if not sim_path:
+        path_to_sim = get_path_to_sim(sim_id)
+    else:
+        path_to_sim = sim_path
+
+    # Find the snapshot directory and add to path:
+    for dir_name in os.listdir(path_to_sim):
+        if "snapshot_{:03d}".format(snap_id) in dir_name:
+            path = os.path.join(path_to_sim, dir_name)
+
+    return path
+
+
+def get_group_data_files(sim_id, snap_id, sim_path=""):
+    """
+
+    Parameters
+    ----------
+    sim_id
+    snap_id
+    path_to_snapshots
+
+    Returns
+    -------
+    files : ndarray of str
+        Sorted array of the subhalo catalogue data file names.
+
+    Notes
+    -----
+    Assumes the following naming convention for the data files:
+    "eagle_subfind_tab*".
+    """
+
+    # Get data file names in an array:
+    data_path = get_group_data_path(sim_id, snap_id, sim_path=sim_path)
+    files = np.array(glob.glob(os.path.join(data_path, 'eagle_subfind_tab*')))
+
+    # Sort in ascending order:
+    fnum = [int(fname.split(".")[-2]) for fname in files]
+    sorting = np.argsort(fnum)
+    files = files[sorting]
+
+    return files
+
+
+def get_particle_data_files(sim_id, snap_id, sim_path=""):
+    """
+
+    Parameters
+    ----------
+    sim_id
+    snap_id
+
+    Returns
+    -------
+    files : ndarray of str
+        Sorted array of the subhalo catalogue data file names.
+
+    Notes
+    -----
+    Assumes the following naming convention for the data files:
+    "snap*".
+    """
+
+    # Get data file names in an array:
+    data_path = get_particle_data_path(sim_id, snap_id, sim_path=sim_path)
+    files = np.array(glob.glob(os.path.join(data_path, 'snap*')))
+
+    # Sort in ascending order:
+    fnum = [int(fname.split(".")[-2]) for fname in files]
+    sorting = np.argsort(fnum)
+    files = files[sorting]
+
+    return files
 
 
 def get_snap_ids(sim_id, path_to_snapshots=""):
-    """ Read the snapshot identifiers of snapshots in a simulation.
+    """ Read the IDs of available snapshots in the simulation data.
     """
 
     path_to_sim = get_path_to_sim(sim_id, path_to_snapshots=path_to_snapshots)
@@ -179,98 +343,3 @@ def get_snap_ids(sim_id, path_to_snapshots=""):
 
     return snap_ids
 
-
-def create_dataset(snapshot, dataset, group):
-    """ An interface to the functions of this module. Uses the correct
-    function to construct the dataset.
-    """
-
-    out = np.array([])
-    subgroup_list = str.split(group, '/')
-
-    # Datasets at the root of the "Extended" group:
-    if len(subgroup_list) == 1:
-        match_v_at_r = re.match("V([0-9]+)kpc", dataset)
-        if bool(match_v_at_r):
-            r = int(match_v_at_r.groups()[0])
-            out = dataset_comp.compute_vcirc(snapshot,
-                                             r * units.kpc.to(
-                                                    units.cm))
-
-        # DO NOT TRUST:
-        elif dataset == 'MassAccum':
-            # Combine all particles from all subhalos into one long array.
-            # Particles are ordered first by halo, then by particle
-            # type, and lastly by distance to host halo.
-
-            ma, r = dataset_comp.compute_mass_accumulation(
-                snapshot, part_type=[0])
-            for pt in [1, 4, 5]:
-                ma_add, r_add = dataset_comp.compute_mass_accumulation(
-                    snapshot, part_type=[pt])
-                ma += ma_add
-                r += r_add
-
-            ma = np.concatenate(ma)
-            r = np.concatenate(r)
-
-            combined = np.column_stack((ma, r))
-
-            out = combined
-
-        elif dataset == 'Max_Vcirc':
-            vmax, rmax = dataset_comp.compute_vmax(snapshot)
-            combined = np.column_stack((vmax, rmax))
-            out = combined
-
-        # Create dataset in grpf:
-        if out.size != 0:
-            with h5py.File(snapshot.grp_file, 'r+') as grpf:
-                grpf.create_dataset('/{}/{}'.format(group, dataset),
-                                    data=out)
-
-    elif subgroup_list[1] == 'RotationCurve':
-        part_type = subgroup_list[2]
-        pt_list = []
-        if part_type == 'All':
-            pt_list = [0, 1, 4, 5]
-        else:
-            pt_list = [int(part_type[-1])]
-
-        v_circ, radii = dataset_comp.compute_rotation_curves(
-            snapshot, n_soft=10, part_type=pt_list)
-
-        # Save array lengths, and concatenate to single array (which is
-        # HDF5 compatible):
-        sub_length = np.array([r.size for r in radii])
-        sub_offset = np.concatenate((np.array([0]),
-                                     np.cumsum(sub_length)[:-1]))
-        v_circ = np.concatenate(v_circ)
-        radii = np.concatenate(radii)
-        combined = np.column_stack((v_circ, radii))
-
-        # Set return value:
-        if dataset == 'Vcirc':
-            out = combined
-        elif dataset == 'SubOffset':
-            out = sub_offset
-
-        # Create datasets in grpf:
-        with h5py.File(snapshot.grp_file, 'r+') as grpf:
-            grpf.create_dataset('/{}/Vcirc'.format(group), data=combined)
-            grpf.create_dataset('/{}/SubOffset'.format(group),
-                                data=sub_offset)
-
-    return out
-
-
-def save_dataset(data, dataset, group, snapshot):
-    # If the dataset already exists, replace it with the new data
-    if group_dataset_exists(snapshot, dataset, group):
-        with h5py.File(snapshot.grp_file, 'r+') as grpf:
-            grpf['/{}/{}'.format(group, dataset)][...] = data
-    # ...otherwise, create a new dataset:
-    else:
-        with h5py.File(snapshot.grp_file, 'r+') as grpf:
-            grpf.create_dataset('/{}/{}'.format(group, dataset),
-                                data=data)

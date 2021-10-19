@@ -18,14 +18,14 @@ class Snapshot:
         The number identifying the snapshot.
     name : str, optional
         Label of the data set.
-    grp_file : str
-        Filename of the combined group data file.
-    part_file : hdf5 file
-        Filename of the combined particle data file.
-
+    group_data : DataEnvelope object
+        Envelope for all subhalo data.
+    part_data : DataEnvelope object
+        Envelope for all particle data.
     """
 
-    def __init__(self, sim_id, snap_id, name="", sim_path=""):
+    def __init__(self, sim_id, snap_id, name="", sim_path="", grp_env="",
+                 part_env="", env_path=""):
         """
         Parameters
         ----------
@@ -40,49 +40,48 @@ class Snapshot:
             and snapID.
         sim_path : str, optional
             Path to the simulation data directory.
+        grp_env : str
+            Group data envelope file name.
+        part_env : str, optional
+            Particle data envelope file name.
+        env_path : str, optional
+            Absolute path for the envelope files.
         """
 
         self.sim_id = sim_id
         self.snap_id = snap_id
-        self.sim_path = sim_path
+
         # If not given, construct name from IDs:
         if not name:
             self.name = "{}_{:03d}".format(sim_id, snap_id)
         else:
             self.name = name
+        if not grp_env:
+            grp_env = ".groups_{}_{:03d}.hdf5".format(sim_id, snap_id)
+        if not part_env:
+            part_env = ".particles_{}_{:03d}.hdf5".format(sim_id, snap_id)
 
-        self.grp_file = datafile_oper.create_common_group_file(self.sim_id,
-                                                               self.snap_id)
-        self.part_file = datafile_oper.create_common_part_file(self.sim_id,
-                                                               self.snap_id)
+        self.group_data = datafile_oper.DataEnvelope(
+            datafile_oper.get_group_data_files(sim_id, snap_id,
+                                               sim_path=sim_path),
+            grp_env,
+            env_path
+        )
+        self.part_data = datafile_oper.DataEnvelope(
+            datafile_oper.get_particle_data_files(sim_id, snap_id,
+                                                  sim_path=sim_path),
+            part_env,
+            env_path
+        )
 
-        # Generate combined data files:
-        # self.grp_file = '.groups_{}_{:03d}.hdf5'.format(sim_id, snap_id)
-        # self.part_file = '.particles_{}_{:03d}.hdf5'.format(sim_id,
-        #                                                     snap_id)
-        #
-        # path = datafile_oper.get_data_path(
-        #     'group', sim_id, snap_id, path_to_snapshots=sim_path)
-        #
-        # datafile_oper.combine_data_files(
-        #     np.array(glob.glob(os.path.join(path, 'eagle_subfind_tab*'))),
-        #     self.grp_file)
-        #
-        # path = datafile_oper.get_data_path(
-        #     'part', sim_id, snap_id, path_to_snapshots=sim_path)
-        #
-        # datafile_oper.combine_data_files(
-        #     np.array(glob.glob(os.path.join(path, 'snap*'))),
-        #     self.part_file)
-
-    def get_subhalos(self, dataset, group='Subhalo', units='cgs'):
+    def get_subhalos(self, dataset, h5_group='Subhalo', units='cgs'):
         """ Retrieves a dataset for subhaloes in the snapshot.
 
         Parameters
         ----------
         dataset : str
             Name of dataset to be retrieved.
-        group : str, optional
+        h5_group : str, optional
             Name of the group that contains the dataset.
 
         Returns
@@ -95,20 +94,21 @@ class Snapshot:
         out = np.empty(0)
 
         # Check whether dataset is in the catalogues or an extension:
-        if str.split(group, '/')[0] == 'Extended':
+        if str.split(h5_group, '/')[0] == 'Extended':
             # Check if the dataset is already stored in grpf:
             in_grpf = False
-            with h5py.File(self.grp_file, 'r') as grpf:
-                if '{}/{}'.format(group, dataset) in grpf:
-                    out = grpf['{}/{}'.format(group, dataset)][...]
+            with h5py.File(self.group_data.fname, 'r') as grpf:
+                if '{}/{}'.format(h5_group, dataset) in grpf:
+                    out = grpf['{}/{}'.format(h5_group, dataset)][...]
                     in_grpf = True
 
             if not in_grpf:
-                out = datafile_oper.create_dataset(self, dataset,
-                                                   group)
+                out = datafile_oper.create_dataset_in_group_envelope(
+                    self, dataset, h5_group
+                )
 
         else:
-            out = self.get_subhalo_catalogue(dataset, group, [], units)
+            out = self.get_subhalo_catalogue(dataset, h5_group, [], units)
 
         return out
 
@@ -137,7 +137,7 @@ class Snapshot:
         out = []
         link_names, link_sort = self.link_select('group', fnums)
 
-        with h5py.File(self.grp_file, 'r') as grpf:
+        with h5py.File(self.group_data.fname, 'r') as grpf:
 
             links = [f for (name, f) in grpf.items()
                      if name in link_names]
@@ -159,14 +159,14 @@ class Snapshot:
 
         return out
 
-    def get_subhalos_IDs(self, part_type, fnums=None):
+    def get_subhalos_IDs(self, part_type=[0, 1, 4, 5], fnums=None):
         """ Read IDs of bound particles of given type for each halo.
         
         Paramaters
         ----------
         part_type : list of int
             Types of particles, whose attribute values are retrieved (the
-            default is set for high-res part types)
+            default is [0, 1, 4, 5], i.e. all high-res particle types)
         fnums : list of ints, optional
             Specifies files, which are to be read
 
@@ -181,12 +181,12 @@ class Snapshot:
         IDs_bound = self.get_bound_particles("ParticleID")
 
         # Construct mask for selecting bound particles of type pt:
-        IDs_pt = self.get_particles("ParticleIDs", part_type=[part_type])
+        IDs_pt = self.get_particles("ParticleIDs", part_type=part_type)
         mask_pt = np.isin(IDs_bound, IDs_pt)
 
         IDs = []
         link_names_sel, link_sort_sel = self.link_select('group', fnums)
-        with h5py.File(self.grp_file, 'r') as grpf:
+        with h5py.File(self.group_data.fname, 'r') as grpf:
             # Get IDs by halo from selected files:
             links = [f for (name, f) in grpf.items() \
                      if name in link_names_sel]
@@ -226,7 +226,7 @@ class Snapshot:
         out = []
         link_names_all, link_sort_all = self.link_select('group', [])
 
-        with h5py.File(self.grp_file, 'r') as grpf:
+        with h5py.File(self.group_data.fname, 'r') as grpf:
             # Get particle IDs from all files:
             out = []
             links = [f for (name, f) in grpf.items() \
@@ -243,16 +243,9 @@ class Snapshot:
 
         return out
 
-    def get_subhalo_number(self, which_gns=[]):
-
-        n = 0
-        gns = self.get_subhalos("GroupNumber")
-        if not which_gns:
-            n = gns.size
-        else:
-            n = np.sum(np.isin(gns, which_gns))
-
-        return n
+    def get_subhalo_number(self):
+        """ Return the number of subhalos in this snapshot. """
+        return self.get_attribute("TotNsubgroups", "Header")
 
     def get_particles(self, dataset, part_type=[0, 1, 4, 5], fnums=[]):
         """ Reads the dataset from particle catalogues.
@@ -263,7 +256,7 @@ class Snapshot:
             Dataset to be retrieved.
         part_type : list of int, optional
             Types of particles, whose attribute values are retrieved (the
-            default is set for high-res part types)
+            default is [0, 1, 4, 5], i.e. all high-res particle types)
 
         Returns
         -------
@@ -323,7 +316,7 @@ class Snapshot:
         link_names, link_sort = self.link_select('part', fnums)
 
         # Get particle file:
-        with h5py.File(self.part_file, 'r') as partf:
+        with h5py.File(self.part_data.fname, 'r') as partf:
 
             # For each particle type, loop over files, s.t. elements in
             # out are primarily ordered by particle type:
@@ -333,7 +326,7 @@ class Snapshot:
                          if name in link_names]
                 links = [links[i] for i in link_sort]
                 for f in links:
-                    if 'PartType{}/{}'.format(pt, dataset) in f.keys():
+                    if 'PartType{}/{}'.format(pt, dataset) in f:
                         tmp = f['PartType{}/{}'.format(pt, dataset)][...]
                         out.append(tmp)
 
@@ -362,7 +355,7 @@ class Snapshot:
         for pt in part_type:
             if pt in [1]:
                 # Get dm particle masses:
-                with h5py.File(self.part_file, 'r') as partf:
+                with h5py.File(self.part_data.fname, 'r') as partf:
                     dm_mass = partf['link0/Header'] \
                         .attrs.get('MassTable')[pt]
                     dm_mass = self.convert_to_cgs_part(
@@ -390,9 +383,9 @@ class Snapshot:
 
         filename = ''
         if data_category == 'group':
-            filename = self.grp_file
+            filename = self.group_data.fname
         else:
-            filename = self.part_file
+            filename = self.part_data.fname
 
         # All items in the snapshot file header are also included in the
         # group file header:
@@ -407,9 +400,9 @@ class Snapshot:
 
         filename = ''
         if data_category == 'group':
-            filename = self.grp_file
+            filename = self.group_data.fname
         else:
-            filename = self.part_file
+            filename = self.part_data.fname
 
         with h5py.File(filename, 'r') as f:
 
@@ -449,7 +442,7 @@ class Snapshot:
 
         converted = data
 
-        with h5py.File(self.grp_file, 'r') as grpf:
+        with h5py.File(self.group_data.fname, 'r') as grpf:
             # Get conversion factors.
             cgs = grpf['link0/{}/{}'.format(group, dataset)].attrs \
                 .get('CGSConversionFactor')
@@ -489,7 +482,7 @@ class Snapshot:
 
         converted = data
 
-        with h5py.File(self.part_file, 'r') as partf:
+        with h5py.File(self.part_data.fname, 'r') as partf:
             # Get conversion factors (same for all types):
             cgs = partf['link0/{}/{}'.format(group, dataset)].attrs \
                 .get('CGSConversionFactor')
@@ -528,7 +521,7 @@ class Snapshot:
 
         converted = data
 
-        with h5py.File(self.grp_file, 'r') as grpf:
+        with h5py.File(self.group_data.fname, 'r') as grpf:
             # Get conversion factors (same for all types):
             cgs = grpf['link0/IDs/{}'.format(dataset)] \
                 .attrs.get('CGSConversionFactor')
@@ -567,7 +560,7 @@ class Snapshot:
 
         fileNum = -1
 
-        with h5py.File(self.grp_file, 'r') as grpf:
+        with h5py.File(self.group_data.fname, 'r') as grpf:
 
             links = [item for item in grpf.items() \
                      if ('link' in item[0])]

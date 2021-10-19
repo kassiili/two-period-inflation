@@ -7,32 +7,42 @@ import datafile_oper
 
 class Simulation:
 
-    def __init__(self, sim_id, sim_path=None):
+    def __init__(self, sim_id, sim_path=None, env_path=""):
+        """
+
+        Parameters
+        ----------
+        sim_id
+        sim_path
+        env_path : str, optional
+            Absolute path for the snapshot data envelope files.
+        """
         self.sim_id = sim_id
         if sim_path is None:
             self.sim_path = ""
         else:
             self.sim_path = sim_path
-        self.snapshots = self.create_snapshots()
+        self.snapshots = self.create_snapshots(env_path)
         self.m31 = (-1, -1)
         self.mw = (-1, -1)
 
-    def create_snapshots(self):
+    def create_snapshots(self, env_path):
         """ Create a dictionary of snapshot objects with snapshot
         identifiers as keys. """
-        snap_ids = self.get_snap_ids()
-        snapshots = {snap_id: Snapshot(self.sim_id, snap_id,
-                                       sim_path=self.sim_path)
-                     for snap_id in snap_ids}
+        snap_ids = datafile_oper.get_snap_ids(self.sim_id)
+        snapshots = {snap_id: Snapshot(
+            self.sim_id, snap_id, sim_path=self.sim_path, env_path=env_path
+        ) for snap_id in snap_ids}
         return snapshots
 
     def set_centrals(self, m31, mw):
         self.m31 = m31
         self.mw = mw
 
-    def get_subhalos_in_snapshots(self, snap_ids, dataset, group='Subhalo'):
-        data = [self.snapshots[snap_id].get_subhalos(dataset, group)
-                for snap_id in snap_ids]
+    def get_subhalos(self, snap_ids, dset_name, h5_group='Subhalo'):
+        data = {snap_id: self.get_snapshot(snap_id).get_subhalos(dset_name,
+                                                                 h5_group)
+                for snap_id in snap_ids}
 
         return data
 
@@ -43,11 +53,12 @@ class Simulation:
         return data
 
     def get_snap_ids(self):
-        return datafile_oper.get_snap_ids(self.sim_id)
+        return list(self.snapshots.keys())
 
-    def get_snapshots(self, snap_start, snap_stop):
-        snaps = np.array([self.snapshots[snap_id] for snap_id in
-                          range(snap_start, snap_stop)])
+    def get_snapshots(self, snap_ids=None):
+        if snap_ids is None:
+            snap_ids = self.get_snap_ids()
+        snaps = np.array([self.snapshots[snap_id] for snap_id in snap_ids])
 
         return snaps
 
@@ -60,9 +71,6 @@ class Simulation:
             # the specified location for the simulation data: " + "{
             # }".format(self.sim_path))
             return None
-
-    def get_snapshots_in_array(self):
-        return self.snapshots.values()
 
     def get_snap_num(self):
         return max(self.snapshots) + 1

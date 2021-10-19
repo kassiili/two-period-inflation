@@ -12,7 +12,7 @@ def split_luminous(snap):
 
 
 def prune_vmax(snap, low_lim=10**(-10), up_lim=10**10):
-    maxpoint = snap.get_subhalos("Max_Vcirc", group="Extended")
+    maxpoint = snap.get_subhalos("Max_Vcirc", h5_group="Extended")
     vmax = maxpoint[:, 0]
     low_lim = low_lim * units.km.to(units.cm)
     up_lim = up_lim * units.km.to(units.cm)
@@ -247,7 +247,7 @@ def mass_accumulation_to_array(snapshot):
     sublentype = snapshot.get_subhalos('SubLengthType')
     splitting_points = np.cumsum(np.concatenate(sublentype))[:-1] \
         .astype(int)
-    raw_cmass = snapshot.get_subhalos('MassAccum', group='Extended')
+    raw_cmass = snapshot.get_subhalos('MassAccum', h5_group='Extended')
     cmass = raw_cmass[:, 0]
     radii = raw_cmass[:, 1]
     cmass = np.array(np.split(cmass, splitting_points)).reshape(
