@@ -4,6 +4,7 @@ Figures/
 snapshots/
 snapshots
 Dump/
+Gadgetviewer/
 Gadgetviewer/Settings
 Gadgetviewer/Images
 Gadgetviewer/Movies
@@ -16,3 +17,5 @@ Gadgetviewer/Movie_params
 
 npy_to_hdf5.py
 Failed_fates_of_satellites/
+
+

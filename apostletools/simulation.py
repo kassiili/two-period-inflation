@@ -2,6 +2,7 @@ import numpy as np
 from collections.abc import Iterable
 
 from snapshot import Snapshot
+from subhalo import Subhalo
 import datafile_oper
 
 
@@ -53,7 +54,7 @@ class Simulation:
         return data
 
     def get_snap_ids(self):
-        return list(self.snapshots.keys())
+        return np.array(list(self.snapshots.keys()))
 
     def get_snapshots(self, snap_ids=None):
         if snap_ids is None:
@@ -75,28 +76,97 @@ class Simulation:
     def get_snap_num(self):
         return max(self.snapshots) + 1
 
-    def get_redshifts(self, snap_start=None, snap_stop=None):
+    def get_attribute(self, attr_name, entry, snap_ids,
+                      data_category='subhalo'):
+        """ Reads an attribute of the given entry (either dataset or group)
+        of each snapshot.
 
-        if snap_start is None:
-            snap_start = min(self.get_snap_ids())
-        if snap_stop is None:
-            snap_stop = max(self.get_snap_ids()) + 1
+        Parameters
+        ----------
+        attr : str
+            Attribute name.
+        entry : str
+            HDF5 group or dataset name with the attribute.
+        snap_ids : sequence of int
+            Snapshot IDs of snapshot to be read.
+        data_category : str, optional
+            Specifies, in which datafile the given attribute is read from.
 
-        z = np.array([self.snapshots[snap_id].get_attribute("Redshift",
-                                                            "Header")
-                      for snap_id in range(snap_start, snap_stop)])
+        Returns
+        -------
+        out : ndarray
+            The attribute values.
+        """
 
-        return z
+        try:
+            iterator = iter(snap_ids)
+        except TypeError:
+            # If ´snap_id´ is not iterable (but, for instance, an integer):
+            snap_ids = [snap_ids]
 
-    def get_hubble(self, snap_start=None, snap_stop=None):
+        attr = np.array([
+            snap.get_attribute(attr_name, entry, data_category=data_category)
+            for snap in self.get_snapshots(snap_ids)
+        ])
 
-        if snap_start is None:
-            snap_start = min(self.get_snap_ids())
-        if snap_stop is None:
-            snap_stop = max(self.get_snap_ids()) + 1
+        return attr
 
-        hubble = np.array([self.snapshots[snap_id].get_attribute("H(z)",
-                                                                 "Header")
-                          for snap_id in range(snap_start, snap_stop)])
+    def trace_subhalos(self, snap_start, snap_stop):
+        """ Read links of all individual subhalos.
 
-        return hubble
+        Parameters
+        ----------
+        mtree
+        snap_start
+        snap_stop
+
+        Returns
+        -------
+        sub_dict : dict of ndarray of Subhalo object
+            Contains items for each snapshot, with snapshot IDs as keys, and
+            with arrays of subhalos present in a snapshot as values.
+        """
+
+        sub_dict = {}
+
+        snap_ids = np.arange(snap_start, snap_stop)
+        for sid in snap_ids:
+            snapshot = self.get_snapshot(sid)
+
+            if sid == snap_start:
+                # Create Subhalo objects of subhalos in the current snapshot and
+                # add to ´sub_dict´:
+                sub_dict[sid] = np.array([
+                    Subhalo(self, i, sid) for i in range(
+                        snapshot.get_subhalo_number())
+                ])
+                continue
+
+            progenitors = snapshot.get_subhalos(
+                'Progenitors', h5_group='Extended/Heritage/BackwardBranching'
+            )
+            no_match = snapshot.get_attribute(
+                'no_match', 'Extended/Heritage/BackwardBranching/Header'
+            )
+            sid_of_prog = sid - 1
+
+            # Iterate through subhalos in the current snapshot and add
+            # corresponding Subhalo objects to ´subhalos´:
+            subhalos = np.empty(progenitors.size, dtype=object)
+            for idx, prog_idx in enumerate(progenitors):
+
+                # If the subhalo has a progenitor, add it to the Subhalo object of
+                # the progenitor, and add to ´subhalos´ a pointer to that object:
+                if prog_idx != no_match:
+                    subhalos[idx] = sub_dict[sid_of_prog][prog_idx]
+                    sub_dict[sid_of_prog][prog_idx].add_snapshot(idx, sid)
+
+                # Otherwise, the subhalo has just formed, so we create a new
+                # Subhalo object:
+                else:
+                    subhalos[idx] = Subhalo(self, idx, sid)
+
+            sub_dict[sid] = subhalos
+
+        return sub_dict
+

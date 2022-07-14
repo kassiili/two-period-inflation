@@ -1,0 +1,58 @@
+Issues with SnapshotMatcher
+
+Matched subhalos between two snapshots satisfy:
+  1. Masses within a factor of three
+  2. Over 50 % of the n_link_ref = 15 most bound (DM) particles in sub_ref are also among the f_link_srch = 20 % of the most bound particles in sub_srch.
+
+Thus, sub_ref can only be identified with a single subhalo sub_srch. sub_srch can, however, be identified with more than one subhalo.
+
+The f_link_srch most bound particles is a small number for the very low-mass subhalos, and can actually even be lower than n_link_ref/2.
+
+What troubles me:
+
+  - Great number of unmatched satellites.
+      - Are they physical?
+          - If so, are they destroyed? 
+          - What is the SUBFIND minimum for the subhalo particle number (I guess 10-20 particles?) I suppose this is so low that close to this minimum, a subhalo near a central could easily be destroyed.
+      - Could the be volatile altogether? I.e. subhalos popping in and out of existence. 
+
+  - Great number of unmatched isolated subhalos. Maybe you could count, how many exactly?
+      - If they are isolated, then: how are these destroyed?
+
+Try changing the parameter values:
+  - Increase accepted mass range. You should see
+      - n_trials / (n_ref * n_srch) --> 1 as f_mass --> \infty
+      - mergers starting to happen
+
+
+
+Which plots do I want?
+
+The satellite accumulation plot
+
+  - Almost every time a satellite disappears this is either because it was volatile (if there are volatile subhalos) or because it has merged with the central (i.e. it disintegrates and diffuses into the background halo. What else could have happened? A merger with another halo? A: either one of the original halos is identified with the resulting halo, or somehow by a rare accident the most bound material of both is flown out of the potential well.)
+
+  - Thus, identifying mergers is not important.
+
+
+How were the centrals assembled?
+
+  - Mildly interesting, but I did not plan to write about this in the thesis...
+
+  - For this, I would need to identify mergers.
+
+
+
+What to do?
+  
+  - At each snapshot, print
+        # subhalos with no descendant
+        # "        "    no progenitor(s)
+        # "        "    neither
+
+
+Ideas for the matching conditions:
+
+  https://ui.adsabs.harvard.edu/abs/2001MNRAS.328..726S/abstract
+
+  https://users.ugent.be/~mbaes/MyPapers/McAlpine%20et%20al.%202016.pdf

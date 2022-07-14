@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 import os.path
 
-import match_halo
+import match_halo_old
 import snapshot_obj
 
 
@@ -73,8 +73,8 @@ class SimulationTracer:
         while snap.snap_id > stop:
             snap_next = snapshot_obj.Snapshot(self.sim_id,
                                               snap.snap_id - 1)
-            matches = match_halo.match_snapshots(snap, snap_next,
-                                                 no_match)
+            matches = match_halo_old.match_snapshots(snap, snap_next,
+                                                     no_match)
 
             # Get those matches that connect to redshift zero:
             for z0_idx, prev_idx in enumerate(tracer[:, snap.snap_id]):

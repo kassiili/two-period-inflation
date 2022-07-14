@@ -1,7 +1,11 @@
+from datetime import date
+
 import h5py
 import numpy as np
+from astropy import units
 
 import datafile_oper
+import dataset_comp
 import match_halo
 
 
@@ -195,19 +199,645 @@ class SnapshotTracer:
 
         return creation_snaps
 
+# def creation_times(mtree, snap_start, snap_stop):
+#     snap_ids = np.arange(snap_stop, snap_start, -1) - 1
+#     created = {}
+#
+#     for sid in snap_ids:
+#
+#         snap = mtree.simulation.snapshots[sid]
+#         created[sid] = np.full(snap.get_subhalo_number(), sid)
+#
+#         if sid == snap_start:
+#             break
+#
+#         prog = snap.get_subhalos('Progenitors', h5_group='Extended/Heritage')
+#
+#         # Masking array for subhalos that have a progenitor:
+#         mask_has_prog = prog != mtree.no_match
+#
+#         # Loop through subsequent snapshots:
+#         for snap_created in filter(
+#             lambda item: item[0] > sid, created.items()
+#         ):
+#             mask = np.logical_and(snap_created == sid, mask_has_prog)
+#             snap_created[mask] = sid
+#
+# def creation_and_destruction_times(mtree, snap_start, snap_stop):
+#     snap_ids = np.arange(snap_start, snap_stop)
+#     created = {}
+#     destroyed = {}
+#
+#     for sid in snap_ids:
+#
+#         snap = mtree.simulation.snapshots[sid]
+#         created[sid] = np.full(snap.get_subhalo_number(), sid)
+#         destroyed[sid] = np.full(snap.get_subhalo_number(), sid)
+#
+#         if sid == snap_start:
+#             continue
+#
+#         prog = snap.get_subhalos('Progenitors', h5_group='Extended/Heritage')
+#         sid_prev = sid - 1
+#
+#         # Masking array for subhalos that have a progenitor:
+#         mask_prog = prog[:,0] != mtree.no_match
+#
+#         # Get pointers of the progenitors (for subhalos with no progenitors,
+#         # insert dummy elements (of value None) to get the correct shape):
+#         pointer_of_prog = subhalo_pointers[sid_prev][
+#             np.where(mask_prog, prog[:,0], None)
+#         ]
+#
+#         # If the subhalo has no progenitor, create a new pointer, otherwise use
+#         # the pointer of the (most massive) progenitor:
+#         subhalo_pointers[sid] = np.where(
+#             mask_prog,
+#             pointer_of_prog,
+#             ["Snap{}_GN{}_SGN{}".format(sid, gn, sgn)
+#              for gn, sgn in zip(gns, sgns)]
+#         )
+#
+#         # Add indices in current snapshot to subhalos present in the previous
+#         # snapshot:
+#         for i, pointer in zip(prog[mask_prog,0], pointer_of_prog[mask_prog]):
+#             subhalos[pointer].append((sid, i))
+#
+#         # Add items for new subhalos:
+#         mask_no_prog = np.logical_not(mask_prog)
+#         subhalos.update({
+#             "Snap{}_GN{}_SGN{}".format(sid, gn, sgn) : [(sid, i)]
+#             for i, gn, sgn in zip(
+#                 np.arange(gns.size)[mask_no_prog],
+#                 gns[mask_no_prog], sgns[mask_no_prog]
+#             )
+#         })
+#
+#     # Sort snapshot index lists of each subhalo by snapshot IDs (in ascending
+#     # order in time):
+#     for sub_id, sub in subhalos.items():
+#         subhalos[sub_id] = sorted(sub, key=lambda in_snap: in_snap[0])
 
-class SatelliteTracer:
 
-    def __init__(self, merger_tree, satellite_selector):
-        self.merger_tree = merger_tree
-        self.satellite_selector = satellite_selector
-        self.tracer_arrays = []
+def creation_times(sub_dict):
 
-    def trace(self):
-        heritage = self.merger_tree.get_all_matches()
-        snap_ids = list(heritage.keys()).sort()
-        for snap_id in snap_ids:
-            pass
+    created = {}
+
+    for sid, subhalos in sub_dict.items():
+        created[sid] = np.array([
+            min(sub.get_indices()[1]) for sub in subhalos
+        ])
+
+    return created
+
+
+def destruction_times(sub_dict):
+
+    destroyed = {}
+
+    for sid, subhalos in sub_dict.items():
+        destroyed[sid] = np.array([
+            max(sub.get_indices()[1]) for sub in subhalos
+        ])
+
+    return destroyed
+
+# NOTE: satellites that fly out (stop being satellites, but are not
+# destroyed) are handled the same as satellites that get destroyed.
+# Would it be better to ignore such fly-by subhalos?
+def get_fallin_times_old(sub_dict, simulation, central, sat_func=None):
+
+    if not sat_func:
+        def sat_func(snapshot, central):
+            r200 = snapshot.get_subhalos(
+                'Group_R_TopHat200', h5_group='FOF'
+            )[central[0]] * units.cm.to(units.kpc)
+            return dataset_comp.satellites_of_halo_by_distance(
+                snapshot, central, max_dist=r200
+            )
+
+    fallin_times = {}
+
+    # Iterate through snapshots in ascending order:
+    snap_ids = list(sub_dict.keys())
+    sorting = np.argsort(snap_ids)
+    snap_ids = np.array(snap_ids)[sorting]
+    snap_subs = np.array(list(sub_dict.values()))[sorting]
+    for sid, subhalos in zip(snap_ids, snap_subs):
+
+        # Get satellite masking array:
+        snapshot = simulation.get_snapshot(sid)
+        mask_sat = sat_func(snapshot, central)
+
+        fallin_times[sid] = np.full(mask_sat.size, None)
+
+        # Set fall-in times of all satellites in the first snapshot at that
+        # snapshot:
+        if sid == min(snap_ids):
+            fallin_times[sid][mask_sat] = sid
+            mask_sat_prev = mask_sat
+            continue
+
+        # Iterate over satellites:
+        for idx, sat in zip(np.arange(mask_sat.size)[mask_sat],
+                            subhalos[mask_sat]):
+
+            # If satellite is not present in the previous snapshot,
+            # set fall-in time to ´sid´:
+            idx_prev = sat.get_index_at_snap(sid-1)
+            if not idx_prev:
+                fallin_times[sid][idx] = sid
+            else:
+                # If it had already fallen in, at the previous snapshot,
+                # copy fall-in time from previous:
+                if mask_sat_prev[idx_prev]:
+                    fallin_times[sid][idx] = fallin_times[sid-1][idx_prev]
+                else:
+                    fallin_times[sid][idx] = sid
+
+        mask_sat_prev = mask_sat
+
+    return fallin_times
+
+# NOTE: satellites that fly out (stop being satellites, but are not
+# destroyed) are handled the same as satellites that get destroyed.
+# Would it be better to ignore such fly-by subhalos?
+def get_fallin_times(simulation, central, snap_start=None, snap_stop=None,
+                     sat_func=None):
+
+    if not sat_func:
+        def sat_func(snapshot, central):
+            r200 = central.get_fof_data(
+                'Group_R_TopHat200', snapshot.snap_id
+            )[0] * units.cm.to(units.kpc)
+            return dataset_comp.satellites_of_halo_by_distance(
+                snapshot, central, max_dist=r200
+            )
+
+    if not snap_start or not snap_stop:
+        snap_ids = simulation.get_snap_ids()
+    else:
+        snap_ids = np.arange(snap_start, snap_stop)
+
+    fallin_times = {}
+
+    # Iterate through snapshots in ascending order:
+    for sid in snap_ids:
+
+        # Get satellite masking array:
+        snapshot = simulation.get_snapshot(sid)
+        mask_sat = sat_func(snapshot, central)
+        # print(snapshot.get_subhalo_number(), mask_sat.size)
+
+        fallin_times[sid] = np.full(snapshot.get_subhalo_number(), np.nan)
+
+        # Set fall-in times of all satellites in the first snapshot at that
+        # snapshot:
+        if sid == min(snap_ids):
+            # print('here', sid)
+            fallin_times[sid][mask_sat] = sid
+            mask_sat_prev = mask_sat
+            continue
+
+        prog = snapshot.get_subhalos('Progenitors',
+                                     'Extended/Heritage/BackwardBranching')
+        no_match = snapshot.get_attribute(
+            'no_match', 'Extended/Heritage/BackwardBranching/Header'
+        )
+
+        # Fill no_match values with dummy index:
+        mask_has_prog = (prog != no_match)
+        # print(sid, max(prog[mask_has_prog]), mask_sat_prev.size)
+        prog_wdummy = np.where(mask_has_prog, prog, 0)
+
+        mask_prog_is_sat = np.logical_and(
+            mask_has_prog, mask_sat_prev[prog_wdummy]
+        )
+
+        fallin_times[sid] = np.where(
+            mask_sat,
+            np.where(
+                mask_prog_is_sat,
+                fallin_times[sid - 1][prog_wdummy],
+                sid
+            ),
+            np.nan
+        )
+
+        mask_sat_prev = mask_sat
+
+    return fallin_times
+
+
+def get_fallin_times_lg(simulation, m31, mw, snap_start=None, snap_stop=None,
+                        sat_func=None, first_infall=True):
+    """ Find the fall-in times of satellites of M31 and MW in each snapshot.
+
+    Parameters
+    ----------
+    simulation : Simulation object
+    m31 : Subhalo object
+    mw : Subhalo object
+    first_infall : bool
+        If True (default), then the time a subhalo is first identified as a
+        satellite is copied as the infall time for all the following
+        snapshots, even if the subhalo flies out of the central galaxy
+        afterwards. If False, then only the latest infall time is copied for
+        only those following snapshots, at which the subhalo is a satellite.
+
+    Returns
+    -------
+    fallin_times_m31, fallin_times_mw : dict of ndarray of int
+        Key - snapshot ID, Value - array of length SubNum of that snapshot,
+        with each item indicating the fall-in snapshot ID of that subhalo,
+        if the subhalo is a satellite, otherwise the item is np.nan.
+    """
+    if first_infall:
+        return get_fallin_times_lg_first_infall(
+            simulation, m31, mw, snap_start=snap_start, snap_stop=snap_stop,
+            sat_func=sat_func
+        )
+    else:
+        return get_fallin_times_lg_last_infall(
+            simulation, m31, mw, snap_start=snap_start, snap_stop=snap_stop,
+            sat_func=sat_func
+        )
+
+def get_fallin_times_lg_last_infall(simulation, m31, mw, snap_start=None,
+                                    snap_stop=None, sat_func=None):
+    """ Find the fall-in times of satellites of M31 and MW in each snapshot.
+
+    Parameters
+    ----------
+    simulation : Simulation object
+    m31 : Subhalo object
+    mw : Subhalo object
+
+    Returns
+    -------
+    fallin_times_m31, fallin_times_mw : dict of ndarray of int
+        Key - snapshot ID, Value - array of length SubNum of that snapshot,
+        with each item indicating the fall-in snapshot ID of that subhalo,
+        if the subhalo is a satellite, otherwise the item is np.nan.
+
+    Notes
+    -----
+    The fall-in time of any given subhalo will only be written in dictionary
+    items corresponding to snapshots that are temporally after the fall-in.
+    Similarly, if a satellite flies out of the central, then no fall-in time
+    will be recorded after it is no longer seen as a satellite. If it
+    afterwards falls back in, the fall-in time that is recorded from there
+    on is the time of the second fall-in.
+    """
+
+    if not sat_func:
+        def sat_func(snapshot, halo1, halo2):
+            h1_id = halo1.get_group_number_at_snap(snapshot.snap_id)
+            h2_id = halo2.get_group_number_at_snap(snapshot.snap_id)
+            mask_sat1, mask_sat2,_ = dataset_comp.split_satellites_by_distance(
+                snapshot, h1_id, h2_id, sat_r=300, comov=True
+            )
+            return mask_sat1, mask_sat2
+
+    if not snap_start or not snap_stop:
+        snap_ids = simulation.get_snap_ids()
+    else:
+        snap_ids = np.arange(snap_start, snap_stop)
+
+    fallin_times_m31 = {}
+    fallin_times_mw = {}
+
+    # Iterate through snapshots in ascending order:
+    for sid in snap_ids:
+
+        # Get satellite masking array:
+        snapshot = simulation.get_snapshot(sid)
+        mask_m31_sat, mask_mw_sat = sat_func(snapshot, m31, mw)
+        # print(snapshot.get_subhalo_number(), mask_sat.size)
+
+        fallin_times_m31[sid] = np.full(snapshot.get_subhalo_number(), np.nan)
+        fallin_times_mw[sid] = np.full(snapshot.get_subhalo_number(), np.nan)
+
+        # Set fall-in times of all satellites in the first snapshot at that
+        # snapshot:
+        if sid == min(snap_ids):
+            # print('here', sid)
+            fallin_times_m31[sid][mask_m31_sat] = sid
+            fallin_times_mw[sid][mask_mw_sat] = sid
+            mask_m31_sat_prev = mask_m31_sat
+            mask_mw_sat_prev = mask_mw_sat
+            continue
+
+        prog = snapshot.get_subhalos('Progenitors',
+                                     'Extended/Heritage/BackwardBranching')
+        no_match = snapshot.get_attribute(
+            'no_match', 'Extended/Heritage/BackwardBranching/Header'
+        )
+
+        # Fill no_match values with dummy index:
+        mask_has_prog = (prog != no_match)
+        # print(sid, max(prog[mask_has_prog]), mask_sat_prev.size)
+        prog_wdummy = np.where(mask_has_prog, prog, 0)
+
+        mask_prog_is_m31_sat = np.logical_and(
+            mask_has_prog, mask_m31_sat_prev[prog_wdummy]
+        )
+        mask_prog_is_mw_sat = np.logical_and(
+            mask_has_prog, mask_mw_sat_prev[prog_wdummy]
+        )
+
+        fallin_times_m31[sid] = np.where(
+            mask_m31_sat,
+            np.where(
+                mask_prog_is_m31_sat,
+                fallin_times_m31[sid - 1][prog_wdummy],
+                sid
+            ),
+            np.nan
+        )
+
+        fallin_times_mw[sid] = np.where(
+            mask_mw_sat,
+            np.where(
+                mask_prog_is_mw_sat,
+                fallin_times_mw[sid - 1][prog_wdummy],
+                sid
+            ),
+            np.nan
+        )
+
+        mask_m31_sat_prev = mask_m31_sat
+        mask_mw_sat_prev = mask_mw_sat
+
+    return fallin_times_m31, fallin_times_mw
+
+
+def get_fallin_times_lg_first_infall(simulation, m31, mw, snap_start=None,
+                                     snap_stop=None, sat_func=None):
+    """ Find the fall-in times of satellites of M31 and MW in each snapshot.
+
+    Parameters
+    ----------
+    simulation : Simulation object
+    m31 : Subhalo object
+    mw : Subhalo object
+
+    Returns
+    -------
+    fallin_times_m31, fallin_times_mw : dict of ndarray of int
+        Key - snapshot ID, Value - array of length SubNum of that snapshot,
+        with each item indicating the fall-in snapshot ID of that subhalo,
+        if the subhalo is a satellite, otherwise the item is np.nan.
+    """
+
+    if not sat_func:
+        def sat_func(snapshot, halo1, halo2):
+            h1_id = halo1.get_group_number_at_snap(snapshot.snap_id)
+            h2_id = halo2.get_group_number_at_snap(snapshot.snap_id)
+            mask_sat1, mask_sat2,_ = dataset_comp.split_satellites_by_distance(
+                snapshot, h1_id, h2_id, sat_r=300, comov=True
+            )
+            return mask_sat1, mask_sat2
+
+    if not snap_start or not snap_stop:
+        snap_ids = simulation.get_snap_ids()
+    else:
+        snap_ids = np.arange(snap_start, snap_stop)
+
+    fallin_times_m31 = {}
+    fallin_times_mw = {}
+
+    # Iterate through snapshots in ascending order:
+    for sid in snap_ids:
+
+        # Get satellite masking array:
+        snapshot = simulation.get_snapshot(sid)
+        mask_m31_sat, mask_mw_sat = sat_func(snapshot, m31, mw)
+
+        # Set fall-in times of all satellites in the first snapshot at that
+        # snapshot:
+        if sid == min(snap_ids):
+            fallin_times_m31[sid] = np.where(mask_m31_sat, sid, np.nan)
+            fallin_times_mw[sid] = np.where(mask_mw_sat, sid, np.nan)
+            continue
+
+        # Selection for subhalos with progenitors:
+        prog = snapshot.get_subhalos('Progenitors',
+                                     'Extended/Heritage/BackwardBranching')
+        no_match = snapshot.get_attribute(
+            'no_match', 'Extended/Heritage/BackwardBranching/Header'
+        )
+        mask_has_prog = (prog != no_match)
+
+        # Fill no_match values with dummy index:
+        prog_wdummy = np.where(mask_has_prog, prog, 0)
+
+        # Get infall times of progenitors:
+        prog_fallin_time_m31 = np.where(
+            mask_has_prog,
+            fallin_times_m31[sid - 1][prog_wdummy],
+            np.nan
+        )
+        # Copy progenitor infall times, where listed. Add infall times for
+        # new satellites:
+        fallin_times_m31[sid] = np.where(
+            ~np.isnan(prog_fallin_time_m31),
+            prog_fallin_time_m31,
+            np.where(mask_m31_sat, sid, np.nan)
+        )
+
+        prog_fallin_time_mw = np.where(
+            mask_has_prog,
+            fallin_times_mw[sid - 1][prog_wdummy],
+            np.nan
+        )
+        fallin_times_mw[sid] = np.where(
+            ~np.isnan(prog_fallin_time_mw),
+            prog_fallin_time_mw,
+            np.where(mask_mw_sat, sid, np.nan)
+        )
+
+    return fallin_times_m31, fallin_times_mw
+
+def sf_onset_times(simulation, snap_start=None, snap_stop=None):
+    """ Find the star formation onset times for all subhalos.
+
+    Parameters
+    ----------
+    simulation : Simulation object
+
+    Returns
+    -------
+    sf_onset : dict of ndarray of int
+        Key - snapshot ID, Value - array of length SubNum of that snapshot,
+        with each item indicating the SF onset time snapshot ID of that subhalo,
+        if the subhalo has any stars, otherwise the item is np.nan.
+
+    Notes
+    -----
+    """
+
+    if not snap_start or not snap_stop:
+        snap_ids = simulation.get_snap_ids()
+    else:
+        snap_ids = np.arange(snap_start, snap_stop)
+
+    sf_onset = {}
+
+    # Iterate through snapshots in ascending order:
+    for sid in snap_ids:
+
+        # Get satellite masking array:
+        snapshot = simulation.get_snapshot(sid)
+        mask_lum, _ = dataset_comp.split_luminous(snapshot)
+
+        sf_onset[sid] = np.full(snapshot.get_subhalo_number(), np.nan)
+
+        # Set fall-in times of all satellites in the first snapshot at that
+        # snapshot:
+        if sid == min(snap_ids):
+            sf_onset[sid][mask_lum] = sid
+            mask_lum_prev = mask_lum
+            continue
+
+        prog = snapshot.get_subhalos('Progenitors',
+                                     'Extended/Heritage/BackwardBranching')
+        no_match = snapshot.get_attribute(
+            'no_match', 'Extended/Heritage/BackwardBranching/Header'
+        )
+
+        # Fill no_match values with dummy index:
+        mask_has_prog = (prog != no_match)
+        prog_wdummy = np.where(mask_has_prog, prog, 0)
+
+        mask_prog_is_lum = np.logical_and(
+            mask_has_prog, mask_lum_prev[prog_wdummy]
+        )
+
+        sf_onset[sid] = np.where(
+            mask_lum,
+            # If subhalo is luminous and has a luminous progenitor, then set its
+            # sf onset time equal to that of the progenitor:
+            np.where(
+                mask_prog_is_lum,
+                sf_onset[sid - 1][prog_wdummy],
+                sid
+            ),
+            np.nan
+        )
+
+        mask_lum_prev = mask_lum
+
+    return sf_onset
+
+
+def get_all_satellites_as_array(simulation, m31_ref, mw_ref, snap_ref,
+                                snap_start, snap_stop):
+    """ Find all subhalos that are satellites of M31 or MW between the given
+    snapshots.
+
+    Returns
+    -------
+    m31_sats, mw_sats : set
+        Sets of Subhalo objects of the satellites of both centrals.
+    """
+
+    sub_dict = trace_subhalos(simulation, snap_start, snap_stop)
+    m31 = sub_dict[snap_ref][
+        simulation.get_snapshot(snap_ref).index_of_halo(m31_ref[0], m31_ref[1])
+    ]
+    mw = sub_dict[snap_ref][
+        simulation.get_snapshot(snap_ref).index_of_halo(mw_ref[0], mw_ref[1])
+    ]
+
+    m31_sats_set = set()
+    mw_sats_set = set()
+
+    m31_sats = []
+    mw_sats = []
+    m31_idx_fallin = []
+    m31_snap_fallin = []
+    m31_vmax_fallin = []
+    mw_idx_fallin = []
+    mw_snap_fallin = []
+    mw_vmax_fallin = []
+
+    for snap_id in range(snap_start, snap_stop):
+        snap = simulation.get_snapshot(snap_id)
+        vmax = snap.get_subhalos('Max_Vcirc', 'Extended')[:,0]
+        mask_m31, mask_mw,_ = dataset_comp.split_satellites_whack(
+            snap, m31, mw, sat_r=300, comov=True
+        )
+
+        # Get new satellites in a list:
+        new_m31 = [sat for sat in sub_dict[snap_id][mask_m31]
+                   if sat not in m31_sats_set]
+        new_mw = [sat for sat in sub_dict[snap_id][mask_mw]
+                  if sat not in mw_sats_set]
+
+        m31_sats.extend(new_m31)
+        mw_sats.extend(new_mw)
+
+        # Save the fallin times and indices at fallin for the new satellites:
+        m31_new_inds = [sat.get_index_at_snap(snap_id) for sat in new_m31]
+        m31_idx_fallin.extend(m31_new_inds)
+        m31_snap_fallin.extend([snap_id] * len(new_m31))
+        m31_vmax_fallin.extend(vmax[m31_new_inds])
+
+        mw_new_inds = [sat.get_index_at_snap(snap_id) for sat in new_mw]
+        mw_idx_fallin.extend(mw_new_inds)
+        mw_snap_fallin.extend([snap_id] * len(new_mw))
+        mw_vmax_fallin.extend(vmax[mw_new_inds])
+
+        # Add the new satellites into the sets:
+        m31_sats_set.update(sub_dict[snap_id][mask_m31])
+        mw_sats_set.update(sub_dict[snap_id][mask_mw])
+
+    # Sort by vmax:
+    m31_sorting = np.argsort(-m31_vmax_fallin)
+    mw_sorting = np.argsort(-mw_vmax_fallin)
+
+    return (m31_sats[m31_sorting], m31_snap_fallin[m31_sorting]), \
+           (mw_sats[mw_sorting], mw_snap_fallin[mw_sorting])
+
+
+def get_all_satellites(simulation, m31_ref, mw_ref, snap_ref, snap_start,
+                       snap_stop):
+    """ Find all subhalos that are satellites of M31 or MW between the given
+    snapshots.
+
+    Returns
+    -------
+    m31_sats, mw_sats : set
+        Sets of Subhalo objects of the satellites of both centrals.
+    """
+
+    sub_dict = trace_subhalos(simulation, snap_start, snap_stop)
+    m31 = sub_dict[snap_ref][
+        simulation.get_snapshot(snap_ref).index_of_halo(m31_ref[0], m31_ref[1])
+    ]
+    mw = sub_dict[snap_ref][
+        simulation.get_snapshot(snap_ref).index_of_halo(mw_ref[0], mw_ref[1])
+    ]
+
+    m31_sats = set()
+    mw_sats = set()
+
+    for snap_id in range(snap_start, snap_stop):
+        snap = simulation.get_snapshot(snap_id)
+        mask_m31, mask_mw,_ = dataset_comp.split_satellites_whack(
+            snap, m31, mw, sat_r=300, comov=True
+        )
+
+        # Add the new satellites into the sets:
+        m31_sats.update(sub_dict[snap_id][mask_m31])
+        mw_sats.update(sub_dict[snap_id][mask_mw])
+
+    return m31_sats, mw_sats
+
+
+def order_satellites_by_mass_at_fallin(simulation, sats, central):
+    return None
 
 
 class MergerTree:
@@ -218,8 +848,8 @@ class MergerTree:
     simulation : Simulation object
         The simulation, whose merger tree this object represents.
     matcher : SnapshotMatcher object
-        The object used, whenever identifications between subhalos in two
-        snapshots are searched.
+        The object used, whenever links between subhalos in two snapshots
+         are searched.
     no_match : int
         Value used to indicate that no match is found.
     branching : str
@@ -269,6 +899,7 @@ class MergerTree:
         """
         self.simulation = simulation
         if matcher is None:
+            # Use the default matcher, which identifies subhalos one-to-one:
             self.matcher = match_halo.SnapshotMatcher()
         else:
             self.matcher = matcher
@@ -278,26 +909,50 @@ class MergerTree:
         self.h5_group = 'Extended/Heritage/{}'.format(self.branching)
         self.storage_file = '.tracer_{}_{}.hdf5'.format(
             self.branching, self.simulation.sim_id)
+        self.create_header()
 
-    def build_tree(self, snap_id_1, snap_id_2):
+    def create_header(self):
+        """ Create a header group, in each snapshot, for the values that define
+        the linking conditions. """
+        for snapshot in self.simulation.get_snapshots():
+            with h5py.File(snapshot.group_data.fname, 'r+') as f:
+                header = f.require_group("{}/Header".format(self.h5_group))
+                header.attrs.create("no_match", self.no_match)
+                header.attrs.create("n_matches", self.matcher.n_matches)
+                header.attrs.create("f_link_srch", self.matcher.f_link_srch)
+                header.attrs.create("f_mass_link", self.matcher.f_mass_link)
+                header.attrs.create("n_link_ref", self.matcher.n_link_ref)
+                header.attrs.create("CreationDate",
+                                    date.today().strftime("%d/%m/%Y"))
+
+    def build_tree(self, snap_id_1, snap_id_2, overwrite=False):
         """ Find descendants and progenitors of all subhalos between
         given snapshots.
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, then existing merger tree data is overwritten, otherwise
+            just read.
         """
 
         if self.branching == 'ForwardBranching':
-            self.build_tree_with_forward_branch(snap_id_1, snap_id_2)
+            self.build_tree_with_forward_branch(snap_id_1, snap_id_2,
+                                                overwrite)
         else:
-            self.build_tree_with_back_branch(snap_id_1, snap_id_2)
+            self.build_tree_with_back_branch(snap_id_1, snap_id_2, overwrite)
 
-    def build_tree_with_back_branch(self, snap_id_1, snap_id_2):
-        """" Find subhalo heritage iterating forward in time.
+    def build_tree_with_back_branch(self, snap_id_1, snap_id_2, overwrite):
+        """ Find subhalo heritage iterating forward in time.
 
         Notes
         -----
         In this case, when two subsequent snapshots are compared,
         the subhalos in the earlier snapshot will only be matched with
         a single subhalo in the next snapshot, so that branching only
-        happens 'backward' in time. """
+        happens 'backward' in time. However, if ´self.matcher.n_matches'==1,
+        then subhalos are linked one-to-one.
+        """
 
         snap_start = min(snap_id_1, snap_id_2)
         snap_stop = max(snap_id_1, snap_id_2)
@@ -311,29 +966,29 @@ class MergerTree:
             if snap_next is None:
                 break
 
-            # If matches are already saved, read them - otherwise, do the
-            # matching:
-            desc_exists = datafile_oper.group_dataset_exists(
-                snap, 'Descendants', self.h5_group)
-            prog_next_exists = \
-                datafile_oper.group_dataset_exists(
-                    snap_next, 'Progenitors', self.h5_group)
+            snap_desc_exists = snap.group_data.dataset_exists('Descendants',
+                                                              self.h5_group)
+            snap_next_prog_exists = \
+                snap_next.group_data.dataset_exists('Progenitors',
+                                                    self.h5_group)
 
-            # Find descendants and progenitors:
-            if not desc_exists or not prog_next_exists:
-                descendants, progenitors_next = \
+            # If asked to overwrite, or one of the datasets is missing,
+            # do the matching, and save:
+            if overwrite or not snap_desc_exists or not snap_next_prog_exists:
+                str_unf = "Matching snapshot {} with snapshot {} " + \
+                         "(in simulation {})"
+                print(str_unf.format(snap.snap_id, snap_next.snap_id,
+                                     self.simulation.sim_id))
+                snap_desc, snap_next_prog = \
                     self.matcher.match_snapshots(snap, snap_next)
-            else:
-                descendants = snap.get_subhalos('Descendants', self.h5_group)
-                progenitors_next = snap_next.get_subhalos('Progenitors',
-                                                          self.h5_group)
-            # Save matches to the subhalo catalogues:
-            if not desc_exists:
-                datafile_oper.save_dataset(
-                    descendants, 'Descendants', self.h5_group, snap)
-            if not prog_next_exists:
-                datafile_oper.save_dataset(
-                    progenitors_next, 'Progenitors', self.h5_group, snap_next)
+
+                # Save matches to the subhalo catalogues:
+                snap.group_data.save_dataset(
+                    snap_desc, 'Descendants', self.h5_group
+                )
+                snap_next.group_data.save_dataset(
+                    snap_next_prog, 'Progenitors', self.h5_group
+                )
 
             snap = snap_next
 
@@ -342,7 +997,7 @@ class MergerTree:
             self.prune_tree() # NOT IMPLEMENTED
 
     # NOT VERIFIED!
-    def build_tree_with_forward_branch(self, snap_id_1, snap_id_2):
+    def build_tree_with_forward_branch(self, snap_id_1, snap_id_2, overwrite):
 
         snap_start = max(snap_id_1, snap_id_2)
         snap_stop = min(snap_id_1, snap_id_2)

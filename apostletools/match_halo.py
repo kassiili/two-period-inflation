@@ -1,55 +1,10 @@
 import numpy as np
-import math
-import heapq
-
-
-def identify_group_numbers(gns1, gns2):
-    """ Identifies the indices, where (gn,sgn) pairs align, between
-    datasets 1 and 2.
-
-    Parameters
-    ----------
-    gns1 : ndarray of int
-        Group numbers of first dataset.
-    gns2 : ndarray of int
-        Group numbers of second dataset.
-
-    Returns
-    -------
-    idx_of1_in2 : list of int
-        Elements satisfy: GNs1[idx] == GNs2[idx_of1_in2[idx]] (unless
-        GNs1[idx] not in GNs2)
-
-    Notes
-    -----
-    If a certain pair in 1 does not exist in 2, it is identified with the
-    halo with the same gn, for which sgn is the largest. """
-
-    gns1 = gns1.astype(int)
-    gns2 = gns2.astype(int)
-    gn_cnt1 = np.bincount(gns1)
-    gn_cnt2 = np.bincount(gns2)
-
-    idx_of1_in2 = [None] * gns1.size
-    for gn in gns1:
-        for sgn in range(gn_cnt1[gn]):
-            idx1 = np.sum(gn_cnt1[:gn]) + sgn
-            # If halo with gn and sgn exists dataset 2, then identify
-            # those halos. If not, set indices equal:
-            if gn < gn_cnt2.size:
-                if sgn < gn_cnt2[gn]:
-                    idx2 = np.sum(gn_cnt2[:gn]) + sgn
-            else:
-                idx2 = min(gns2.size - 1, idx1)
-            idx_of1_in2[idx1] = idx2
-
-    return idx_of1_in2
 
 
 class SnapshotMatcher:
 
-    def __init__(self, no_match=2 ** 32, n_link_ref=15,
-                 f_link_exp=1 / 5, f_mass_link=3):
+    def __init__(self, no_match=2 ** 32, n_link_ref=20,
+                 f_link_srch=1 / 5, f_mass_link=3, n_matches=1):
         """
 
         Parameters
@@ -58,34 +13,32 @@ class SnapshotMatcher:
             Value used to indicate that no match is found.
         n_link_ref : int
             Number of most bound in reference used for matching.
-        f_link_exp : float
+        f_link_srch : float
             Fraction of most bound in explored used for matching.
         f_mass_link : float
             Limit for mass difference between matching halos.
-        """
-
-        self.f_link_exp = f_link_exp
-        self.f_mass_link = f_mass_link
-        self.n_link_ref = n_link_ref
-        self.no_match = no_match
-        self.snap = None
-        self.snap_search = None
-        self.subhalo_num_search = -1
-
-    def match_snapshots(self, snap, snap_search, max_num_matched=3):
-        """ Try matching all subhalos in snap with subhalos in
-        snap_search.
-
-        Parameters
-        ----------
-        snap : Snapshot object
-            The snapshot, whose subhalos are being matched.
-        snap_search : Snapshot object
-            The snapshot, whose subhalos are being tried as matches for
-            subhalos in snap.
-        max_num_matched : int, optional
+        n_matches : int, optional
             Maximum number of subhalos in self.snap, with which a single
             subhalo in snap_search can be matched.
+        """
+
+        self.no_match = no_match
+        self.n_link_ref = n_link_ref
+        self.f_link_srch = f_link_srch
+        self.f_mass_link = f_mass_link
+        self.n_matches = n_matches
+
+    def match_snapshots(self, snap_ref, snap_srch):
+        """ Try matching all subhalos in snap_ref with subhalos in
+        snap_search.
+
+        Attributes
+        ----------
+        snap_ref : Snapshot object
+            The snapshot, whose subhalos are being matched.
+        snap_srch : Snapshot object
+            The snapshot, whose subhalos are being tried as matches for
+            subhalos in snap_ref.
 
         Returns
         -------
@@ -94,157 +47,191 @@ class SnapshotMatcher:
 
         Notes
         -----
-        A subhalo in snap is only matched with one subhalo in
-        snap_search, but the same is not true of subhalos in snap_search.
+        A subhalo in snap_ref is only matched with one subhalo in
+        snap_srch, but the same is not true of subhalos in snap_srch.
         I.e. the identification from ref to exp can be described as  a
         function that is not necessarily injective. This feature is
         logically inherited from the is_a_match method.
         """
 
-        self.snap = snap
-        self.snap_search = snap_search
-        self.subhalo_num_search = self.snap_search.get_subhalo_number()
-        reference, explore = self.get_data_for_matching()
+        if self.n_matches == 1:
+            return self.match_injective(snap_ref, snap_srch)
+        else:
+            return self.match_non_injective(snap_ref, snap_srch)
 
-        # Initialize matches (ADD TO THE DICTIONARIES IN THE METHOD
-        # ABOVE):
-        matches = self.no_match * np.ones(reference['GNs'].size,
-                                          dtype=int)
-        matches_search = self.no_match * np.ones(
-            (explore['GNs'].size, max_num_matched), dtype=int)
+    # NOT TESTED:
+    def match_injective(self, snap_ref, snap_srch):
+        """ Match injectively subhalos in snap_ref with subhalos in snap_search.
 
-        # This is defined just make the code run a bit faster
-        init_idents = identify_group_numbers(reference['GNs'],
-                                             explore['GNs'])
-
-        # Initialize priority queue:
-        pq = []
-        for idx, idx_search in enumerate(init_idents):
-            heapq.heappush(pq, (0, (idx, idx_search)))
-
-        trials = 0
-        n_matched = 0
-        while len(pq) > 0:
-            trials += 1
-
-            # Get next one for matching:
-            next_item = heapq.heappop(pq)
-            step = next_item[0]
-            idx = next_item[1][0]  # Index of subhalo in snap
-            idx_search_ref = next_item[1][1]  # Index of the
-            # iteration reference point in snap_search
-
-            # Get index of the halo to be tried next. step tells how far
-            # to iterate from initial index:
-            idx_search = self.get_index_at_step(idx_search_ref, step)
-
-            # If all subhalos have been tried already:
-            if idx_search == idx_search_ref and step > 0:
-                continue
-
-            # Match:
-            # ARE THE ARGUMENTS THE WRONG WAY AROUND???
-            found_match = self.is_a_match(explore['IDs'][idx_search],
-                                          explore['Mass'][idx_search],
-                                          reference['IDs'][idx],
-                                          reference['Mass'][idx])
-
-            if found_match:
-                n_matched += 1
-                matches[idx] = idx_search
-                matches_search[idx_search] = self.add_to_matches(
-                    matches_search[idx_search], idx, reference['Mass'])
-            else:
-                heapq.heappush(pq, (step + 1, (idx, idx_search_ref)))
-
-        print("{} -> {}: {} trials, {} matches".format(snap.snap_id,
-                                                       snap_search.snap_id,
-                                                       trials, n_matched))
-        return matches, matches_search
-
-    def get_data_for_matching(self):
-        """ Retrieve datasets for matching for the given set of group numbers.
-
-        Returns
-        -------
-        (reference,explore) : tuple of dict
-            Matching data for both snapshots in dictionaries.
-        """
-
-        reference = {'GNs': self.snap.get_subhalos('GroupNumber'),
-                     'SGNs': self.snap.get_subhalos('SubGroupNumber'),
-                     'IDs': self.snap.get_subhalos_IDs(part_type=1),
-                     'Mass': self.snap.get_subhalos('MassType')[:, 1]}
-
-        explore = {'GNs': self.snap_search.get_subhalos('GroupNumber'),
-                   'SGNs': self.snap_search.get_subhalos(
-                       'SubGroupNumber'),
-                   'IDs': self.snap_search.get_subhalos_IDs(part_type=1),
-                   'Mass': self.snap_search.get_subhalos('MassType')[:,
-                           1]}
-
-        return reference, explore
-
-    def add_to_matches(self, matches, new_match, masses):
-        """ Try to insert the new match into the array of existing
-        matches. """
-
-        if matches[1] < self.no_match:
-            print(matches)
-
-        # Try insertion, and move the rest of the matches accordingly,
-        # if the insertion is successful:
-        insertion = new_match
-        for i, idx in enumerate(matches):
-            if idx == self.no_match:
-                matches[i] = insertion
-                break
-
-            if masses[idx] < masses[insertion]:
-                matches[i] = insertion
-                insertion = idx
-
-        return matches
-
-    def get_index_at_step(self, idx_ref, step):
-        """ Get the index of the next subhalo after step iterations from
-        idx_ref.
-
-        Parameters
+        Attributes
         ----------
-        idx_ref : int
-            Starting point of iterations.
-        step : int
-            Number of iterations completed.
+        snap_ref : Snapshot object
+            The snapshot, whose subhalos are being matched.
+        snap_srch : Snapshot object
+            The snapshot, whose subhalos are being tried as matches for
+            subhalos in snap_ref.
 
         Returns
         -------
-        idx : int
-            Index of next subhalo after step iterations from idx_ref.
+        matches_ref, matches_srch : ndarray of int
+            Array of indices of matched subhalos in snap_search (snap_ref).
         """
 
-        # Get the upper limit for the value of the index:
-        lim = self.subhalo_num_search
+        mass_ref = snap_ref.get_subhalos('MassType')[:, 1]
+        ids_ref = snap_ref.get_subhalos_IDs(part_type=[1])
+        mass_srch = snap_srch.get_subhalos('MassType')[:, 1]
+        ids_srch = snap_srch.get_subhalos_IDs(part_type=[1])
 
-        # Iterate outwards from idx_ref, alternating between lower and
-        # higher indices:
-        idx = idx_ref + int(math.copysign(
-            math.floor((step + 1) / 2), (step % 2) - 0.5))
+        matches_ref = self.no_match * np.ones(mass_ref.size, dtype=int)
+        matches_srch = self.no_match * np.ones(mass_srch.size, dtype=int)
+        mask_unmatched_srch = np.full(mass_srch.size, True)
 
-        # Check that index is not negative:
-        if abs(idx_ref - idx) > idx_ref:
-            idx = step
-        # Check that index is not out of array bounds:
-        elif abs(idx_ref - idx) > lim - 1 - idx_ref:
-            idx = lim - step
+        # Iterate over subhalos in ref, in descending order by mass, s.t. if
+        # two subhalos could be linked with the same subhalo in snap_srch,
+        # only the more massive one is linked:
+        sorting_ref = np.argsort(-mass_ref)
+        for sub_idx_ref in sorting_ref:
+            # Select match candidates from snap_search:
+            mask_mass_range = self.select_by_mass(
+                mass_ref[sub_idx_ref], mass_srch
+            )
 
-        # If all values of array are consumed:
-        if idx < 0 or idx >= lim:
-            idx = idx_ref
+            # Look for matches among unmatched, in the given mass range:
+            searched_subs = np.arange(mass_srch.size)[
+                np.logical_and(mask_unmatched_srch, mask_mass_range)
+            ]
+            for sub_idx_srch in searched_subs:
+                # Match:
+                found_match = self.is_a_match(ids_ref[sub_idx_ref],
+                                              mass_ref[sub_idx_ref],
+                                              ids_srch[sub_idx_srch],
+                                              mass_srch[sub_idx_srch])
 
-        return idx
+                if found_match:
+                    matches_ref[sub_idx_ref] = sub_idx_srch
+                    matches_srch[sub_idx_srch] = sub_idx_ref
+                    mask_unmatched_srch[sub_idx_srch] = False
+                    break
 
-    def is_a_match(self, ids_ref, mass_ref, ids_exp, mass_exp):
+        return matches_ref, matches_srch
+
+    # # MADE THIS BY MISTAKE: the order, in which subhalos in snap_srch are
+    # # iterated over, does not influence the linking output, by virtue of how
+    # # ´is_a_match´ is implemented (there can only be one matching subhalo in
+    # # snap_srch for each subhalo in snap_ref). That order does matter for the
+    # # time complexity, however: most matches have similar GNs, and thus,
+    # # by default the arrays are in a befitting order (and re-ordering by mass
+    # # only slows things down)
+    # def match_injective_reordered(self, snap_ref, snap_srch):
+    #     """ Match injectively subhalos in snap_ref with subhalos in snap_search.
+    #
+    #     Attributes
+    #     ----------
+    #     snap_ref : Snapshot object
+    #         The snapshot, whose subhalos are being matched.
+    #     snap_srch : Snapshot object
+    #         The snapshot, whose subhalos are being tried as matches for
+    #         subhalos in snap_ref.
+    #
+    #     Returns
+    #     -------
+    #     matches_ref, matches_srch : ndarray of int
+    #         Array of indices of matched subhalos in snap_search (snap_ref).
+    #
+    #     Notes
+    #     -----
+    #     A subhalo in snap_ref is only matched with one subhalo in
+    #     snap_srch, but the same is not true of subhalos in snap_srch.
+    #     I.e. the identification from ref to exp can be described as  a
+    #     function that is not necessarily injective. This feature is
+    #     logically inherited from the is_a_match method.
+    #     """
+    #
+    #     mass_ref = snap_ref.get_subhalos('MassType')[:, 1]
+    #     ids_ref = snap_ref.get_subhalos_IDs(part_type=[1])
+    #     mass_srch = snap_srch.get_subhalos('MassType')[:, 1]
+    #     ids_srch = snap_srch.get_subhalos_IDs(part_type=[1])
+    #
+    #     matches_ref = self.no_match * np.ones(mass_ref.size, dtype=int)
+    #     matches_srch = self.no_match * np.ones(mass_srch.size, dtype=int)
+    #     mask_unmatched_srch = np.full(mass_srch.size, True)
+    #
+    #     sorting_ref = np.argsort(-mass_ref)
+    #     sorting_srch = np.argsort(-mass_srch)
+    #
+    #     # This array tells you, in a mass-sorted array, at which index place
+    #     # each subhalo would appear:
+    #     mass_ranking_srch = np.argsort(sorting_srch)
+    #
+    #     # Iterate over subhalos in ref, in descending order by mass:
+    #     for sub_idx_ref in sorting_ref:
+    #         # Select match candidates from snap_search:
+    #         mask_mass_range = self.select_by_mass(
+    #             mass_ref[sub_idx_ref], mass_srch
+    #         )
+    #
+    #         # Look for matches among unmatched, in the given mass range:
+    #         rank_of_searched = mass_ranking_srch[
+    #             np.logical_and(mask_unmatched_srch, mask_mass_range)
+    #         ]
+    #
+    #         # Iterate over the selected subhalos in srch, in descending order
+    #         # by mass:
+    #         searched_subs = sorting_srch[rank_of_searched]
+    #         for sub_idx_srch in searched_subs:
+    #             # Match:
+    #             found_match = self.is_a_match(ids_ref[sub_idx_ref],
+    #                                           mass_ref[sub_idx_ref],
+    #                                           ids_srch[sub_idx_srch],
+    #                                           mass_srch[sub_idx_srch])
+    #
+    #             if found_match:
+    #                 matches_ref[sub_idx_ref] = sub_idx_srch
+    #                 matches_srch[sub_idx_srch] = sub_idx_ref
+    #                 mask_unmatched_srch[sub_idx_srch] = False
+    #                 break
+    #
+    #     return matches_ref, matches_srch
+
+    def match_non_injective(self, snap_ref, snap_srch):
+
+        mass_ref = snap_ref.get_subhalos('MassType')[:, 1]
+        ids_ref = snap_ref.get_subhalos_IDs(part_type=[1])
+        mass_srch = snap_srch.get_subhalos('MassType')[:, 1]
+        ids_srch = snap_srch.get_subhalos_IDs(part_type=[1])
+
+        # IDEA: Sort subhalos in snap_search by mass to speed up matching?
+        # mass_argsort_srch = np.argsort(search['Mass'])
+        # mass_sort_srch = search['Mass'][mass_argsort_srch]
+
+        matches_ref = self.no_match * np.ones(mass_ref.size, dtype=int)
+
+        # Iterate over subhalos in ref:
+        for sub_idx_ref in range(mass_ref.size):
+            # Select match candidates from snap_search:
+            mask_mass_range = self.select_by_mass(
+                mass_ref[sub_idx_ref], mass_srch
+            )
+
+            # Look for matches in the given mass range:
+            searched_subs = np.arange(mass_srch.size)[mask_mass_range]
+            for sub_idx_srch in searched_subs:
+                # Match:
+                found_match = self.is_a_match(ids_ref[sub_idx_ref],
+                                              mass_ref[sub_idx_ref],
+                                              ids_srch[sub_idx_srch],
+                                              mass_srch[sub_idx_srch])
+
+                if found_match:
+                    matches_ref[sub_idx_ref] = sub_idx_srch
+                    break
+
+        # Invert matches_ref into an array of matches for subhalos in search:
+        matches_srch = self.invert_matches(matches_ref, mass_ref, mass_srch)
+
+        return matches_ref, matches_srch
+
+    def is_a_match(self, ids_ref, mass_ref, ids_srch, mass_srch):
         """ Check if two halos with given IDs and masses correspond to the same
         halo.
 
@@ -255,10 +242,10 @@ class SnapshotMatcher:
             energy (most bound first).
         mass_ref : float
             Mass of (particles of) first halo.
-        ids_exp : ndarray of int
+        ids_srch : ndarray of int
             Particle IDs of the explored halo in ascending order by binding
             energy (most bound first).
-        mass_exp : float
+        mass_srch : float
             Mass of (particles of) second halo.
 
         Returns
@@ -268,9 +255,17 @@ class SnapshotMatcher:
 
         Notes
         -----
+        Subhalos S_ref and S_srch are linked, if
+            1. their total DM masses are within the fraction ´f_mass_link´
+            from each other, and
+            2. more than half of the ´n_link_ref´ most bound DM particles of
+            S_ref are among the max(n_srch * ´f_link_srch´, ´n_link_ref´) most
+            bound DM particles of S_srch (where n_srch is the DM particle
+            number of S_srch).
+
         The reference subhalo can only be matched with one subhalo in the
-        explored dataset. Explicitly, this is because of the following: if at
-        least half of the n_link most bound particles in the reference subhalo
+        explored dataset. Explicitly, this is because of the following: if more
+        than half of the n_link most bound particles in the reference subhalo
         are found in a given halo S, then there can be no other subhalo
         satisfying the same condition (no duplicates of any ID in dataset).
         """
@@ -278,113 +273,66 @@ class SnapshotMatcher:
         found_match = False
 
         # Ignore pure gas halos:
-        if mass_ref > 0 and mass_exp > 0:
+        if mass_ref > 0 and mass_srch > 0:
 
             # Check masses:
-            if (mass_ref / mass_exp < self.f_mass_link) and \
-                    (mass_ref / mass_exp > 1 / self.f_mass_link):
+            if (mass_ref / mass_srch < self.f_mass_link) and \
+                    (mass_ref / mass_srch > 1 / self.f_mass_link):
 
                 # Get most bound particles:
                 most_bound_ref = ids_ref[:self.n_link_ref]
-                most_bound_exp = ids_exp[:int(ids_exp.size \
-                                              * self.f_link_exp)]
+                most_bound_srch = ids_srch[:max(
+                    int(ids_srch.size * self.f_link_srch),
+                    self.n_link_ref
+                )]
 
                 # Check intersection:
                 shared_parts = np.intersect1d(most_bound_ref,
-                                              most_bound_exp,
+                                              most_bound_srch,
                                               assume_unique=True)
                 if len(shared_parts) > self.n_link_ref / 2:
                     found_match = True
 
         return found_match
 
-# def find_match(subhalo, snap_id, snap_search):
-#    """ Attempts to match a given subhalo with another subhalo in a given
-#    snapshot.
-#
-#    Parameters
-#    ----------
-#    subhalo : Subhalo object
-#        Matched subhalo.
-#    snap_id : int
-#        ID of the snapshot, at which the match is searched.
-#    snap_search : Snapshot object
-#        Explored snapshot.
-#
-#    Returns
-#    -------
-#    match : tuple
-#        (gn,sgn) of matching halo in snap. match==(-1,-1) if no match is
-#        found.
-#    """
-#
-#    ids = subhalo.get_ids(snap_id)
-#    mass = subhalo.get_halo_data('MassType', snap_id)[1]
-#    gn, sgn = subhalo.tracer.get(snap_id)
-#
-#    # Set maximum number of iterations:
-#    term = 10000
-#
-#    # Read subhalos with group numbers and subgroup numbers near gn and
-#    # sgn:
-#    fnums = neighborhood(snap_search, gn, sgn, term / 2)
-#    gns = snap_search.get_subhalos('GroupNumber', fnums=fnums)
-#    sgns = snap_search.get_subhalos('SubGroupNumber', fnums=fnums)
-#    ids_in_file = snap_search.get_subhalos_IDs(part_type=1, fnums=fnums)
-#    mass_in_file = snap_search.get_subhalos('MassType', fnums=fnums)[:, 1]
-#
-#    # Get index of halo with same sgn and gn as ref:
-#    idx0 = np.argwhere(np.logical_and((gns == gn), (sgns == sgn)))[0, 0]
-#    #    print('find match for:', gns[idx0], sgns[idx0], ' in ',
-#    #          snap_search.snap_id)
-#
-#    # Initial value of match is returned if no match is found:
-#    match = (-1, -1)
-#
-#    idx = idx0
-#    for step in range(1, term):
-#        ids_exp = ids_in_file[idx]
-#        mass_exp = mass_in_file[idx]
-#        found_match = is_a_match(ids, mass, ids_exp, mass_exp)
-#
-#        if found_match:
-#            match = (gns[idx], sgns[idx])
-#            break
-#
-#        idx = get_index_at_step(idx0, step, gns.size)
-#        if idx == idx0:
-#            break
-#
-#    return match
-#
-#
-# def neighborhood(snap, gn, sgn, min_halos):
-#    """ Gets file numbers of files that contain a minimum amount of
-#    halos above and below a certain halo. """
-#
-#    fnum = snap.file_of_halo(gn, sgn)
-#    GNs = snap.get_subhalos('GroupNumber', fnums=[fnum])
-#    SGNs = snap.get_subhalos('SubGroupNumber', fnums=[fnum])
-#    idx = np.argwhere(np.logical_and((GNs == gn), (SGNs == sgn)))[0, 0]
-#
-#    fnums = [fnum]
-#    halos_below = idx
-#    for n in range(fnum - 1, -1, -1):
-#        if halos_below < min_halos:
-#            fnums.append(n)
-#            halos_below += snap.get_subhalos('GroupNumber', fnums=[n]).size
-#        else:
-#            break
-#
-#    with h5py.File(snap.grp_file, 'r') as grpf:
-#        n_files = grpf['link1/FOF'].attrs.get('NTask')
-#
-#    halos_above = GNs.size - 1 - idx
-#    for n in range(fnum + 1, n_files):
-#        if halos_above < min_halos:
-#            fnums.append(n)
-#            halos_above += snap.get_subhalos('GroupNumber', fnums=[n]).size
-#        else:
-#            break
-#
-#    return fnums
+    def select_by_mass(self, mass_ref, mass_array):
+        """ Select elements from array that are within a given factor from
+        the reference mass. """
+
+        mask = np.logical_and(
+            mass_array > mass_ref / self.f_mass_link, # massive enough
+            mass_array < mass_ref * self.f_mass_link # not too massive
+        )
+
+        return mask
+
+    def invert_matches(self, matches_ref, mass_ref, mass_srch):
+
+        # Initialize match array for subhalos in search:
+        matches_srch = self.no_match * np.ones(
+            (mass_srch.size, self.n_matches), dtype=int)
+
+        # Iterate through matches:
+        for sub_idx_ref, sub_idx_srch in enumerate(matches_ref):
+            if sub_idx_srch == self.no_match:
+                continue
+
+            # Iterate through matches of subhalo in ref (at index place
+            # sub_idx_ref):
+            for i, match_srch in enumerate(matches_srch[sub_idx_srch]):
+
+                # No match yet listed:
+                if match_srch == self.no_match:
+                    matches_srch[sub_idx_srch, i] = sub_idx_ref
+                    break
+
+                # A match listed, but less massive:
+                elif mass_ref[sub_idx_ref] > mass_ref[match_srch]:
+                    print('here')
+                    # Insert the new match in place:
+                    matches_srch[sub_idx_srch] = np.insert(
+                        matches_srch[sub_idx_srch], i, sub_idx_ref
+                    )[:self.n_matches]
+                    break
+
+        return matches_srch

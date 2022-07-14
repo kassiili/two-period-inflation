@@ -4,8 +4,10 @@ import h5py
 from collections import Counter
 import matplotlib.pyplot as plt
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from snapshot_obj import Snapshot
+apt_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'apostletools'))
+sys.path.append(apt_path)
+
+from snapshot import Snapshot
 from curve_fit import poly_fit
 
 def test_get_data_path(dataset):
@@ -350,7 +352,7 @@ def test_peculiar_files():
 def test_get_subhalos_IDs_new(snap):
     snap.get_subhalos_IDs(part_type=0)
 
-LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
+LCDM = Snapshot("V1_LR_fix",127,"LCDM")
 #LCDM_x = Snapshot("CDM_V1_LR", 101, "LCDM")
 #test_get_data_path(LCDM_x)
 #test_count_files(LCDM)
@@ -374,12 +376,13 @@ LCDM = Snapshot("CDM_V1_LR",127,"LCDM")
 #test_get_subhalos_IDs(LCDM)
 #test_get_subhalos_IDs_ptSelection(LCDM)
 #test_get_subhalos_IDs_pt(LCDM)
+test_get_subhalos_IDs_type(LCDM)
 #test_get_all_bound_IDs(LCDM)
 #test_IDs_dist(LCDM)
 #test_link_select(LCDM)
 #test_get_subhalos_order(LCDM)
 #test_peculiar_files()
-test_get_subhalos_IDs_new(LCDM)
+#test_get_subhalos_IDs_new(LCDM)
 
 #sgns = LCDM.get_subhalos('SubGroupNumber',False)[0]
 #print(sgns.size)
